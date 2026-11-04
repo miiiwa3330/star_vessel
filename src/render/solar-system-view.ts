@@ -78,7 +78,22 @@ export class SolarSystemView {
     const d: Drawn = { mesh: null as unknown as THREE.Mesh, info, uniforms, glow: null, owned, removed: false };
 
     let material: THREE.Material;
-    if (info.glow) {
+    if (info.kind === 'satellite') {
+      // 人工衛星：箱の本体と、左右の太陽電池の板（見た目のための簡単な模型）
+      const s = info.radiusKm * 2;
+      const bodyGeo = new THREE.BoxGeometry(s * 0.25, s * 0.25, s * 0.4);
+      const panelGeo = new THREE.BoxGeometry(s * 0.35, s * 0.02, s * 0.25);
+      const bodyMat = new THREE.MeshStandardNodeMaterial({ color: 0xd8d4c8, roughness: 0.5, metalness: 0.6 });
+      const panelMat = new THREE.MeshStandardNodeMaterial({ color: 0x1c2a5a, roughness: 0.3, metalness: 0.4, side: THREE.DoubleSide });
+      owned.push(bodyGeo, panelGeo, bodyMat, panelMat);
+      d.mesh = new THREE.Mesh(bodyGeo, bodyMat);
+      for (const x of [-1, 1]) {
+        const panel = new THREE.Mesh(panelGeo, panelMat);
+        panel.position.set(x * s * 0.32, 0, 0);
+        d.mesh.add(panel);
+      }
+      material = bodyMat;
+    } else if (info.glow) {
       material = createStarMaterial(info.glow);
       d.glow = createStarGlow(info.glow);
       d.glow.scale.setScalar(info.radiusKm * STAR_GLOW_RADII * 2);

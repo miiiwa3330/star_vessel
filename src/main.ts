@@ -31,6 +31,8 @@ import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBo
 import { decodeExoplanets } from './world/exoplanet-data';
 import { largeAsteroidBodies, moonBodies, smallAsteroidBody, type LargeAsteroid, type MoonRecord } from './world/small-bodies';
 import { findAsteroidByNumber, findNearbyAsteroids } from './world/asteroid-search';
+import { SatelliteCatalog, type SatelliteRecord } from './world/satellites';
+import { SatelliteField } from './render/satellite-field';
 import { StarSystems } from './world/star-systems';
 import { starBodyId } from './world/planets';
 import { createExtraStarfield } from './render/starfield';
@@ -115,11 +117,29 @@ async function main() {
   // 系外惑星（要件 F22）。いる恒星系の恒星と惑星を、天体の一覧に入れ替えて登録する
   const realSystems = decodeExoplanets(exoplanetsJson);
   const systems = new StarSystems(stars.data, realSystems);
-  // 一覧に無い天体：遠くの恒星系の天体、または光の点として描いている小さな小惑星（A＋番号）
+  // 人工衛星（ISS など）。サーバーが最新の軌道要素を取ってくる。取れなければ同梱の写し（古くなる）を使う
+  const satRecords = await fetch('/api/satellites')
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .catch(() => fetch('/data/satellites.json').then((r) => r.json()))
+    .then((d: { satellites: SatelliteRecord[] }) => d.satellites)
+    .catch((e: unknown) => {
+      console.error('人工衛星のデータが読めない', e);
+      return [] as SatelliteRecord[];
+    });
+  const satellites = new SatelliteCatalog(satRecords);
+  satellites.update(worldNow(), true);
+  const satelliteField = new SatelliteField(satellites);
+
+  // 一覧に無い天体：遠くの恒星系の天体、光の点として描いている小さな小惑星（A＋番号）や人工衛星（N＋番号）
   const smallAsteroidCache = new Map<string, BodyInfo | null>();
   setBodyResolver((id) => {
     const exo = systems.findBody(id);
     if (exo) return exo;
+    const sat = /^N([0-9]+)$/.exec(id);
+    if (sat) {
+      const i = satellites.indexOfId(Number(sat[1]));
+      return i >= 0 ? satellites.body(i) : null;
+    }
     const m = /^A([0-9]+)$/.exec(id);
     if (!m) return null;
     if (!smallAsteroidCache.has(id)) {
@@ -151,6 +171,7 @@ async function main() {
   const systemAt = (posKm: { x: number; y: number; z: number }) =>
     nearestSystem(posKm, stars.data, STAR_STRIDE, [...galaxy.localStars, ...extraStars]);
   solar.scene.add(asteroids.group);
+  solar.scene.add(satelliteField.sprite);
   // 小惑星の光の点は、起動してから裏で読み込む。スマホ（指で操作する端末）は明るいものだけ
   // （?asteroids=bright を付けると、PC でも明るいものだけにする。重さの確かめ用）
   const brightOnly = matchMedia('(pointer: coarse)').matches || new URLSearchParams(location.search).get('asteroids') === 'bright';
@@ -369,6 +390,8 @@ async function main() {
   let lastRoomCheck = -Infinity;
   /** いま球として一覧に入れている、小さな小惑星の id */
   const shownSmallAsteroids = new Set<string>();
+  /** いま模型として一覧に入れている、人工衛星の id */
+  const shownSatellites = new Set<string>();
   let velocityKmS = { x: 0, y: 0, z: 0 };
   hudStore.set({ status: null });
 
@@ -384,6 +407,8 @@ async function main() {
     const abs = absolutePositionKm(observer, date);
     solar.update(date, abs);
     asteroids.update(date, abs);
+    satellites.update(date);
+    satelliteField.update(sub(heliocentricPositionKm('Earth', date), abs));
     warpView.update(date, abs, nowMs / 1000);
 
     // いる恒星系。その恒星系の天体を登録し、宇宙の部屋（他のプレイヤーの宇宙船。要件 F2）も恒星系ごとに分ける
@@ -404,6 +429,16 @@ async function main() {
       if (add.length > 0) registerBodies(add);
       drop.forEach((id) => shownSmallAsteroids.delete(id));
       add.forEach((b) => shownSmallAsteroids.add(b.id));
+      // 近くの人工衛星（3,000 km 以内の近い順 8 機）も、模型の天体として一覧に入れる
+      const fromEarth = sub(abs, heliocentricPositionKm('Earth', date));
+      const nearSat = system === SYSTEM_SOL ? satellites.nearby(fromEarth, 3_000, 8) : [];
+      const nextSat = new Set(nearSat.map((i) => `N${satellites.records[i].id}`));
+      const dropSat = [...shownSatellites].filter((id) => !nextSat.has(id) && id !== observer.anchor);
+      if (dropSat.length > 0) unregisterBodies(dropSat);
+      const addSat = nearSat.filter((i) => !shownSatellites.has(`N${satellites.records[i].id}`)).map((i) => satellites.body(i));
+      if (addSat.length > 0) registerBodies(addSat);
+      dropSat.forEach((id) => shownSatellites.delete(id));
+      addSat.forEach((b) => shownSatellites.add(b.id));
       if (online) link.setRoom(system);
     }
     if (online) {
@@ -463,7 +498,7 @@ async function main() {
         // 天体が多いので、半径 200 km 以上か、1,000 万 km より近い天体だけを出す
         ...allBodies()
           .map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date), r: b.radiusKm }))
-          .filter((t) => t.r >= 200 || length(sub(t.positionKm, abs)) < 1e7)
+          .filter((t) => t.r >= 200 || length(sub(t.positionKm, abs)) < (t.id.startsWith('N') ? 2_000 : 1e7))
           .map(({ r: _r, ...t }) => t),
         ...others.map((o) => ({ kind: 'ship' as const, id: o.id, label: '', positionKm: shipPositionKm(o.state, date) })),
         // レーダーは狭いので、住所の恒星系から後ろだけを出す（例：SOL-3-0-001）

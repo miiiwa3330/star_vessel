@@ -41,6 +41,8 @@ export const SOL_BODY_NUMBERS: Readonly<Record<string, { planet: number; moon: n
 
 /** 太陽系の衛星：S＋惑星の番号＋.＋衛星の正式な番号（例：イオ＝木星 I は S5.1、タイタン＝土星 VI は S6.6） */
 const SOL_MOON_ID = /^S([1-9])\.([1-9][0-9]{0,2})$/;
+/** 人工衛星：N＋カタログ番号（NORAD）。住所は地球のまわり（惑星 3・衛星 0） */
+const SATELLITE_ID = /^N([1-9][0-9]{0,8})$/;
 /** 小惑星・準惑星：A＋小惑星番号（例：ケレスは A1）。住所の惑星の位置にも A1 と書く */
 const ASTEROID_ID = /^A([1-9][0-9]{0,6})$/;
 /**
@@ -66,6 +68,7 @@ export function bodyAddress(anchor: string): BodyAddress | null {
   }
   let m = SOL_MOON_ID.exec(anchor);
   if (m) return { planet: m[1], moon: Number(m[2]), system: SYSTEM_SOL };
+  if (SATELLITE_ID.test(anchor)) return { planet: '3', moon: 0, system: SYSTEM_SOL };
   m = ASTEROID_ID.exec(anchor);
   if (m) return { planet: `A${m[1]}`, moon: 0, system: SYSTEM_SOL };
   m = EXOPLANET_ID.exec(anchor);

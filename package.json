@@ -14,6 +14,7 @@
     "exoplanets": "node tools/build-exoplanets.mjs",
     "moons": "NODE_USE_ENV_PROXY=1 node tools/build-moons.mjs",
     "asteroids": "NODE_USE_ENV_PROXY=1 node tools/build-asteroids.mjs",
+    "satellites": "NODE_USE_ENV_PROXY=1 node tools/build-satellites.mjs",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "auth:schema": "node tools/gen-auth-schema.ts"
   },
@@ -23,6 +24,7 @@
     "hono": "^4.13.16",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "satellite.js": "^7.1.0",
     "three": "^0.187.0"
   },
   "devDependencies": {
