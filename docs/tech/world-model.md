@@ -19,7 +19,7 @@ summary: 世界の作り方の決まり。単位と座標系、天体の一覧�
 
 `src/world/solar-system.ts`。天体は**一覧（registry）に登録して使う**。描画・衝突・基準の天体・レーダーは、どれもこの一覧を見る。
 
-- 最初から入っているのは `CORE_BODIES`（太陽・惑星・冥王星・月・ガリレオ衛星）。系外惑星は、いる恒星系が変わるたびに入れ替える（`registerBodies`・`unregisterBodies`）
+- 最初から入っているのは `CORE_BODIES`（太陽・惑星・冥王星・月・ガリレオ衛星）。系外惑星は、いる恒星系が変わるたびに入れ替える（`registerBodies`・`unregisterBodies`。[`exoplanets.md`](exoplanets.md)）
 - 一覧に無い天体（遠くの恒星系の惑星に置かれたワープホールなど）は、`setBodyResolver` で渡した関数で調べる
 - 位置の決め方（`motion`）：astronomy-engine の `HelioVector`（太陽・惑星・冥王星・月）、`JupiterMoons`（ガリレオ衛星）、ケプラーの軌道（`src/world/kepler.ts`。系外惑星など）、動かない（系外の恒星）
 - 同じ時刻の位置は覚えておき、1 フレームに何度聞かれても計算は 1 回

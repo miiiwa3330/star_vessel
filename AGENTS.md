@@ -4,7 +4,7 @@
 
 **サービスの内容そのもの（コンセプト・体験の設計・機能仕様・世界観・技術選定の理由）は本ファイルに書かない。** それらの正本は `docs/` 配下に置く。本ファイルは「どう作業するか」だけを扱う。
 
-> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
+> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
 
 ---
 
@@ -139,9 +139,10 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 | 型チェック | `npm run check`（Cloudflare の型を作り直してから、ブラウザ側と Worker 側の両方を確かめる） |
 | ビルド | `npm run build`（型チェック → `dist/`） |
 | 星のデータの作り直し | `npm run stars`（HYG を取得して `public/data/stars.bin` を書き出す。取得した元データは `tools/.cache/` に置き、コミットしない） |
+| 系外惑星のデータの作り直し | `npm run exoplanets`（Open Exoplanet Catalogue を git で取得して `public/data/exoplanets.json` を書き出す。星のデータを作り直したら、これも作り直す） |
 
 - **「動いた」と書く前に、画面で確かめる。** テストが通っても、描画の向き・明るさ・重なりは画面でしか分からない。WebGPU と WebGL2（WebGPU を消した状態）の両方と、スマホの幅（390px 前後）で見る
-- 開発サーバーでは、ブラウザの開発者ツールから瞬間移動できる：`__sv.teleportGalacto({ x: 0, y: 0, z: 45 })`（銀河中心の座標・kpc。この例は銀河の真上）、`__sv.teleportPc({ x, y, z })`（太陽中心の EQJ・pc）、`__sv.teleportBody('Saturn', 400000)`（天体の id と中心からの距離 km。天体の昼の側から見る）。本番のビルドには入らない
+- 開発サーバーでは、ブラウザの開発者ツールから瞬間移動できる：`__sv.teleportGalacto({ x: 0, y: 0, z: 45 })`（銀河中心の座標・kpc。この例は銀河の真上）、`__sv.teleportPc({ x, y, z })`（太陽中心の EQJ・pc）、`__sv.teleportBody('Saturn', 400000)`（天体の id と中心からの距離 km。天体の昼の側から見る）、`__sv.teleportSystem('E1WHADEK', 0.1)`（恒星系の記号と恒星からの距離 AU。この例は TRAPPIST-1）。本番のビルドには入らない
 - 他のプレイヤーの機能を確かめるときは、別々のブラウザ（別のアカウントになる）を 2 つ開く
 
 ## ディレクトリ構成
@@ -152,6 +153,9 @@ src/
   world/                  世界の計算。three.js も React も使わない純粋な関数（テストはここに集める）
     solar-system.ts       天体の一覧（registry）と、位置と向き。astronomy-engine はこのファイルの中だけで使う
     kepler.ts             ケプラーの軌道（系外惑星などの公転）
+    planets.ts            太陽系の外の恒星系の天体（実在の惑星と、自動で作る惑星）
+    star-systems.ts       恒星系の記号から恒星を引き、いる恒星系の天体を一覧に入れ替える
+    exoplanet-data.ts     実在の系外惑星のデータの読み方
     surface.ts            天体の表面の模様と環を自動で描く（画像が無い天体のため）
     observer.ts           自分の位置（基準の天体からの相対位置）
     collision.ts          天体に近づける距離
@@ -170,10 +174,12 @@ src/
   net/                    サーバーとのやりとり（アカウント・ワープホールの API・宇宙の部屋の WebSocket）
 public/
   data/stars.bin          星のデータ（npm run stars で作る。stars.LICENSE.txt と必ず一緒に置く）
+  data/exoplanets.json    系外惑星のデータ（npm run exoplanets で作る。exoplanets.LICENSE.txt と必ず一緒に置く）
   textures/               天体の画像（出どころは docs/tech/credits.md）
 worker/                   サーバー（Cloudflare Workers）。index.ts が入口、warps.ts がワープホールの API、space-room.ts が宇宙の部屋（Durable Object）、auth*.ts がアカウント
 migrations/               D1 のテーブル（0001 は npm run auth:schema で作ったもの）
 tools/build-stars.mjs     HYG → stars.bin の変換
+tools/build-exoplanets.mjs Open Exoplanet Catalogue → exoplanets.json の変換（stars.bin が先に要る）
 tools/gen-auth-schema.ts  Better Auth のテーブルの SQL を作る
 docs/                     仕様・判断・経緯の正本（地図は docs/README.md）
 ```

@@ -13,3 +13,10 @@ export function createStarfield(catalog: StarCatalog): StarSprites {
   });
   return stars;
 }
+
+/** 系外惑星のデータにだけある恒星（HYG に無い恒星）を描く */
+export function createExtraStarfield(list: readonly { position: { x: number; y: number; z: number }; absMag: number; bv: number }[]): StarSprites {
+  const stars = new StarSprites(Math.max(1, list.length));
+  stars.set(list.length, (i) => ({ ...list[i].position, absMag: list[i].absMag, bv: list[i].bv }));
+  return stars;
+}

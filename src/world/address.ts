@@ -178,7 +178,7 @@ export function toRoman(n: number): string {
   return out;
 }
 
-/** 名前の分かる天体（衛星・小惑星）の名前を引く。住所の読みに使う（src/world/body-names.ts が入れる） */
+/** 名前の分かる天体（衛星・小惑星・系外惑星。planet が空なら恒星系）の名前を引く。住所の読みに使う（src/main.ts が入れる） */
 let nameOf: (anchorLike: { system: string; planet: string; moon: number }) => string | null = () => null;
 export function setAddressNameLookup(fn: typeof nameOf): void {
   nameOf = fn;
@@ -195,12 +195,16 @@ export function readAddress(code: string): string {
   const words: string[] = [
     galaxy === GALAXY_MILKY_WAY ? '天の川銀河' : galaxy,
     isArmCode(arm) ? ARM_NAMES_JA[arm] : arm,
-    system === SYSTEM_SOL ? '太陽系' : `恒星 ${system}`,
+    system === SYSTEM_SOL ? '太陽系' : `恒星 ${nameOf({ system, planet: '', moon: 0 }) ?? system}`,
   ];
   if (asteroid) {
     words.push(nameOf({ system, planet: planetS, moon: 0 }) ?? `小惑星 (${planetS.slice(1)})`);
   } else if (planet > 0) {
-    words.push(system === SYSTEM_SOL ? (SOL_PLANET_NAMES[planet] ?? `第${planet}惑星`) : `第${planet}惑星`);
+    words.push(
+      system === SYSTEM_SOL
+        ? (SOL_PLANET_NAMES[planet] ?? `第${planet}惑星`)
+        : (nameOf({ system, planet: planetS, moon: 0 }) ?? `第${planet}惑星`),
+    );
   }
   if (moon > 0) {
     const known = system === SYSTEM_SOL && planet === 3 && moon === 1 ? '月' : nameOf({ system, planet: planetS, moon });

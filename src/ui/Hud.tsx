@@ -44,7 +44,8 @@ export function Hud() {
         </div>
         <div className="hud-panel hud-credits">
           星：<a href="https://codeberg.org/astronexus/hyg">HYG v4.4</a>（
-          <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>） ／ 天体の画像：
+          <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>） ／ 系外惑星：
+          <a href="https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue">Open Exoplanet Catalogue</a>（MIT） ／ 天体の画像：
           <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>（
           <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>）
         </div>

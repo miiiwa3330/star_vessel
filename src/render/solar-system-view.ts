@@ -58,7 +58,8 @@ export class SolarSystemView {
         const look = info.surface?.look ?? SURFACE_LOOKS[info.id] ?? DEFAULT_LOOK;
         const seed = info.surface?.seed ?? seedOf(info.id);
         // 小さな天体は画像も小さくして、作る時間を減らす
-        map = big ? surfaceTexture(look, seed, 512, 256) : surfaceTexture(look, seed, 256, 128);
+        // 系外惑星は恒星系に入るたびに作るので、画像を小さくして作る時間を減らす
+        map = big && info.kind !== 'exoplanet' ? surfaceTexture(look, seed, 512, 256) : surfaceTexture(look, seed, 256, 128);
         owned.push(map);
       }
       material = new THREE.MeshStandardNodeMaterial({ map, roughness: 1, metalness: 0 });
@@ -96,6 +97,7 @@ export class SolarSystemView {
   update(date: Date, observerKm: Vec3): void {
     this.sync();
     let nearestStar: Vec3 | null = null;
+    let nearestGlow: readonly [number, number, number] = [1, 1, 1];
     let nearestD = Number.POSITIVE_INFINITY;
     for (const [id, d] of this.drawn) {
       const rel = sub(heliocentricPositionKm(id, date), observerKm);
@@ -108,9 +110,15 @@ export class SolarSystemView {
         if (dist < nearestD) {
           nearestD = dist;
           nearestStar = rel;
+          nearestGlow = d.info.glow ?? nearestGlow;
         }
       }
     }
-    if (nearestStar) this.starLight.position.set(nearestStar.x, nearestStar.y, nearestStar.z);
+    if (nearestStar) {
+      this.starLight.position.set(nearestStar.x, nearestStar.y, nearestStar.z);
+      // 光の色は恒星の色（太陽は白に近い）。いちばん明るい成分を 1 にそろえる
+      const m = Math.max(...nearestGlow);
+      this.starLight.color.setRGB(nearestGlow[0] / m, nearestGlow[1] / m, nearestGlow[2] / m);
+    }
   }
 }
