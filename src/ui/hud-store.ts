@@ -4,6 +4,17 @@
  * 毎フレーム React を動かさないため（docs/tech/stack.md「2. 3D と画面の部品のつなぎ方」）。
  */
 import type { RadarBlip } from '../world/radar';
+import type { HullType } from '../world/ship-design';
+import type { ViewMode } from '../controls/chase-camera';
+
+/** 宇宙船を作る画面の状態（開いていなければ null） */
+export interface ShipBuilderState {
+  /** 選んでいる船体（画面の後ろに、この船を見せる） */
+  hull: HullType;
+  /** 初めて遊ぶときに出したか */
+  firstTime: boolean;
+  saving: boolean;
+}
 
 export interface WarpListItem {
   id: string;
@@ -32,6 +43,13 @@ export interface HudState {
   warps: WarpListItem[];
   /** ワープホールが使えるか（サーバーにつながらないときは false） */
   warpsReady: boolean;
+  /** 一人称・三人称 */
+  viewMode: ViewMode;
+  /** スマホの三人称で、1 本指のドラッグでカメラを回すか */
+  orbitDrag: boolean;
+  shipBuilder: ShipBuilderState | null;
+  /** 宇宙船の設定がサーバーに保存できるか */
+  shipReady: boolean;
 }
 
 let state: HudState = {
@@ -46,6 +64,10 @@ let state: HudState = {
   radar: [],
   warps: [],
   warpsReady: false,
+  viewMode: 'first',
+  orbitDrag: false,
+  shipBuilder: null,
+  shipReady: false,
 };
 const listeners = new Set<() => void>();
 
@@ -70,6 +92,15 @@ export const hudActions = {
   refreshWarps: (): void => {},
   /** 速さを変える（スマホのボタン用） */
   changeSpeed: (_steps: number): void => {},
+  /** 一人称・三人称を切り替える */
+  toggleView: (): void => {},
+  /** スマホの三人称で、ドラッグを「船の向き」と「カメラを回す」で切り替える */
+  toggleOrbitDrag: (): void => {},
+  openShipBuilder: (): void => {},
+  /** 船体を選ぶ（画面の後ろの船が変わる） */
+  previewHull: (_hull: HullType): void => {},
+  saveShip: (): void => {},
+  closeShipBuilder: (): void => {},
 };
 
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;

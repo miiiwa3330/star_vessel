@@ -11,11 +11,15 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 |------|----------|----------|------------|--------------|
 | HYG Database v4.4（恒星） | `public/data/stars.bin`（変換したもの） | https://codeberg.org/astronexus/hyg（David Nash / astronexus） | CC BY-SA 4.0 | 画面に「星：HYG v4.4（CC BY-SA 4.0）」とリンク。変換したデータも CC BY-SA 4.0 で、変更点を `public/data/stars.LICENSE.txt` に書いている |
 | Open Exoplanet Catalogue（系外惑星） | `public/data/exoplanets.json`（変換したもの） | https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue（Hanno Rein ほか） | MIT | 画面に「系外惑星：Open Exoplanet Catalogue（MIT）」とリンク。著作権の表示と許諾の文を `public/data/exoplanets.LICENSE.txt` に置く（必ず json と一緒に置く） |
+| JPL の衛星のデータ（平均軌道要素・物理量・Horizons） | `public/data/moons.json`（変換したもの） | https://ssd.jpl.nasa.gov/（NASA/JPL Solar System Dynamics） | NASA/JPL のデータ（著作権の制限なし。出典を書く） | 画面に「衛星・小惑星：NASA/JPL」とリンク |
+| JPL Small-Body Database（小惑星） | `public/data/asteroids-*.bin`・`asteroids-large.json`（変換したもの） | https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html | 同上 | 同上 |
 | 地球の画像（2k_earth_daymap.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク |
 | 月の画像（2k_moon.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |
+| 水星・金星・火星・木星・土星・天王星・海王星の画像（2k_*.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |
 
 - 2026-11-04 に、それぞれの配布元でライセンスの文を確かめた（Open Exoplanet Catalogue は 2026-11-05 に README の License の節で確かめた）
-- ほかの惑星の画像（`src/render/body-looks.ts` の `TEXTURE_FILES`）は、Solar System Scope から取ってきて `public/textures/` に置けば使われる（同じ CC BY 4.0。画面の表記は「天体の画像：Solar System Scope」のまま）。2026-11-05 の時点では置いていない（開発の環境から配布元に接続できなかったため）
+- 惑星の画像（`src/render/body-looks.ts` の `TEXTURE_FILES`）は、2026-11-05 に Solar System Scope から取得して置いた（配布元のページで CC BY 4.0 と確かめた）
+- NASA/JPL のデータは、NASA の方針で著作権の制限が無い（出典を明記する）。エリス・マケマケの直径は論文の値（`docs/tech/small-bodies.md`）
 - Solar System Scope の画像は、NASA の画像などをもとに作られている。CC BY 4.0 の範囲で、加工・商用利用ができる
 
 ## ライブラリ（npm）

@@ -45,6 +45,12 @@ export const SURFACE_LOOKS: Readonly<Record<string, SurfaceLook>> = {
   'S5.2': { kind: 'rocky', colors: [rgb(0x9a7a5a), rgb(0xd8ccb8), rgb(0xf4f0e8)], craters: 0.05 },
   'S5.3': { kind: 'rocky', colors: [rgb(0x5a5048), rgb(0x8f857a), rgb(0xc8beb0)], craters: 0.35 },
   'S5.4': { kind: 'rocky', colors: [rgb(0x3a342e), rgb(0x5f564c), rgb(0x9a9084)], craters: 0.5 },
+  // 土星・海王星・冥王星の主な衛星（見た目のための色）
+  'S6.6': { kind: 'banded', colors: [rgb(0xb0702a), rgb(0xd89a48), rgb(0xe8b468)], bands: 3, turbulence: 0.5 },
+  'S6.2': { kind: 'rocky', colors: [rgb(0xc8d0d8), rgb(0xe8eef4), rgb(0xffffff)], craters: 0.1 },
+  'S6.8': { kind: 'rocky', colors: [rgb(0x2a2420), rgb(0x8a8078), rgb(0xe8e4dc)], craters: 0.3 },
+  'S8.1': { kind: 'rocky', colors: [rgb(0x9a8070), rgb(0xd8c0b0), rgb(0xf0e4dc)], craters: 0.1 },
+  'S9.1': { kind: 'rocky', colors: [rgb(0x5a5450), rgb(0x8a8480), rgb(0xb8b0a8)], craters: 0.3 },
 };
 
 /** どの天体にも当てはまらないときの模様（灰色の岩） */

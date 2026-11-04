@@ -5,6 +5,7 @@
 import { Hono } from 'hono';
 import { createAuth } from './auth';
 import { warps } from './warps';
+import { ships } from './ships';
 import { isSystemCode } from '../src/world/address';
 
 export { SpaceRoom } from './space-room';
@@ -24,6 +25,13 @@ app.use('/api/warps/*', async (c, next) => {
   await next();
 });
 app.route('/api/warps', warps);
+
+app.use('/api/ship', async (c, next) => {
+  const session = await createAuth(c.env).api.getSession({ headers: c.req.raw.headers });
+  c.set('userId', session?.user.id ?? null);
+  await next();
+});
+app.route('/api/ship', ships);
 
 /**
  * 宇宙の部屋への WebSocket。部屋は恒星系ごと（例：/api/space/SOL）。ログインが必要（匿名でよい）。

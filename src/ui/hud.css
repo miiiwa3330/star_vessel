@@ -120,3 +120,49 @@
   .hud-radar { width: 130px; height: 130px; }
   .hud-notice { top: auto; bottom: 170px; left: 16px; right: 16px; transform: none; max-width: none; }
 }
+
+.hud-view-buttons { display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
+.hud-view-buttons .hud-touch-only { display: none; }
+.hud-ship-builder {
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hud-ship-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hud-ship-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(160, 190, 255, 0.25);
+  background: rgba(20, 40, 70, 0.5);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.hud-ship-option.is-selected { border-color: #74e6ff; background: rgba(40, 90, 130, 0.7); }
+.hud-ship-option:focus-visible { outline: 2px solid #74e6ff; outline-offset: 2px; }
+.hud-ship-option-name { font-weight: 600; }
+.hud-ship-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+@media (max-width: 720px), (pointer: coarse) {
+  .hud-view-buttons .hud-touch-only { display: block; }
+  .hud-ship-options { grid-template-columns: 1fr; }
+  .hud-ship-builder { bottom: 12px; }
+}
+
+/* 高さの低い画面（スマホの横向きなど）：右の列が下の説明に重ならないよう、視点・宇宙船のボタンを横に並べ、説明を隠す */
+@media (max-width: 720px), (pointer: coarse) {
+  .hud-view-buttons { flex-direction: row; flex-wrap: wrap; }
+  .hud-view-buttons .hud-button { flex: 1 1 60px; min-width: 0; padding-left: 6px; padding-right: 6px; }
+}
+@media (max-height: 500px) {
+  .hud-help { display: none; }
+}

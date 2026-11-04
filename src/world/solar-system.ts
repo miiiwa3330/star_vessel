@@ -8,7 +8,7 @@
  * 系外惑星は、いる恒星系が変わるたびに src/world/planets.ts が入れ替える。
  * 一覧に無い天体（遠くの恒星系の惑星など）は、setBodyResolver で渡した関数に聞く。
  */
-import { Body, HelioVector, JupiterMoons, RotationAxis } from 'astronomy-engine';
+import { Body, HelioVector, JupiterMoons, MassProduct, RotationAxis } from 'astronomy-engine';
 import {
   CALLISTO_RADIUS_KM,
   EUROPA_RADIUS_KM,
@@ -327,4 +327,11 @@ export function bodyFixedToEqj(id: BodyId, date: Date): Mat3 {
     return fromAxes(add(scale(x, c), scale(y, sn)), add(scale(y, c), scale(x, -sn)), pole);
   }
   return [1, 0, 0, 0, 1, 0, 0, 0, 1];
+}
+
+// ── 衛星・小惑星のデータから天体を作るための値（src/world/small-bodies.ts） ──────
+
+/** 太陽系の主な天体の GM（km³/s²）。astronomy-engine の値（AU³/日² を換算） */
+export function majorGmKm3s2(id: BodyId): number {
+  return (MassProduct(Body[id as keyof typeof Body]) * KM_PER_AU ** 3) / 86_400 ** 2;
 }

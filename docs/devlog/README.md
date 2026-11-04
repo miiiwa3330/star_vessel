@@ -14,3 +14,4 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-05 | [他のプレイヤーの宇宙船と、銀河の形](entries/2026-11-05-ships-and-galaxy.md) |
 | 2026-11-05 | [天体を増やす（惑星の模様・衛星・系外惑星）](entries/2026-11-05-more-bodies.md) |
 | 2026-11-05 | [見た目の向上と、系外の衛星・環](entries/2026-11-05-world-polish.md) |
+| 2026-11-05 | [宇宙船と視点、太陽系の衛星と小惑星](entries/2026-11-05-ships-and-small-bodies.md) |

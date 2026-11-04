@@ -4,7 +4,7 @@
 
 **サービスの内容そのもの（コンセプト・体験の設計・機能仕様・世界観・技術選定の理由）は本ファイルに書かない。** それらの正本は `docs/` 配下に置く。本ファイルは「どう作業するか」だけを扱う。
 
-> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
+> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（188 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
 
 ---
 
@@ -140,9 +140,11 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 | ビルド | `npm run build`（型チェック → `dist/`） |
 | 星のデータの作り直し | `npm run stars`（HYG を取得して `public/data/stars.bin` を書き出す。取得した元データは `tools/.cache/` に置き、コミットしない） |
 | 系外惑星のデータの作り直し | `npm run exoplanets`（Open Exoplanet Catalogue を git で取得して `public/data/exoplanets.json` を書き出す。星のデータを作り直したら、これも作り直す） |
+| 衛星・小惑星のデータの作り直し | `npm run moons`・`npm run asteroids`（JPL から取得。衛星は元期から離れるほどずれるので年に一度くらい。Node の fetch をプロキシ越しに使うため `NODE_USE_ENV_PROXY=1` を付けている） |
 
 - **「動いた」と書く前に、画面で確かめる。** テストが通っても、描画の向き・明るさ・重なりは画面でしか分からない。WebGPU と WebGL2（WebGPU を消した状態）の両方と、スマホの幅（390px 前後）で見る
 - 開発サーバーでは、ブラウザの開発者ツールから瞬間移動できる：`__sv.teleportGalacto({ x: 0, y: 0, z: 45 })`（銀河中心の座標・kpc。この例は銀河の真上）、`__sv.teleportPc({ x, y, z })`（太陽中心の EQJ・pc）、`__sv.teleportBody('Saturn', 400000, 'pole')`（天体の id、中心からの距離 km、どこから見るか：`'day'` 昼の側〈省略時〉・`'pole'` 北極の上・`'night'` 夜の側）、`__sv.teleportSystem('E1WHADEK', 0.1)`（恒星系の記号と恒星からの距離 AU。この例は TRAPPIST-1）。本番のビルドには入らない
+- 小惑星（約 90 万個）はソフトウェアの描画（GPU の無い環境の自動の確かめ）では重すぎるので、URL に `?asteroids=bright` を付けて明るい約 7.6 万個だけにする
 - 他のプレイヤーの機能を確かめるときは、別々のブラウザ（別のアカウントになる）を 2 つ開く
 
 ## ディレクトリ構成
@@ -156,6 +158,8 @@ src/
     planets.ts            太陽系の外の恒星系の天体（実在の惑星と、自動で作る惑星）
     star-systems.ts       恒星系の記号から恒星を引き、いる恒星系の天体を一覧に入れ替える
     exoplanet-data.ts     実在の系外惑星のデータの読み方
+    small-bodies.ts       太陽系の衛星と大きな小惑星・準惑星（データから天体の一覧を作る）
+    ship-design.ts        宇宙船の設計の形と確かめ方（サーバーと共有）
     surface.ts            天体の表面の模様と環を自動で描く（画像が無い天体のため）
     observer.ts           自分の位置（基準の天体からの相対位置）
     collision.ts          天体に近づける距離
@@ -169,18 +173,23 @@ src/
     clock.ts              世界の時刻
     units.ts / vec.ts     単位と、倍精度のベクトル・行列
   render/                 three.js での描画（太陽系・星・銀河・ワープホール・他の船）。body-looks.ts は天体の画像のファイル名と模様の色、
-                          body-effects.ts は大気・恒星の光・環の影、surface-worker.ts は模様を描く Web Worker
-  controls/flight.ts      一人称の操縦（仮）
+                          body-effects.ts は大気・恒星の光・環の影、surface-worker.ts は模様を描く Web Worker、
+                          asteroid-field.ts は小惑星の光の点（GPU でケプラーの方程式を解く）、ship-models.ts は 3 種類の船体
+  controls/flight.ts      操縦（仮）。chase-camera.ts は一人称・三人称の視点
   ui/                     画面の表示（React）。hud-store.ts を通して世界から値を受け取り、hudActions で世界へ操作を渡す
   net/                    サーバーとのやりとり（アカウント・ワープホールの API・宇宙の部屋の WebSocket）
 public/
   data/stars.bin          星のデータ（npm run stars で作る。stars.LICENSE.txt と必ず一緒に置く）
   data/exoplanets.json    系外惑星のデータ（npm run exoplanets で作る。exoplanets.LICENSE.txt と必ず一緒に置く）
+  data/moons.json         衛星のデータ（npm run moons）
+  data/asteroids-*.bin    小惑星のデータ（npm run asteroids。asteroids-large.json に大きな天体とファイルの一覧）
   textures/               天体の画像（出どころは docs/tech/credits.md）
-worker/                   サーバー（Cloudflare Workers）。index.ts が入口、warps.ts がワープホールの API、space-room.ts が宇宙の部屋（Durable Object）、auth*.ts がアカウント
+worker/                   サーバー（Cloudflare Workers）。index.ts が入口、warps.ts がワープホールの API、ships.ts が宇宙船の設計の API、space-room.ts が宇宙の部屋（Durable Object）、auth*.ts がアカウント
 migrations/               D1 のテーブル（0001 は npm run auth:schema で作ったもの）
 tools/build-stars.mjs     HYG → stars.bin の変換
 tools/build-exoplanets.mjs Open Exoplanet Catalogue → exoplanets.json の変換（stars.bin が先に要る）
+tools/build-moons.mjs     JPL（衛星の表・Horizons）→ moons.json
+tools/build-asteroids.mjs JPL Small-Body Database → asteroids-*.bin・asteroids-large.json
 tools/gen-auth-schema.ts  Better Auth のテーブルの SQL を作る
 docs/                     仕様・判断・経緯の正本（地図は docs/README.md）
 ```
