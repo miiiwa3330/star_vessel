@@ -12,6 +12,7 @@ import { bodyAddress, SYSTEM_SOL } from './address';
 import type { RealSystem } from './exoplanet-data';
 import { generateCell, parseGeneratedSystem } from './galaxy';
 import { systemBodies, type HostStar } from './planets';
+import type { CompactObject } from './compact-objects';
 import { registerBodies, unregisterBodies, type BodyInfo } from './solar-system';
 import { STAR_STRIDE } from './stars';
 
@@ -24,14 +25,21 @@ export class StarSystems {
   private current: string = SYSTEM_SOL;
   private registered: string[] = [];
 
+  private readonly compactByCode = new Map<string, CompactObject>();
+
   constructor(
     private readonly stars: Float32Array,
     private readonly real: ReadonlyMap<string, RealSystem>,
-  ) {}
+    compact: readonly CompactObject[] = [],
+  ) {
+    for (const c of compact) this.compactByCode.set(c.code, c);
+  }
 
   /** 系外惑星のデータにだけある恒星（E…）。星空に描き、いちばん近い恒星を探すのに使う */
   extraStars(): { position: { x: number; y: number; z: number }; absMag: number; bv: number; system: string }[] {
     const out = [];
+    // 実在の星の燃えかす（白色矮星・パルサー・ブラックホール）も、星空に描き、いちばん近い恒星を探すのに使う
+    for (const c of this.compactByCode.values()) out.push({ position: c.positionPc, absMag: c.absMag, bv: c.bv, system: c.code });
     for (const s of this.real.values()) {
       if (s.positionPc && s.absMag !== undefined && s.bv !== undefined) {
         out.push({ position: s.positionPc, absMag: s.absMag, bv: s.bv, system: s.code });
@@ -54,8 +62,20 @@ export class StarSystems {
     }
     if (system.startsWith('G')) {
       const g = parseGeneratedSystem(system);
-      const star = g ? generateCell(g.cell)[g.index] : undefined;
-      return star ? { system, positionPc: star.position, absMag: star.absMag, bv: star.bv } : null;
+      // 番号は並びの位置ではない（燃えかすは 1000 から）ので、記号で探す
+      const star = g ? generateCell(g.cell).find((s) => s.system === system) : undefined;
+      return star ? { system, positionPc: star.position, absMag: star.absMag, bv: star.bv, compact: star.compact } : null;
+    }
+    const c = this.compactByCode.get(system);
+    if (c) {
+      return {
+        system,
+        positionPc: c.positionPc,
+        absMag: c.absMag,
+        bv: c.bv,
+        compact: c.kind,
+        compactInfo: { name: c.name, teffK: c.teffK, periodS: c.periodS },
+      };
     }
     const r = this.real.get(system);
     if (r?.positionPc && r.absMag !== undefined && r.bv !== undefined) {

@@ -10,6 +10,7 @@
  * three.js・DOM・astronomy-engine を読み込まない。
  */
 import { exoplanetId } from './address';
+import { compactBody, type CompactKind } from './compact-objects';
 import { axisKmFromPeriod, meanAnomalyFromTrue, orbitNormal, periodDaysFromAxis, type KeplerElements } from './kepler';
 import type { RealPlanet, RealSystem } from './exoplanet-data';
 import { hashInts, mulberry32 } from './random';
@@ -41,6 +42,10 @@ export interface HostStar {
   positionPc: Vec3;
   absMag: number;
   bv: number;
+  /** 星の燃えかす（白色矮星・中性子星・ブラックホール） */
+  compact?: CompactKind;
+  /** 実在の燃えかすのデータ（名前・温度・周期） */
+  compactInfo?: { name: string; teffK?: number; periodS?: number };
 }
 
 // ── 恒星のおおよその性質（色と明るさから） ──────────────────
@@ -344,6 +349,16 @@ export const starBodyId = (system: string): string => `${system}.0`;
  * 惑星の id は src/world/address.ts の exoplanetId（住所の番号を含む）
  */
 export function systemBodies(host: HostStar, real: RealSystem | null): BodyInfo[] {
+  // 星の燃えかすは、それ 1 つだけ（惑星は作らない。docs/tech/compact-objects.md）
+  if (host.compact) {
+    return [
+      compactBody(host.system, host.compactInfo?.name ?? host.system, host.compact, host.positionPc, {
+        teffK: host.compactInfo?.teffK,
+        periodS: host.compactInfo?.periodS,
+        real: !!host.compactInfo,
+      }),
+    ];
+  }
   const star = starModel(host, real);
   const starId = starBodyId(host.system);
   const positionKm = scale(host.positionPc, KM_PER_PC);

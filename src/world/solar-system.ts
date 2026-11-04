@@ -19,6 +19,7 @@ import { keplerPositionKm, orbitNormal, orbitToEqj, type KeplerElements } from '
 import { DEG, KM_PER_AU } from './units';
 import { add, length, mulMat, normalize, rotX, rotZ, scale, sub, type Mat3, type Vec3 } from './vec';
 import type { RingZone, SurfaceLook } from './surface';
+import type { CompactLook } from './compact-objects';
 
 /**
  * 天体の名前（id）。太陽系の主な天体は英語の名前（Earth など）、ほかは住所の番号を含む記号。
@@ -26,7 +27,7 @@ import type { RingZone, SurfaceLook } from './surface';
  */
 export type BodyId = string;
 
-export type BodyKind = 'star' | 'planet' | 'dwarf' | 'moon' | 'asteroid' | 'exoplanet' | 'satellite';
+export type BodyKind = 'star' | 'planet' | 'dwarf' | 'moon' | 'asteroid' | 'exoplanet' | 'satellite' | 'blackhole';
 
 /** 位置の決め方 */
 export type Motion =
@@ -72,6 +73,8 @@ export interface BodyInfo {
   glow?: readonly [number, number, number];
   /** 大気（ふちに光の輪を描く）。見た目のための値 */
   atmosphere?: Atmosphere;
+  /** 星の燃えかす（白色矮星・中性子星・ブラックホール）の見た目。src/world/compact-objects.ts */
+  compact?: CompactLook;
 }
 
 export interface Atmosphere {

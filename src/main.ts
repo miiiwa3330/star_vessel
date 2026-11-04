@@ -34,6 +34,7 @@ import { findAsteroidByNumber, findNearbyAsteroids } from './world/asteroid-sear
 import { SatelliteCatalog, type SatelliteRecord } from './world/satellites';
 import { SatelliteField } from './render/satellite-field';
 import { ClusterView } from './render/cluster-view';
+import { decodeCompact, type CompactObject } from './world/compact-objects';
 import { clusterAt, clusterLabel, decodeClusters, type Cluster } from './world/clusters';
 import { StarSystems } from './world/star-systems';
 import { starBodyId } from './world/planets';
@@ -118,7 +119,15 @@ async function main() {
   starScene.add(createStarfield(stars).sprite);
   // 系外惑星（要件 F22）。いる恒星系の恒星と惑星を、天体の一覧に入れ替えて登録する
   const realSystems = decodeExoplanets(exoplanetsJson);
-  const systems = new StarSystems(stars.data, realSystems);
+  // 実在の星の燃えかす（白色矮星・パルサー・ブラックホール）。読めなくても宇宙は見られるようにする
+  const compactObjects = await fetch('/data/compact.json')
+    .then((r) => r.json())
+    .then(decodeCompact)
+    .catch((e: unknown) => {
+      console.error('白色矮星・パルサー・ブラックホールのデータが読めない', e);
+      return [] as CompactObject[];
+    });
+  const systems = new StarSystems(stars.data, realSystems, compactObjects);
   // 人工衛星（ISS など）。サーバーが最新の軌道要素を取ってくる。取れなければ同梱の写し（古くなる）を使う
   const satRecords = await fetch('/api/satellites')
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))

@@ -147,3 +147,70 @@ export function createRingMaterial(ringMap: THREE.Texture, radiusKm: number, u: 
   material.opacityNode = tex.w;
   return material;
 }
+
+/**
+ * パルサーのビーム（磁極から出る 2 本の光の円錐）。自転軸のまわりを回る。
+ * 長さは半径の 3,000 倍（見た目のための値。本物のビームは遠くまで届くが、描くのはこの長さまで）
+ */
+export function createPulsarBeams(radiusKm: number): THREE.Group {
+  const group = new THREE.Group();
+  const length = radiusKm * 3_000;
+  const material = new THREE.MeshBasicNodeMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  // 根元ほど明るく、先へ行くほど暗く（円錐の uv の y が 0〜1）
+  material.colorNode = vec3(0.55, 0.75, 1).mul(float(1).sub(uv().y).pow(1.5).mul(0.45));
+  for (const dir of [1, -1]) {
+    const cone = new THREE.ConeGeometry(length * 0.12, length, 32, 1, true);
+    // 先（細い方）を星の側に。y の正の向きに伸ばす
+    cone.rotateX(Math.PI);
+    cone.translate(0, length / 2, 0);
+    const mesh = new THREE.Mesh(cone, material);
+    if (dir < 0) mesh.rotation.x = Math.PI;
+    group.add(mesh);
+  }
+  group.name = 'pulsar-beams';
+  return group;
+}
+
+/** ブラックホール：黒い球（事象の地平面）と、光子球のあたりの細い光の輪。disk なら光る降着円盤も */
+export function createBlackHole(radiusKm: number, disk: boolean): { mesh: THREE.Mesh; owned: { dispose(): void }[] } {
+  const owned: { dispose(): void }[] = [];
+  const sphere = new THREE.SphereGeometry(radiusKm, 48, 24);
+  const black = new THREE.MeshBasicNodeMaterial({ color: 0x000000 });
+  owned.push(sphere, black);
+  const mesh = new THREE.Mesh(sphere, black);
+  const ringGeo = new THREE.TorusGeometry(radiusKm * 1.5, radiusKm * 0.04, 8, 96);
+  const ringMat = new THREE.MeshBasicNodeMaterial({
+    color: new THREE.Color(1.2, 0.9, 0.6),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  owned.push(ringGeo, ringMat);
+  mesh.add(new THREE.Mesh(ringGeo, ringMat));
+  if (disk) {
+    // 降着円盤：内側（最も内側の安定な軌道、3 倍）ほど熱く白く、外側ほど赤く暗い（見た目のための近似）
+    const inner = radiusKm * 3;
+    const outer = radiusKm * 60;
+    const diskGeo = new THREE.RingGeometry(inner, outer, 128, 8);
+    const pos = diskGeo.attributes.position;
+    const uvAttr = diskGeo.attributes.uv;
+    for (let i = 0; i < pos.count; i++) uvAttr.setXY(i, (Math.hypot(pos.getX(i), pos.getY(i)) - inner) / (outer - inner), 0.5);
+    diskGeo.rotateX(-Math.PI / 2);
+    const t = uv().x;
+    const diskMat = new THREE.MeshBasicNodeMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    diskMat.colorNode = vec3(float(1.4), float(1.1).sub(t.mul(0.8)), float(0.9).sub(t.mul(0.9))).mul(float(1).sub(t).pow(2));
+    owned.push(diskGeo, diskMat);
+    mesh.add(new THREE.Mesh(diskGeo, diskMat));
+  }
+  return { mesh, owned };
+}

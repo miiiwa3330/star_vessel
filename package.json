@@ -16,6 +16,7 @@
     "asteroids": "NODE_USE_ENV_PROXY=1 node tools/build-asteroids.mjs",
     "satellites": "NODE_USE_ENV_PROXY=1 node tools/build-satellites.mjs",
     "clusters": "NODE_USE_ENV_PROXY=1 node tools/build-clusters.mjs",
+    "compact": "NODE_USE_ENV_PROXY=1 node tools/build-compact.mjs",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "auth:schema": "node tools/gen-auth-schema.ts"
   },

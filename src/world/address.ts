@@ -85,9 +85,10 @@ export const exoplanetId = (system: string, n: number, generation = 1, moon = 0)
 
 /**
  * SOL：太陽系、H＋数字：本物の星（HYG の id）、G＋36 進 11 桁：自動で作った星（src/world/galaxy.ts）、
- * E＋36 進 7 桁：系外惑星のデータにだけある恒星（HYG に無い恒星。src/world/exoplanet-data.ts）
+ * E＋36 進 7 桁：系外惑星のデータにだけある恒星（HYG に無い恒星。src/world/exoplanet-data.ts）、
+ * P＋パルサーの J 名（+ は P、− は M）・W＋36 進 7 桁（白色矮星）・B＋36 進 7 桁（ブラックホール）：src/world/compact-objects.ts
  */
-const SYSTEM_PATTERN = /^(SOL|H[1-9][0-9]{0,6}|G[0-9A-Z]{11}|E[0-9A-Z]{7})$/;
+const SYSTEM_PATTERN = /^(SOL|H[1-9][0-9]{0,6}|G[0-9A-Z]{11}|E[0-9A-Z]{7}|P[0-9A-Z]{1,15}|W[0-9A-Z]{7}|B[0-9A-Z]{7})$/;
 export const isSystemCode = (s: string): boolean => SYSTEM_PATTERN.test(s);
 
 /** HYG の星の恒星系の記号（例：シリウスは H32263） */
