@@ -4,6 +4,8 @@
  * PC：ドラッグで向きを変える、W/S で前後、A/D で左右、R/F で上下、Q/E で傾き、
  *     ホイールか +/− で速さを変える
  * スマホ：1 本指のドラッグで向きを変える、2 本指で触れている間は前に進む
+ * 視点（src/controls/chase-camera.ts）：V キーで一人称と三人称を切り替える。三人称では、右ドラッグで船のまわりを回り、
+ *     Alt＋ホイールで距離を変える。スマホは画面のボタンで切り替え、「カメラを回す」のときは 1 本指のドラッグで回る
  */
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 import type { Vec3 } from '../world/vec';
@@ -21,8 +23,16 @@ const FAST_SPEED_STEP = 10;
 export class FlightControls {
   readonly orientation = new Quaternion();
   speedKmS = 500;
+  /** 1 本指（左ボタン）のドラッグで、船の向きを変えるか、カメラを回すか（スマホの三人称で使う） */
+  dragMode: 'steer' | 'orbit' = 'steer';
+  /** カメラを回す（右ドラッグ・dragMode が orbit のときのドラッグ）。main.ts が入れる */
+  onOrbit: (dxPx: number, dyPx: number) => void = () => {};
+  /** カメラの距離を変える（Alt＋ホイール） */
+  onZoom: (steps: number) => void = () => {};
+  /** 視点を切り替える（V キー） */
+  onToggleView: () => void = () => {};
   private readonly keys = new Set<string>();
-  private dragging: { x: number; y: number } | null = null;
+  private dragging: { x: number; y: number; orbit: boolean } | null = null;
   private touches = 0;
   private readonly q = new Quaternion();
   private readonly axis = new Vector3();
@@ -40,6 +50,8 @@ export class FlightControls {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', () => this.keys.clear());
+    // 右ドラッグでカメラを回すので、右クリックのメニューを出さない
+    element.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   /** target の方を、up を上にして向く（target・up は EQJ）。カメラは −Z の向きを見る */
@@ -91,14 +103,18 @@ export class FlightControls {
 
   private onPointerDown = (e: PointerEvent) => {
     if (e.pointerType === 'touch' && this.touches >= 2) return;
-    this.dragging = { x: e.clientX, y: e.clientY };
+    this.dragging = { x: e.clientX, y: e.clientY, orbit: e.button === 2 || this.dragMode === 'orbit' };
   };
 
   private onPointerMove = (e: PointerEvent) => {
     if (!this.dragging || this.touches >= 2) return;
     const dx = e.clientX - this.dragging.x;
     const dy = e.clientY - this.dragging.y;
-    this.dragging = { x: e.clientX, y: e.clientY };
+    this.dragging = { ...this.dragging, x: e.clientX, y: e.clientY };
+    if (this.dragging.orbit) {
+      this.onOrbit(dx, dy);
+      return;
+    }
     this.rotateLocal(0, 1, 0, -dx * LOOK_RAD_PER_PX);
     this.rotateLocal(1, 0, 0, -dy * LOOK_RAD_PER_PX);
   };
@@ -114,12 +130,14 @@ export class FlightControls {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    this.changeSpeed(e.deltaY < 0 ? 1 : -1, e.shiftKey);
+    if (e.altKey) this.onZoom(e.deltaY < 0 ? 1 : -1);
+    else this.changeSpeed(e.deltaY < 0 ? 1 : -1, e.shiftKey);
   };
 
   private onKeyDown = (e: KeyboardEvent) => {
     if (e.key === '+' || e.key === '=' || e.key === ']') this.changeSpeed(1, e.shiftKey);
     else if (e.key === '-' || e.key === '_' || e.key === '[') this.changeSpeed(-1, e.shiftKey);
+    else if (e.code === 'KeyV' && !e.repeat) this.onToggleView();
     else this.keys.add(e.code);
   };
 

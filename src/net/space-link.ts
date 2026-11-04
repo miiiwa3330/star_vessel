@@ -3,6 +3,7 @@
  * 自分の状態を送り、近くの船の状態を受け取る。切れたら、間をあけてつなぎ直す。
  */
 import type { ServerMessage, ShipSnapshot, ShipState, StateMessage } from '../world/ship-schema';
+import type { ShipDesign } from '../world/ship-design';
 
 const MAX_RETRY_MS = 10_000;
 
@@ -33,9 +34,9 @@ export class SpaceLink {
     this.connect();
   }
 
-  send(state: ShipState): void {
+  send(state: ShipState, design?: ShipDesign): void {
     if (!this.connected) return;
-    const msg: StateMessage = { t: 'state', s: state };
+    const msg: StateMessage = { t: 'state', s: state, d: design };
     this.ws?.send(JSON.stringify(msg));
   }
 

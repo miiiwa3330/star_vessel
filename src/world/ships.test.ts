@@ -57,3 +57,12 @@ describe('nearestIndices', () => {
     expect(nearestIndices(p[0], p, 2, 0)).toEqual([2, 3]);
   });
 });
+
+describe('サーバーが知らない天体を基準にした船', () => {
+  it('位置の計算は例外になる（サーバーはこれを受けて相対位置で代わりにする。worker/space-room.ts）', async () => {
+    const { shipPositionKm } = await import('./ships');
+    expect(() =>
+      shipPositionKm({ anchor: 'H70666.2', offsetKm: { x: 1, y: 0, z: 0 }, velocityKmS: { x: 0, y: 0, z: 0 }, orientation: { x: 0, y: 0, z: 0, w: 1 } }, new Date()),
+    ).toThrow();
+  });
+});

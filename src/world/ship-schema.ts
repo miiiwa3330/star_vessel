@@ -7,6 +7,7 @@ import type { BodyId } from './solar-system';
 import { KM_PER_LY } from './units';
 import type { Vec3 } from './vec';
 import { isBodyId } from './warp-schema';
+import { isShipDesign, type ShipDesign } from './ship-design';
 
 /** ブラウザが自分の状態を送る回数（1 秒あたり） */
 export const SHIP_SEND_HZ = 4;
@@ -28,10 +29,11 @@ export interface ShipState {
   orientation: Quat;
 }
 
-/** ブラウザ → サーバー */
+/** ブラウザ → サーバー。d は自分の船の設計（形。見た目だけなので、サーバーは形が正しいかだけを確かめる） */
 export interface StateMessage {
   t: 'state';
   s: ShipState;
+  d?: ShipDesign;
 }
 
 export interface ShipSnapshot {
@@ -40,6 +42,8 @@ export interface ShipSnapshot {
   /** 船の色（色相 0〜359）。アカウントごとに決まる */
   hue: number;
   s: ShipState;
+  /** 船の設計（送ってこない人は無し。受け取った側が決まった船で描く） */
+  d?: ShipDesign;
   /** サーバーがこの状態を受け取った時刻（ms・サーバーの時計） */
   at: number;
 }
@@ -68,6 +72,9 @@ export function isShipState(v: unknown): v is ShipState {
   // 銀河の外（約 30 万光年）まで、速さは上限の 1.5 倍まで受け付ける
   return len(s.offsetKm) < 3e5 * KM_PER_LY && len(s.velocityKmS) <= MAX_SPEED_KM_S * 1.5;
 }
+
+/** 受け取った設計として正しければそれを、でなければ undefined */
+export const designOrNone = (v: unknown): ShipDesign | undefined => (isShipDesign(v) ? v : undefined);
 
 /** アカウントの ID から船の色相を決める（FNV-1a）。同じアカウントはいつも同じ色 */
 export function hueFromId(id: string): number {

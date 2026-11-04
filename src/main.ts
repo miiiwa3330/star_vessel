@@ -7,6 +7,11 @@ import { WarpApiError, warpApi } from './net/warp-repository';
 import { SpaceLink } from './net/space-link';
 import { createStarfield } from './render/starfield';
 import { SolarSystemView } from './render/solar-system-view';
+import { ChaseCamera } from './controls/chase-camera';
+import { hullLengthKm } from './render/ship-models';
+import { shipApi } from './net/ship-repository';
+import { HULLS, SHIP_DESIGN_VERSION, type ShipDesign } from './world/ship-design';
+import { AsteroidField, type AsteroidFile } from './render/asteroid-field';
 import { REQUIRED_TEXTURES, TEXTURE_FILES } from './render/body-looks';
 import { WarpView } from './render/warp-view';
 import { ShipView } from './render/ship-view';
@@ -20,8 +25,9 @@ import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/obs
 import { radarBlips, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
 import { predictShip, shipPositionKm } from './world/ships';
-import { allBodies, bodyFixedToEqj, bodyInfo, findBody, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
+import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
 import { decodeExoplanets } from './world/exoplanet-data';
+import { largeAsteroidBodies, moonBodies, type LargeAsteroid, type MoonRecord } from './world/small-bodies';
 import { StarSystems } from './world/star-systems';
 import { starBodyId } from './world/planets';
 import { createExtraStarfield } from './render/starfield';
@@ -81,6 +87,20 @@ async function main() {
       return r.json();
     }),
   ]);
+  // 太陽系の衛星と、大きな小惑星・準惑星（要件 F20・F21）。読めなくても宇宙は見られるようにする
+  let asteroidFiles: AsteroidFile[] = [];
+  await Promise.all([
+    fetch('/data/moons.json')
+      .then((r) => r.json())
+      .then((d: { moons: MoonRecord[] }) => registerBodies(moonBodies(d.moons, { gm: majorGmKm3s2 }))),
+    fetch('/data/asteroids-large.json')
+      .then((r) => r.json())
+      .then((d: { large: LargeAsteroid[]; files: AsteroidFile[] }) => {
+        registerBodies(largeAsteroidBodies(d.large));
+        asteroidFiles = d.files;
+      }),
+  ]).catch((e: unknown) => console.error('衛星・小惑星のデータが読めない', e));
+  const asteroids = new AsteroidField();
   const solar = new SolarSystemView(Object.fromEntries(textures.filter((t) => t !== null)));
   const stars = decodeStars(starsBin);
   starScene.add(createStarfield(stars).sprite);
@@ -108,6 +128,13 @@ async function main() {
   /** いる場所の恒星系と腕（本物の星・系外惑星のデータの星・自動で作った星のうち、いちばん近い星） */
   const systemAt = (posKm: { x: number; y: number; z: number }) =>
     nearestSystem(posKm, stars.data, STAR_STRIDE, [...galaxy.localStars, ...extraStars]);
+  solar.scene.add(asteroids.group);
+  // 小惑星の光の点は、起動してから裏で読み込む。スマホ（指で操作する端末）は明るいものだけ
+  // （?asteroids=bright を付けると、PC でも明るいものだけにする。重さの確かめ用）
+  const brightOnly = matchMedia('(pointer: coarse)').matches || new URLSearchParams(location.search).get('asteroids') === 'bright';
+  void asteroids
+    .load(brightOnly ? asteroidFiles.slice(0, 1) : asteroidFiles)
+    .catch((e: unknown) => console.error('小惑星のデータが読めない', e));
   const warpView = new WarpView();
   solar.scene.add(warpView.group);
   const shipView = new ShipView();
@@ -121,12 +148,19 @@ async function main() {
     warpView.setWarps(warps);
   };
   const refreshWarps = async () => setWarps(await warpApi.list());
+  /** 自分の宇宙船の設計（要件 F27）。サーバーから読むまでは仮にアロー */
+  let myDesign: ShipDesign = { v: SHIP_DESIGN_VERSION, hull: 'arrow' };
   let online = false;
   try {
     await ensureSession();
     online = true;
     await refreshWarps();
     hudStore.set({ warpsReady: true });
+    // 自分の宇宙船の設計。まだ決めていなければ、作る画面を出す
+    const saved = await shipApi.get();
+    hudStore.set({ shipReady: true });
+    if (saved) myDesign = saved;
+    else hudStore.set({ shipBuilder: { hull: myDesign.hull, firstTime: true, saving: false } });
   } catch (e) {
     console.error(e);
     hudStore.set({ status: 'サーバーにつながらないため、ワープホールは使えません' });
@@ -134,6 +168,64 @@ async function main() {
 
   let observer = startObserver(worldNow());
   const controls = new FlightControls(canvas);
+
+  // 視点（要件 F28）と自分の宇宙船（要件 F27）
+  const chase = new ChaseCamera();
+  /** 宇宙船を作る画面を開いている間に、船を見せるためのカメラ（ゆっくり回る） */
+  const previewCam = new ChaseCamera();
+  previewCam.mode = 'third';
+  previewCam.pitch = 0.2;
+  previewCam.distanceFactor = 2.4;
+  controls.onOrbit = (dx, dy) => {
+    if (chase.mode === 'third') chase.orbit(dx, dy);
+  };
+  controls.onZoom = (steps) => {
+    if (chase.mode === 'third') chase.zoom(steps);
+  };
+  controls.onToggleView = () => hudActions.toggleView();
+  hudActions.toggleView = () => {
+    const mode = chase.toggle();
+    if (mode === 'first') {
+      chase.reset();
+      controls.dragMode = 'steer';
+    }
+    hudStore.set({ viewMode: mode, orbitDrag: false });
+  };
+  hudActions.toggleOrbitDrag = () => {
+    controls.dragMode = controls.dragMode === 'orbit' ? 'steer' : 'orbit';
+    hudStore.set({ orbitDrag: controls.dragMode === 'orbit' });
+  };
+  hudActions.openShipBuilder = () => {
+    hudStore.set({ shipBuilder: { hull: myDesign.hull, firstTime: false, saving: false } });
+  };
+  hudActions.previewHull = (hull) => {
+    const b = hudStore.get().shipBuilder;
+    if (b) hudStore.set({ shipBuilder: { ...b, hull } });
+  };
+  const saveDesign = async (design: ShipDesign, notice: boolean) => {
+    const b = hudStore.get().shipBuilder;
+    if (b) hudStore.set({ shipBuilder: { ...b, saving: true } });
+    try {
+      await shipApi.save(design);
+      myDesign = design;
+      hudStore.set({ shipBuilder: null });
+      if (notice) showNotice(`宇宙船を ${HULLS[design.hull].nameJa} にしました`);
+    } catch (e) {
+      console.error(e);
+      if (b) hudStore.set({ shipBuilder: { ...b, saving: false } });
+      showNotice('宇宙船を保存できませんでした。少し待ってからもう一度試してください', 5000);
+    }
+  };
+  hudActions.saveShip = () => {
+    const b = hudStore.get().shipBuilder;
+    if (b) void saveDesign({ v: SHIP_DESIGN_VERSION, hull: b.hull }, true);
+  };
+  hudActions.closeShipBuilder = () => {
+    const b = hudStore.get().shipBuilder;
+    // 初めての画面を閉じたら、いまの船（自動で決めた船）を保存して、次から聞かない
+    if (b?.firstTime) void saveDesign(myDesign, false);
+    else hudStore.set({ shipBuilder: null });
+  };
   {
     const d = worldNow();
     const earthRel = sub(heliocentricPositionKm('Earth', d), absolutePositionKm(observer, d));
@@ -251,6 +343,7 @@ async function main() {
     observer = reanchor(keepOutsideBodies(moveBy(observer, delta), date), date);
     const abs = absolutePositionKm(observer, date);
     solar.update(date, abs);
+    asteroids.update(date, abs);
     warpView.update(date, abs, nowMs / 1000);
 
     // いる恒星系。その恒星系の天体を登録し、宇宙の部屋（他のプレイヤーの宇宙船。要件 F2）も恒星系ごとに分ける
@@ -264,15 +357,22 @@ async function main() {
       if (nowMs - lastSend > 1000 / SHIP_SEND_HZ) {
         lastSend = nowMs;
         const q = controls.orientation;
-        link.send({ ...observer, velocityKmS, orientation: { x: q.x, y: q.y, z: q.z, w: q.w } });
+        link.send({ ...observer, velocityKmS, orientation: { x: q.x, y: q.y, z: q.z, w: q.w } }, myDesign);
       }
     }
     const serverNow = link.serverNow();
-    const others = link.ships.map((snap) => ({ id: snap.id, hue: snap.hue, state: predictShip(snap, serverNow) }));
+    const others = link.ships.map((snap) => ({ id: snap.id, hue: snap.hue, state: predictShip(snap, serverNow), design: snap.d }));
     shipView.update(others, date, abs);
 
-    camera.quaternion.copy(controls.orientation);
-    starCamera.quaternion.copy(controls.orientation);
+    // 視点：宇宙船を作る画面を開いている間は、選んでいる船をゆっくり回して見せる
+    const builder = hudStore.get().shipBuilder;
+    const shownHull = builder?.hull ?? myDesign.hull;
+    const cam = builder ? previewCam : chase;
+    if (builder) previewCam.yaw += dt * 0.5;
+    cam.pose(controls.orientation, hullLengthKm(shownHull), camera.position, camera.quaternion);
+    const q = controls.orientation;
+    shipView.setOwn(cam.mode === 'third', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w });
+    starCamera.quaternion.copy(camera.quaternion);
     starCamera.position.set(abs.x / KM_PER_PC, abs.y / KM_PER_PC, abs.z / KM_PER_PC);
     galaxy.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
 
@@ -284,7 +384,11 @@ async function main() {
     if (nowMs - lastHud > HUD_INTERVAL_MS) {
       lastHud = nowMs;
       const targets: RadarTarget[] = [
-        ...allBodies().map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date) })),
+        // 天体が多いので、半径 200 km 以上か、1,000 万 km より近い天体だけを出す
+        ...allBodies()
+          .map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date), r: b.radiusKm }))
+          .filter((t) => t.r >= 200 || length(sub(t.positionKm, abs)) < 1e7)
+          .map(({ r: _r, ...t }) => t),
         ...others.map((o) => ({ kind: 'ship' as const, id: o.id, label: '', positionKm: shipPositionKm(o.state, date) })),
         // レーダーは狭いので、住所の恒星系から後ろだけを出す（例：SOL-3-0-001）
         ...warps.map((w) => ({

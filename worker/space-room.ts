@@ -19,6 +19,8 @@ import {
   type ShipState,
 } from '../src/world/ship-schema';
 import { nearestIndices, shipPositionKm } from '../src/world/ships';
+import { designOrNone } from '../src/world/ship-schema';
+import type { ShipDesign } from '../src/world/ship-design';
 
 const BROADCAST_MS = 1000 / SHIP_SEND_HZ;
 const MAX_MESSAGE_BYTES = 2048;
@@ -28,8 +30,22 @@ interface Attachment {
   sid: string;
   hue: number;
   state: ShipState | null;
+  /** 船の設計（最後に受け取ったもの） */
+  design?: ShipDesign;
   /** 状態を受け取った時刻（ms） */
   at: number;
+}
+
+/**
+ * 近い船を選ぶための位置。サーバーは太陽系の主な天体の位置しか計算できない（衛星・小惑星・系外惑星の一覧を持たない）ので、
+ * それ以外を基準にしている船は、基準の天体からの相対位置で代わりにする（同じ天体のまわりの船どうしは正しく並ぶ）
+ */
+function roughPositionKm(s: ShipState, date: Date) {
+  try {
+    return shipPositionKm(s, date);
+  } catch {
+    return s.offsetKm;
+  }
 }
 
 export class SpaceRoom extends DurableObject<Env> {
@@ -60,9 +76,10 @@ export class SpaceRoom extends DurableObject<Env> {
     } catch {
       return;
     }
-    const m = parsed as { t?: unknown; s?: unknown };
+    const m = parsed as { t?: unknown; s?: unknown; d?: unknown };
     if (m.t !== 'state' || !isShipState(m.s)) return;
     a.state = m.s;
+    a.design = designOrNone(m.d) ?? a.design;
     a.at = now;
     ws.serializeAttachment(a);
 
@@ -86,8 +103,14 @@ export class SpaceRoom extends DurableObject<Env> {
     const sockets = this.ctx.getWebSockets();
     const all = sockets.map((ws) => ({ ws, a: ws.deserializeAttachment() as Attachment }));
     const active = all.filter((e) => e.a.state && now - e.a.at < SHIP_STALE_MS);
-    const positions = active.map((e) => shipPositionKm(e.a.state as ShipState, date));
-    const snaps: ShipSnapshot[] = active.map((e) => ({ id: e.a.sid, hue: e.a.hue, s: e.a.state as ShipState, at: e.a.at }));
+    const positions = active.map((e) => roughPositionKm(e.a.state as ShipState, date));
+    const snaps: ShipSnapshot[] = active.map((e) => ({
+      id: e.a.sid,
+      hue: e.a.hue,
+      s: e.a.state as ShipState,
+      d: e.a.design,
+      at: e.a.at,
+    }));
 
     for (const { ws, a } of all) {
       const selfIndex = active.findIndex((e) => e.a.sid === a.sid);

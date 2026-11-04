@@ -30,6 +30,10 @@ export interface KeplerElements {
   periodDays: number;
   /** 基準の面（x・y が面、z が北）→ EQJ の回転 */
   frame: Mat3;
+  /** 近点引数 ω が 1 日に進む角度（衛星の近点の歳差。無ければ 0） */
+  periRatePerDay?: number;
+  /** 昇交点の経度 Ω が 1 日に進む角度（衛星の交点の逆行は負。無ければ 0） */
+  nodeRatePerDay?: number;
 }
 
 /** ケプラーの方程式 M = E − e·sin E を解く（離心近点角 E） */
@@ -48,10 +52,23 @@ export function solveKepler(meanAnomaly: number, e: number): number {
 export const orbitToEqj = (el: Pick<KeplerElements, 'nodeRad' | 'iRad' | 'periRad' | 'frame'>): Mat3 =>
   mulMat(el.frame, mulMat(rotZ(el.nodeRad), mulMat(rotX(el.iRad), rotZ(el.periRad))));
 
+/** 歳差のある軌道か（あれば、軌道の向きを時刻ごとに作り直す） */
+export const hasPrecession = (el: KeplerElements): boolean => !!el.periRatePerDay || !!el.nodeRatePerDay;
+
 /** 親の天体の中心からの位置（km・EQJ） */
-export function keplerPositionKm(el: KeplerElements, date: Date, rot = orbitToEqj(el)): Vec3 {
+export function keplerPositionKm(el: KeplerElements, date: Date, rot?: Mat3): Vec3 {
+  const dt = date.getTime() - el.epochMs;
+  if (!rot || hasPrecession(el)) {
+    const days = dt / DAY_MS;
+    rot = orbitToEqj({
+      frame: el.frame,
+      iRad: el.iRad,
+      nodeRad: el.nodeRad + (el.nodeRatePerDay ?? 0) * days,
+      periRad: el.periRad + (el.periRatePerDay ?? 0) * days,
+    });
+  }
   const n = (2 * Math.PI) / (el.periodDays * DAY_MS);
-  const M = el.meanAnomalyRad + n * (date.getTime() - el.epochMs);
+  const M = el.meanAnomalyRad + n * dt;
   const E = solveKepler(M, el.e);
   const b = el.aKm * Math.sqrt(1 - el.e * el.e);
   const p = { x: el.aKm * (Math.cos(E) - el.e), y: b * Math.sin(E), z: 0 };
