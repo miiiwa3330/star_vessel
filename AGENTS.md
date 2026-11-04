@@ -4,7 +4,7 @@
 
 **サービスの内容そのもの（コンセプト・体験の設計・機能仕様・世界観・技術選定の理由）は本ファイルに書かない。** それらの正本は `docs/` 配下に置く。本ファイルは「どう作業するか」だけを扱う。
 
-> **現在の状態（2026-11-04）**：要件を詰めている段階で、コードは無い。`docs/` に要件・コンセプトの初版がある。Web アプリとして作り、ブラウザ側の技術スタックは決定。サーバー側の技術・コマンドは未定。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
+> **現在の状態（2026-11-04）**：「世界の創造」の土台ができた（現実の時刻の太陽系と、HYG の星空を一人称で見られる。操縦は仮）。サーバー側の技術は未定。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
 
 ---
 
@@ -43,6 +43,8 @@ docs は実装の副産物ではなく、実装と同格の成果物として扱
 | コンセプト・体験・世界観 | [`docs/concept/README.md`](docs/concept/README.md) |
 | 要件・決まっていないこと | [`docs/product/requirements.md`](docs/product/requirements.md) |
 | デザインルール | [`docs/design/README.md`](docs/design/README.md) |
+| 世界の作り方（単位・座標系・自分の位置・描画の分け方） | [`docs/tech/world-model.md`](docs/tech/world-model.md) |
+| 素材とライセンス | [`docs/tech/credits.md`](docs/tech/credits.md) |
 | 処理的に可能な範囲（Web／アプリ） | [`docs/tech/feasibility.md`](docs/tech/feasibility.md) |
 | 技術スタック・選定理由 | [`docs/tech/stack.md`](docs/tech/stack.md) |
 | 開発経緯・判断の変遷 | [`docs/devlog/README.md`](docs/devlog/README.md) |
@@ -87,6 +89,8 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 | 機能・画面の追加・変更 | `docs/product/` 配下の該当ファイル |
 | デザインルール（色・フォント・UI 部品・演出）の追加・変更 | `docs/design/README.md` |
 | 技術スタック・ライブラリの追加 | `docs/tech/stack.md` |
+| 単位・座標系・位置の持ち方・描画の分け方の変更 | `docs/tech/world-model.md` |
+| 外部のデータ・画像・ライブラリの追加 | `docs/tech/credits.md` |
 | ディレクトリ構成の変更 | 本ファイルの「ディレクトリ構成」 |
 | 設計・調査・方針変更、詰まった点、判断を変えた点 | `docs/devlog/entries/YYYY-MM-DD-<slug>.md` |
 | 決定事項（何を・なぜ決めたか） | 該当する docs の「決まっていないこと」から「決まったこと」へ日付付きで移す。経緯が重要なら devlog にも残す |
@@ -124,17 +128,39 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 
 ## コマンド
 
-**未定。** 技術スタックが決まったら、開発サーバー・テスト・型チェック・ビルドのコマンドを表で書く。AI がサーバーを起動するときの方法（バックグラウンド起動・停止）も書く。
+| 用途 | コマンド |
+|------|----------|
+| 開発サーバー | `npm run dev`（http://localhost:5173 。AI が起動するときはバックグラウンドで `npx vite --port 5173 --strictPort` を実行し、終わったら止める） |
+| テスト | `npm test`（Vitest。天体の位置・向き、星の見た目、自分の位置の計算） |
+| 型チェック | `npm run check` |
+| ビルド | `npm run build`（型チェック → `dist/`） |
+| 星のデータの作り直し | `npm run stars`（HYG を取得して `public/data/stars.bin` を書き出す。取得した元データは `tools/.cache/` に置き、コミットしない） |
+
+- **「動いた」と書く前に、画面で確かめる。** テストが通っても、描画の向き・明るさ・重なりは画面でしか分からない。WebGPU と WebGL2（WebGPU を消した状態）の両方と、スマホの幅（390px 前後）で見る
 
 ## ディレクトリ構成
 
 ```
-AGENTS.md   本ファイル（作業の前提とルール）
-README.md   サービスの概要・起動手順
-docs/       仕様・判断・経緯の正本（地図は docs/README.md）
+src/
+  main.ts                 起動と毎フレームのループ（世界の更新 → 描画 → 画面の表示）
+  world/                  世界の計算。three.js も React も使わない純粋な関数（テストはここに集める）
+    solar-system.ts       天体の位置と向き。astronomy-engine はこのファイルの中だけで使う
+    observer.ts           自分の位置（基準の天体からの相対位置）
+    stars.ts              星のデータの読み方と、見た目（大きさ・明るさ・色）
+    clock.ts              世界の時刻
+    units.ts / vec.ts     単位と、倍精度のベクトル・行列
+  render/                 three.js での描画（太陽系・星空・球の向きのつなぎ）
+  controls/flight.ts      一人称の操縦（仮）
+  ui/                     画面の表示（React）。hud-store.ts を通して世界から値を受け取る
+public/
+  data/stars.bin          星のデータ（npm run stars で作る。stars.LICENSE.txt と必ず一緒に置く）
+  textures/               天体の画像（出どころは docs/tech/credits.md）
+tools/build-stars.mjs     HYG → stars.bin の変換
+docs/                     仕様・判断・経緯の正本（地図は docs/README.md）
 ```
 
-ファイルを追加したら、主要なディレクトリとその役割をここに足す。
+- 世界の計算は `src/world/` に置き、three.js・React を読み込まない。描画や画面から切り離してテストするため
+- 外部の素材（データ・画像）を足したら、[`docs/tech/credits.md`](docs/tech/credits.md) に書き、表記が要るものは画面のクレジットにも出す
 
 ---
 

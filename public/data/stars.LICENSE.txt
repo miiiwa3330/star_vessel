@@ -1,0 +1,5 @@
+stars.bin は HYG Database v4.4 を変換したデータです。
+This data is derived from the HYG Database v4.4 by David Nash (astronexus), https://codeberg.org/astronexus/hyg
+Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0):
+https://creativecommons.org/licenses/by-sa/4.0/
+Changes: kept only x, y, z (parsec, J2000 equatorial), apparent magnitude and B-V color index; removed the Sun; sorted by magnitude; stored as little-endian float32.
