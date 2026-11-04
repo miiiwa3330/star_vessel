@@ -1,0 +1,2 @@
+# 手元の開発用の秘密の値。.dev.vars にコピーして値を入れる（.dev.vars はコミットしない）
+BETTER_AUTH_SECRET=openssl rand -base64 32 で作った値

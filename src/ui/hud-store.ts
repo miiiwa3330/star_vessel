@@ -8,7 +8,10 @@ import type { BodyId } from '../world/solar-system';
 
 export interface WarpListItem {
   id: string;
-  name: string;
+  /** 宇宙の住所（例：MW-ORI-SOL-3-1-002） */
+  code: string;
+  /** 住所の読み（例：天の川銀河 オリオン腕 太陽系 地球 月 2番） */
+  reading: string;
   distanceKm: number;
   mine: boolean;
 }
@@ -25,8 +28,8 @@ export interface HudState {
   notice: string | null;
   radar: RadarBlip[];
   warps: WarpListItem[];
-  /** ワープホールが全員と共有されているか（仮の保存のあいだは false） */
-  warpsShared: boolean;
+  /** ワープホールが使えるか（サーバーにつながらないときは false） */
+  warpsReady: boolean;
 }
 
 let state: HudState = {
@@ -39,7 +42,7 @@ let state: HudState = {
   notice: null,
   radar: [],
   warps: [],
-  warpsShared: false,
+  warpsReady: false,
 };
 const listeners = new Set<() => void>();
 
@@ -60,6 +63,8 @@ export const hudActions = {
   placeWarp: (): void => {},
   warpTo: (_id: string): void => {},
   removeWarp: (_id: string): void => {},
+  /** 一覧を開いたときに、全員のワープホールを取り直す */
+  refreshWarps: (): void => {},
 };
 
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;

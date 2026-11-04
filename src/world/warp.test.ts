@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { arriveAt, createWarpHere, isWarpHole, warpPositionKm, WARP_STANDOFF_KM } from './warp';
+import { arriveAt, planWarpHere, warpPositionKm, WARP_STANDOFF_KM } from './warp';
+import { isWarpHole, isWarpPlacement } from './warp-schema';
 import { absolutePositionKm, type Observer } from './observer';
 import { heliocentricPositionKm } from './solar-system';
 import { minAltitudeKm } from './collision';
@@ -9,57 +10,64 @@ const now = new Date('2026-11-05T00:00:00Z');
 const later = new Date('2026-12-01T00:00:00Z');
 const nearMars: Observer = { anchor: 'Mars', offsetKm: { x: 10_000, y: 0, z: 0 } };
 const forwardY = { x: 0, y: 1, z: 0 };
-const make = (o: Observer, existing: Parameters<typeof createWarpHere>[4] = [], id = 'w1') =>
-  createWarpHere(o, forwardY, now, 'me', existing, id, now);
+const sol = () => 'SOL';
+const plan = (o: Observer, forward = forwardY) => planWarpHere(o, forward, now, sol);
 
-describe('createWarpHere', () => {
+describe('planWarpHere', () => {
   it('自分の前方 WARP_STANDOFF_KM に置かれる', () => {
-    const w = make(nearMars);
-    const d = length(sub(warpPositionKm(w, now), absolutePositionKm(nearMars, now)));
+    const p = plan(nearMars);
+    const d = length(sub(warpPositionKm(p, now), absolutePositionKm(nearMars, now)));
     expect(d).toBeCloseTo(WARP_STANDOFF_KM, 6);
-    expect(w.offsetKm.y).toBeCloseTo(WARP_STANDOFF_KM, 6);
   });
 
   it('ワープすると、置いた人が立っていた位置（輪の正面）に出る', () => {
-    const w = make(nearMars);
-    const arrived = absolutePositionKm(arriveAt(w), later);
-    const placedFrom = absolutePositionKm(nearMars, later);
-    expect(length(sub(arrived, placedFrom))).toBeLessThan(1e-6);
+    const p = plan(nearMars);
+    const d = length(sub(absolutePositionKm(arriveAt(p), later), absolutePositionKm(nearMars, later)));
+    expect(d).toBeLessThan(1e-6);
   });
 
   it('天体の近くのワープホールは、天体と一緒に動く', () => {
-    const w = make(nearMars);
-    expect(length(sub(warpPositionKm(w, later), warpPositionKm(w, now)))).toBeGreaterThan(1e6);
+    const p = plan(nearMars);
+    expect(length(sub(warpPositionKm(p, later), warpPositionKm(p, now)))).toBeGreaterThan(1e6);
   });
 
   it('前方が天体にふさがれていても、天体の中には置かない', () => {
-    // 地球の表面 150 km の高さで、真下（地球の中心の方）を向いている
     const low: Observer = { anchor: 'Earth', offsetKm: { x: 6_371 + 150, y: 0, z: 0 } };
-    const w = createWarpHere(low, { x: -1, y: 0, z: 0 }, now, 'me', [], 'w1', now);
-    const altitude = length(sub(warpPositionKm(w, now), heliocentricPositionKm('Earth', now))) - 6_371;
+    const p = plan(low, { x: -1, y: 0, z: 0 });
+    const altitude = length(sub(warpPositionKm(p, now), heliocentricPositionKm('Earth', now))) - 6_371;
     expect(altitude).toBeGreaterThanOrEqual(minAltitudeKm(6_371) - 1e-6);
   });
 
-  it('名前は「天体の近く 番号」で、同じ天体のワープホールの数で番号が増える', () => {
-    const first = make(nearMars);
-    const second = make(nearMars, [first], 'w2');
-    expect(first.name).toBe('火星の近く 1');
-    expect(second.name).toBe('火星の近く 2');
+  it('恒星系の記号は、置く場所の位置から決める', () => {
+    let asked: unknown = null;
+    planWarpHere(nearMars, forwardY, now, (pos) => {
+      asked = pos;
+      return 'SOL';
+    });
+    expect(length(sub(asked as never, warpPositionKm(plan(nearMars), now)))).toBeLessThan(1e-6);
   });
 
-  it('置いたあとに自分が動いても、ワープホールは動かない', () => {
-    const o: Observer = { anchor: 'Earth', offsetKm: { x: 20_000, y: 0, z: 0 } };
-    const w = make(o);
-    o.offsetKm.x = 999;
-    expect(w.offsetKm.x).toBe(20_000);
+  it('置く場所は、サーバーが受け付ける形になっている', () => {
+    expect(isWarpPlacement(plan(nearMars))).toBe(true);
+  });
+});
+
+describe('isWarpPlacement', () => {
+  const ok = plan(nearMars);
+  it('正しくない置き場所は受け付けない', () => {
+    expect(isWarpPlacement({ ...ok, anchor: 'Vulcan' })).toBe(false);
+    expect(isWarpPlacement({ ...ok, facing: { x: 0, y: 0, z: 0 } })).toBe(false);
+    expect(isWarpPlacement({ ...ok, offsetKm: { x: Number.NaN, y: 0, z: 0 } })).toBe(false);
+    expect(isWarpPlacement({ ...ok, system: 'H32263' })).toBe(false); // 火星を基準にしたまま、ほかの恒星系
+    expect(isWarpPlacement({ ...ok, anchor: 'Sun', system: 'H32263' })).toBe(true);
+    expect(isWarpPlacement(null)).toBe(false);
   });
 });
 
 describe('isWarpHole', () => {
-  it('正しい形だけを受け付ける', () => {
-    expect(isWarpHole(make(nearMars))).toBe(true);
-    expect(isWarpHole({ ...make(nearMars), facing: { x: 0, y: 0, z: 0 } })).toBe(false);
-    expect(isWarpHole({ id: 'x' })).toBe(false);
-    expect(isWarpHole(null)).toBe(false);
+  it('サーバーの返すワープホールの形だけを受け付ける', () => {
+    const w = { ...plan(nearMars), id: 'a', code: 'MW-ORI-SOL-4-0-001', createdAt: now.toISOString(), mine: true };
+    expect(isWarpHole(w)).toBe(true);
+    expect(isWarpHole({ ...w, mine: undefined })).toBe(false);
   });
 });

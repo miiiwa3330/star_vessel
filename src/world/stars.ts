@@ -5,8 +5,8 @@
  * 形式は docs/tech/world-model.md の「恒星のデータ形式」。
  */
 
-/** 1 個の星が持つ数の数。x・y・z（pc・EQJ）、見かけの等級、色指数 B−V */
-export const STAR_STRIDE = 5;
+/** 1 個の星が持つ数の数。x・y・z（pc・EQJ）、見かけの等級、色指数 B−V、HYG の id */
+export const STAR_STRIDE = 6;
 
 /** 色指数が分からない星に使う値（太陽と同じくらい） */
 export const DEFAULT_BV = 0.65;

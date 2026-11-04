@@ -11,7 +11,7 @@ const cacheFile = join(cacheDir, 'hyg_v44.csv.gz');
 const outDir = join(root, 'public/data');
 // Codeberg は Git LFS のファイルを /media/ から配る（/raw/ は LFS の目印の小さなファイルになる）
 const SOURCE_URL = 'https://codeberg.org/astronexus/hyg/media/branch/main/data/hyg/CURRENT/hyg_v44.csv.gz';
-const STRIDE = 5;
+const STRIDE = 6;
 
 async function download() {
   if (existsSync(cacheFile)) return;
@@ -55,7 +55,7 @@ for (const line of lines.slice(1)) {
   const f = parseLine(line);
   if (f[iId] === '0') continue; // 太陽は太陽系の側で描く
   const ci = f[iCi] === '' ? Number.NaN : Number(f[iCi]);
-  stars.push([Number(f[iX]), Number(f[iY]), Number(f[iZ]), Number(f[iMag]), ci]);
+  stars.push([Number(f[iX]), Number(f[iY]), Number(f[iZ]), Number(f[iMag]), ci, Number(f[iId])]);
 }
 // 明るい順に並べる。性能の低い端末では先頭から一部だけを描けばよい
 stars.sort((a, b) => a[3] - b[3]);
@@ -71,7 +71,7 @@ writeFileSync(
     'This data is derived from the HYG Database v4.4 by David Nash (astronexus), https://codeberg.org/astronexus/hyg',
     'Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0):',
     'https://creativecommons.org/licenses/by-sa/4.0/',
-    'Changes: kept only x, y, z (parsec, J2000 equatorial), apparent magnitude and B-V color index; removed the Sun; sorted by magnitude; stored as little-endian float32.',
+    'Changes: kept only x, y, z (parsec, J2000 equatorial), apparent magnitude, B-V color index and the HYG id; removed the Sun; sorted by magnitude; stored as little-endian float32.',
     '',
   ].join('\n'),
 );

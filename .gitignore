@@ -3,3 +3,6 @@ dist/
 tools/.cache/
 .env*
 .DS_Store
+.dev.vars
+.wrangler/
+worker-configuration.d.ts

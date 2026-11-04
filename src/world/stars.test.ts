@@ -34,7 +34,7 @@ describe('bvToRgb', () => {
 });
 
 describe('decodeStars', () => {
-  it('5 個ずつの数を 1 個の星として数える', () => {
+  it('STAR_STRIDE 個ずつの数を 1 個の星として数える', () => {
     const buf = new Float32Array(STAR_STRIDE * 3).buffer;
     expect(decodeStars(buf).count).toBe(3);
   });

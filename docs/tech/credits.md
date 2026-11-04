@@ -24,4 +24,6 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | astronomy-engine | MIT |
 | react・react-dom | MIT |
 | vite・vitest・@vitejs/plugin-react | MIT |
+| better-auth・hono・@cloudflare/vite-plugin | MIT |
+| wrangler | MIT または Apache-2.0 |
 | typescript | Apache-2.0 |

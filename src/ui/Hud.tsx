@@ -24,7 +24,7 @@ export function Hud() {
       {s.notice && <div className="hud-panel hud-notice">{s.notice}</div>}
       <div className="hud-dock">
         <Radar blips={s.radar} />
-        <WarpPanel warps={s.warps} shared={s.warpsShared} />
+        <WarpPanel warps={s.warps} ready={s.warpsReady} />
       </div>
       <div className="hud-bottom">
         <div className="hud-panel hud-help">

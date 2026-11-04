@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "star-vessel",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // /api/ だけ Worker が受け、それ以外は Vite が書き出した静的なファイルを配る
+  "assets": { "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "star-vessel",
+      // 本番の D1 を作ったら（npx wrangler d1 create star-vessel）、その id に置き換える。手元の開発ではこの値のままでよい
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": { "BETTER_AUTH_URL": "http://localhost:5173" }
+}

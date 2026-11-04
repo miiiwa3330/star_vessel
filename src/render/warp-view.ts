@@ -3,7 +3,8 @@
  * 大きさは見た目のための値（半径 300 km）。遠くからは小さすぎて見えないので、レーダーで場所を示す。
  */
 import * as THREE from 'three/webgpu';
-import { warpPositionKm, type WarpHole } from '../world/warp';
+import { warpPositionKm } from '../world/warp';
+import type { WarpHole } from '../world/warp-schema';
 import { sub, type Vec3 } from '../world/vec';
 
 const RING_RADIUS_KM = 300;

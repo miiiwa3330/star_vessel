@@ -2,7 +2,8 @@ import * as THREE from 'three/webgpu';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FlightControls } from './controls/flight';
-import { LocalWarpRepository, localPlayerId } from './net/warp-repository';
+import { ensureSession } from './net/auth';
+import { WarpApiError, warpApi } from './net/warp-repository';
 import { createStarfield } from './render/starfield';
 import { SolarSystemView } from './render/solar-system-view';
 import { WarpView } from './render/warp-view';
@@ -13,10 +14,12 @@ import { keepOutsideBodies } from './world/collision';
 import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/observer';
 import { radarBlips, type RadarTarget } from './world/radar';
 import { BODIES, bodyInfo, heliocentricPositionKm } from './world/solar-system';
-import { decodeStars } from './world/stars';
+import { decodeStars, STAR_STRIDE } from './world/stars';
+import { nearestSystem, readAddress } from './world/address';
 import { KM_PER_PC } from './world/units';
 import { length, sub } from './world/vec';
-import { arriveAt, createWarpHere, warpPositionKm, type WarpHole } from './world/warp';
+import { arriveAt, planWarpHere, warpPositionKm } from './world/warp';
+import { MAX_WARPS_PER_PLAYER, type WarpHole } from './world/warp-schema';
 
 const FOV = 60;
 const HUD_INTERVAL_MS = 100;
@@ -53,16 +56,26 @@ async function main() {
     }),
   ]);
   const solar = new SolarSystemView({ Earth: earthMap, Moon: moonMap });
-  starScene.add(createStarfield(decodeStars(starsBin)));
+  const stars = decodeStars(starsBin);
+  starScene.add(createStarfield(stars));
   const warpView = new WarpView();
   solar.scene.add(warpView.group);
 
-  // ワープホール（要件 F9）。共有のサーバーができるまでは、この端末の中だけに保存する
-  const warpRepo = new LocalWarpRepository();
-  const playerId = localPlayerId();
-  let warps: WarpHole[] = await warpRepo.list();
-  warpView.setWarps(warps);
-  hudStore.set({ warpsShared: warpRepo.shared });
+  // ワープホール（要件 F9）。全員で共有する。サーバーにつながらなくても、宇宙は見られるようにする
+  let warps: WarpHole[] = [];
+  const setWarps = (next: WarpHole[]) => {
+    warps = next;
+    warpView.setWarps(warps);
+  };
+  const refreshWarps = async () => setWarps(await warpApi.list());
+  try {
+    await ensureSession();
+    await refreshWarps();
+    hudStore.set({ warpsReady: true });
+  } catch (e) {
+    console.error(e);
+    hudStore.set({ status: 'サーバーにつながらないため、ワープホールは使えません' });
+  }
 
   let observer = startObserver(worldNow());
   const controls = new FlightControls(canvas);
@@ -83,13 +96,25 @@ async function main() {
   window.addEventListener('resize', resize);
   resize();
 
-  hudActions.placeWarp = () => {
-    const now = worldNow();
-    const w = createWarpHere(observer, controls.forward(), now, playerId, warps, crypto.randomUUID(), now);
-    warps = [...warps, w];
-    warpView.setWarps(warps);
-    void warpRepo.add(w);
-    showNotice(`ワープホール「${w.name}」を置きました`);
+  const describeError = (e: unknown) =>
+    e instanceof WarpApiError && e.kind === 'limit'
+      ? `ワープホールを置けるのは ${MAX_WARPS_PER_PLAYER} 個までです。一覧で自分のものを消すと、また置けます`
+      : 'うまくいきませんでした。少し待ってからもう一度試してください';
+  hudActions.placeWarp = async () => {
+    const placement = planWarpHere(observer, controls.forward(), worldNow(), (pos) =>
+      nearestSystem(pos, stars.data, STAR_STRIDE),
+    );
+    try {
+      const w = await warpApi.place(placement);
+      setWarps([...warps, w]);
+      showNotice(`ワープホール ${w.code} を置きました`, 4000);
+    } catch (e) {
+      console.error(e);
+      showNotice(describeError(e), 5000);
+    }
+  };
+  hudActions.refreshWarps = () => {
+    refreshWarps().catch((e: unknown) => console.error(e));
   };
   hudActions.warpTo = (id) => {
     const w = warps.find((x) => x.id === id);
@@ -97,15 +122,19 @@ async function main() {
     observer = arriveAt(w);
     // 輪の正面に出て、輪の方を向く
     controls.lookAt({ x: -w.facing.x, y: -w.facing.y, z: -w.facing.z }, controls.up());
-    showNotice(`「${w.name}」へワープしました`);
+    showNotice(`${w.code} へワープしました`);
   };
-  hudActions.removeWarp = (id) => {
-    const w = warps.find((x) => x.id === id && x.ownerId === playerId);
+  hudActions.removeWarp = async (id) => {
+    const w = warps.find((x) => x.id === id && x.mine);
     if (!w) return;
-    warps = warps.filter((x) => x !== w);
-    warpView.setWarps(warps);
-    void warpRepo.remove(w.id, playerId);
-    showNotice(`ワープホール「${w.name}」を消しました`);
+    try {
+      await warpApi.remove(w.id);
+      setWarps(warps.filter((x) => x.id !== w.id));
+      showNotice(`ワープホール ${w.code} を消しました`);
+    } catch (e) {
+      console.error(e);
+      showNotice(describeError(e), 5000);
+    }
   };
 
   let last = performance.now();
@@ -136,7 +165,13 @@ async function main() {
       lastHud = nowMs;
       const targets: RadarTarget[] = [
         ...BODIES.map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date) })),
-        ...warps.map((w) => ({ kind: 'warp' as const, id: w.id, label: w.name, positionKm: warpPositionKm(w, date) })),
+        // レーダーは狭いので、住所の恒星系から後ろだけを出す（例：SOL-3-0-001）
+        ...warps.map((w) => ({
+          kind: 'warp' as const,
+          id: w.id,
+          label: w.code.split('-').slice(2).join('-'),
+          positionKm: warpPositionKm(w, date),
+        })),
       ];
       hudStore.set({
         date,
@@ -146,9 +181,10 @@ async function main() {
         radar: radarBlips(abs, controls.orientation, targets),
         warps: warps.map((w) => ({
           id: w.id,
-          name: w.name,
+          code: w.code,
+          reading: readAddress(w.code),
           distanceKm: length(sub(warpPositionKm(w, date), abs)),
-          mine: w.ownerId === playerId,
+          mine: w.mine,
         })),
       });
     }

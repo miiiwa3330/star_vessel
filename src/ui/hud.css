@@ -108,6 +108,9 @@
   min-height: 40px;
 }
 .hud-warp-item:hover { background: rgba(116, 230, 255, 0.12); }
+.hud-warp-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hud-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: 0.04em; color: #74e6ff; }
+.hud-button:disabled { opacity: 0.4; cursor: default; }
 
 @media (max-width: 720px), (pointer: coarse) {
   .hud-dock { top: 16px; bottom: auto; width: 130px; }
