@@ -20,7 +20,7 @@ import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/obs
 import { radarBlips, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
 import { predictShip, shipPositionKm } from './world/ships';
-import { allBodies, bodyInfo, findBody, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
+import { allBodies, bodyFixedToEqj, bodyInfo, findBody, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
 import { decodeExoplanets } from './world/exoplanet-data';
 import { StarSystems } from './world/star-systems';
 import { starBodyId } from './world/planets';
@@ -28,7 +28,7 @@ import { createExtraStarfield } from './render/starfield';
 import { decodeStars, STAR_STRIDE } from './world/stars';
 import { nearestSystem, readAddress, setAddressNameLookup, SYSTEM_SOL } from './world/address';
 import { KM_PER_AU, KM_PER_PC } from './world/units';
-import { add, length, normalize, scale, sub } from './world/vec';
+import { add, length, mulVec, normalize, scale, sub } from './world/vec';
 import { arriveAt, planWarpHere, warpPositionKm } from './world/warp';
 import { MAX_WARPS_PER_PLAYER, type WarpHole } from './world/warp-schema';
 
@@ -203,13 +203,14 @@ async function main() {
         controls.lookAt({ x: lookAtPc.x - p.x, y: lookAtPc.y - p.y, z: lookAtPc.z - p.z }, { x: 0, y: 0, z: 1 });
       },
       /** 天体（id）のそばへ行き、その天体の方を向く。distanceKm は中心からの距離（省略すると半径の 4 倍） */
-      teleportBody(id: string, distanceKm?: number) {
+      teleportBody(id: string, distanceKm?: number, view: 'day' | 'pole' | 'night' = 'day') {
         const d = worldNow();
         const info = bodyInfo(id);
         const center = heliocentricPositionKm(id, d);
-        // 恒星の光が当たっている側から見る
+        // day：恒星の光が当たっている側から、pole：北極の上から、night：夜の側から見る
         const toLight = center.x === 0 && center.y === 0 && center.z === 0 ? { x: 1, y: 0, z: 0 } : scale(center, -1 / length(center));
-        const p = add(center, scale(toLight, distanceKm ?? info.radiusKm * 4));
+        const dir = view === 'pole' ? mulVec(bodyFixedToEqj(id, d), { x: 0, y: 0, z: 1 }) : view === 'night' ? scale(toLight, -1) : toLight;
+        const p = add(center, scale(dir, distanceKm ?? info.radiusKm * 4));
         observer = reanchor({ anchor: 'Sun', offsetKm: p }, d);
         lastRoomCheck = -Infinity;
         controls.lookAt(sub(center, p), { x: 0, y: 0, z: 1 });

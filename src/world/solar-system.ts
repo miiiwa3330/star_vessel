@@ -64,9 +64,36 @@ export interface BodyInfo {
   surface?: { look: SurfaceLook; seed: number };
   /** 環（赤道の面） */
   rings?: readonly RingZone[];
+  /** 環の色（0〜255 の RGB）。無ければ土星の環の色 */
+  ringColor?: readonly [number, number, number];
   /** 光る天体（恒星）の色（0〜1 の RGB） */
   glow?: readonly [number, number, number];
+  /** 大気（ふちに光の輪を描く）。見た目のための値 */
+  atmosphere?: Atmosphere;
 }
+
+export interface Atmosphere {
+  /** 色（0〜1 の RGB） */
+  color: readonly [number, number, number];
+  /** 光の輪の厚さ（半径に対する割合） */
+  thickness: number;
+  /** 明るさ（0〜1 くらい） */
+  strength: number;
+}
+
+/**
+ * 太陽系の大気の見た目（要件 F25）。色・厚さ・明るさは見た目のための値で、観測の値ではない。
+ * 厚さは本物の大気の高さ（地球で数十 km）より厚くしている。本物どおりだと 1 ピクセルにもならないため
+ */
+const SOL_ATMOSPHERES: Record<string, Atmosphere> = {
+  Earth: { color: [0.35, 0.6, 1.0], thickness: 0.025, strength: 1 },
+  Venus: { color: [1.0, 0.9, 0.65], thickness: 0.03, strength: 0.9 },
+  Mars: { color: [0.95, 0.6, 0.45], thickness: 0.015, strength: 0.35 },
+  Jupiter: { color: [0.95, 0.85, 0.7], thickness: 0.012, strength: 0.5 },
+  Saturn: { color: [0.95, 0.88, 0.65], thickness: 0.012, strength: 0.5 },
+  Uranus: { color: [0.6, 0.9, 0.95], thickness: 0.02, strength: 0.6 },
+  Neptune: { color: [0.4, 0.6, 1.0], thickness: 0.02, strength: 0.6 },
+};
 
 /**
  * 土星の環（赤道の面にある）。半径は NASA の Saturnian Rings Fact Sheet の主な環の範囲（km）。
@@ -112,6 +139,7 @@ const major = (id: string, nameJa: string, radiusKm: number, kind: BodyKind, par
   motion: { type: 'major' },
   spin: { type: 'major' },
   anchorRadiusKm: SOI_KM[id],
+  atmosphere: SOL_ATMOSPHERES[id],
 });
 
 const galilean = (id: string, nameJa: string, radiusKm: number, index: 0 | 1 | 2 | 3): BodyInfo => ({

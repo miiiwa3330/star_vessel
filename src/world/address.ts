@@ -43,8 +43,11 @@ export const SOL_BODY_NUMBERS: Readonly<Record<string, { planet: number; moon: n
 const SOL_MOON_ID = /^S([1-9])\.([1-9][0-9]{0,2})$/;
 /** 小惑星・準惑星：A＋小惑星番号（例：ケレスは A1）。住所の惑星の位置にも A1 と書く */
 const ASTEROID_ID = /^A([1-9][0-9]{0,6})$/;
-/** 系外惑星：恒星系の記号＋.＋恒星に近い順の番号。自動で作った惑星で、作り方の世代が 2 以上なら ~世代 を付ける */
-const EXOPLANET_ID = /^([0-9A-Z]+)\.([1-9][0-9]?)(?:~([2-9]|[1-9][0-9]))?$/;
+/**
+ * 系外惑星：恒星系の記号＋.＋恒星に近い順の番号。その衛星は、さらに .＋惑星に近い順の番号。
+ * 自動で作った天体で、作り方の世代が 2 以上なら ~世代 を付ける
+ */
+const EXOPLANET_ID = /^([0-9A-Z]+)\.([1-9][0-9]?)(?:\.([1-9][0-9]?))?(?:~([2-9]|[1-9][0-9]))?$/;
 
 export interface BodyAddress {
   /** 住所の惑星の位置（数字、または A＋小惑星番号） */
@@ -66,16 +69,16 @@ export function bodyAddress(anchor: string): BodyAddress | null {
   m = ASTEROID_ID.exec(anchor);
   if (m) return { planet: `A${m[1]}`, moon: 0, system: SYSTEM_SOL };
   m = EXOPLANET_ID.exec(anchor);
-  if (m && m[1] !== SYSTEM_SOL && SYSTEM_PATTERN.test(m[1])) return { planet: m[2], moon: 0, system: m[1] };
+  if (m && m[1] !== SYSTEM_SOL && SYSTEM_PATTERN.test(m[1])) return { planet: m[2], moon: m[3] ? Number(m[3]) : 0, system: m[1] };
   return null;
 }
 
 /** 天体の id の形として正しいか */
 export const isBodyId = (v: unknown): v is string => typeof v === 'string' && bodyAddress(v) !== null;
 
-/** 系外惑星の id（例：H70666.2。世代 2 以上は H70666.2~2） */
-export const exoplanetId = (system: string, n: number, generation = 1): string =>
-  `${system}.${n}${generation >= 2 ? `~${generation}` : ''}`;
+/** 系外惑星の id（例：H70666.2。世代 2 以上は H70666.2~2）。moon を渡すとその衛星の id（例：H70666.2.1） */
+export const exoplanetId = (system: string, n: number, generation = 1, moon = 0): string =>
+  `${system}.${n}${moon > 0 ? `.${moon}` : ''}${generation >= 2 ? `~${generation}` : ''}`;
 
 /**
  * SOL：太陽系、H＋数字：本物の星（HYG の id）、G＋36 進 11 桁：自動で作った星（src/world/galaxy.ts）、
@@ -208,7 +211,8 @@ export function readAddress(code: string): string {
   }
   if (moon > 0) {
     const known = system === SYSTEM_SOL && planet === 3 && moon === 1 ? '月' : nameOf({ system, planet: planetS, moon });
-    words.push(known ?? `第${toRoman(moon)}衛星`);
+    // 太陽系の衛星は正式な番号（ローマ数字）、系外の衛星は惑星に近い順の番号
+    words.push(known ?? (system === SYSTEM_SOL ? `第${toRoman(moon)}衛星` : `第${moon}衛星`));
   }
   words.push(`${Number(serialS)}番`);
   return words.join(' ');
