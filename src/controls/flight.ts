@@ -49,6 +49,18 @@ export class FlightControls {
     this.orientation.setFromRotationMatrix(m);
   }
 
+  /** 自分の進む向き（EQJ の単位ベクトル。カメラの −Z） */
+  forward(): Vec3 {
+    const v = new Vector3(0, 0, -1).applyQuaternion(this.orientation);
+    return { x: v.x, y: v.y, z: v.z };
+  }
+
+  /** 自分の上の向き（EQJ の単位ベクトル。カメラの +Y） */
+  up(): Vec3 {
+    const v = new Vector3(0, 1, 0).applyQuaternion(this.orientation);
+    return { x: v.x, y: v.y, z: v.z };
+  }
+
   /** dt 秒ぶん操作を進め、動いた量（km・EQJ）を返す */
   update(dt: number): Vec3 {
     const roll = (this.keys.has('KeyQ') ? 1 : 0) - (this.keys.has('KeyE') ? 1 : 0);

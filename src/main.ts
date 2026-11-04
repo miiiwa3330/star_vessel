@@ -2,19 +2,24 @@ import * as THREE from 'three/webgpu';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FlightControls } from './controls/flight';
+import { LocalWarpRepository, localPlayerId } from './net/warp-repository';
 import { createStarfield } from './render/starfield';
 import { SolarSystemView } from './render/solar-system-view';
+import { WarpView } from './render/warp-view';
 import { Hud } from './ui/Hud';
-import { hudStore } from './ui/hud-store';
+import { hudActions, hudStore, showNotice } from './ui/hud-store';
 import { worldNow } from './world/clock';
+import { keepOutsideBodies } from './world/collision';
 import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/observer';
-import { bodyInfo, heliocentricPositionKm } from './world/solar-system';
+import { radarBlips, type RadarTarget } from './world/radar';
+import { BODIES, bodyInfo, heliocentricPositionKm } from './world/solar-system';
 import { decodeStars } from './world/stars';
 import { KM_PER_PC } from './world/units';
 import { length, sub } from './world/vec';
+import { arriveAt, createWarpHere, warpPositionKm, type WarpHole } from './world/warp';
 
 const FOV = 60;
-const HUD_INTERVAL_MS = 250;
+const HUD_INTERVAL_MS = 100;
 
 async function main() {
   createRoot(document.getElementById('ui')!).render(createElement(Hud));
@@ -49,6 +54,15 @@ async function main() {
   ]);
   const solar = new SolarSystemView({ Earth: earthMap, Moon: moonMap });
   starScene.add(createStarfield(decodeStars(starsBin)));
+  const warpView = new WarpView();
+  solar.scene.add(warpView.group);
+
+  // ワープホール（要件 F9）。共有のサーバーができるまでは、この端末の中だけに保存する
+  const warpRepo = new LocalWarpRepository();
+  const playerId = localPlayerId();
+  let warps: WarpHole[] = await warpRepo.list();
+  warpView.setWarps(warps);
+  hudStore.set({ warpsShared: warpRepo.shared });
 
   let observer = startObserver(worldNow());
   const controls = new FlightControls(canvas);
@@ -69,6 +83,31 @@ async function main() {
   window.addEventListener('resize', resize);
   resize();
 
+  hudActions.placeWarp = () => {
+    const now = worldNow();
+    const w = createWarpHere(observer, controls.forward(), now, playerId, warps, crypto.randomUUID(), now);
+    warps = [...warps, w];
+    warpView.setWarps(warps);
+    void warpRepo.add(w);
+    showNotice(`ワープホール「${w.name}」を置きました`);
+  };
+  hudActions.warpTo = (id) => {
+    const w = warps.find((x) => x.id === id);
+    if (!w) return;
+    observer = arriveAt(w);
+    // 輪の正面に出て、輪の方を向く
+    controls.lookAt({ x: -w.facing.x, y: -w.facing.y, z: -w.facing.z }, controls.up());
+    showNotice(`「${w.name}」へワープしました`);
+  };
+  hudActions.removeWarp = (id) => {
+    const w = warps.find((x) => x.id === id && x.ownerId === playerId);
+    if (!w) return;
+    warps = warps.filter((x) => x !== w);
+    warpView.setWarps(warps);
+    void warpRepo.remove(w.id, playerId);
+    showNotice(`ワープホール「${w.name}」を消しました`);
+  };
+
   let last = performance.now();
   let lastHud = 0;
   hudStore.set({ status: null });
@@ -79,9 +118,10 @@ async function main() {
     last = nowMs;
     const date = worldNow();
 
-    observer = reanchor(moveBy(observer, controls.update(dt)), date);
+    observer = reanchor(keepOutsideBodies(moveBy(observer, controls.update(dt)), date), date);
     const abs = absolutePositionKm(observer, date);
     solar.update(date, abs);
+    warpView.update(date, abs, nowMs / 1000);
 
     camera.quaternion.copy(controls.orientation);
     starCamera.quaternion.copy(controls.orientation);
@@ -94,11 +134,22 @@ async function main() {
 
     if (nowMs - lastHud > HUD_INTERVAL_MS) {
       lastHud = nowMs;
+      const targets: RadarTarget[] = [
+        ...BODIES.map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date) })),
+        ...warps.map((w) => ({ kind: 'warp' as const, id: w.id, label: w.name, positionKm: warpPositionKm(w, date) })),
+      ];
       hudStore.set({
         date,
         anchor: observer.anchor,
         altitudeKm: length(observer.offsetKm) - bodyInfo(observer.anchor).radiusKm,
         speedKmS: controls.speedKmS,
+        radar: radarBlips(abs, controls.orientation, targets),
+        warps: warps.map((w) => ({
+          id: w.id,
+          name: w.name,
+          distanceKm: length(sub(warpPositionKm(w, date), abs)),
+          mine: w.ownerId === playerId,
+        })),
       });
     }
   });
