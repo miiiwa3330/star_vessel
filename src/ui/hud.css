@@ -11,6 +11,9 @@
   max-width: calc(100vw - 32px);
 }
 .hud-status { top: 16px; left: 16px; }
+/* 左上の列：状態とスタンプ（重ならないよう縦に並べる） */
+.hud-left { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.hud-left .hud-panel { position: static; }
 .hud-title { font-weight: 600; letter-spacing: 0.08em; }
 .hud-muted { opacity: 0.6; }
 .hud-warn { color: #ffd38a; }
@@ -165,4 +168,71 @@
 }
 @media (max-height: 500px) {
   .hud-help { display: none; }
+}
+
+/* スタンプ（要件 F6）：左の列。履歴の下に、選ぶパネルとボタン */
+.hud-stamps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: auto;
+  max-width: 260px;
+}
+.hud-stamps .hud-panel { position: static; }
+.hud-stamp-log { list-style: none; margin: 0; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; }
+.hud-stamp-log li { display: flex; align-items: center; gap: 6px; }
+.hud-stamp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.hud-stamp-palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; }
+.hud-stamp-button {
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 22px;
+  border-radius: 8px;
+  border: 1px solid rgba(160, 190, 255, 0.25);
+  background: rgba(20, 40, 70, 0.5);
+  color: inherit;
+  cursor: pointer;
+}
+.hud-stamp-button.is-phrase { grid-column: span 2; font-size: 13px; }
+.hud-stamp-button:hover:not(:disabled) { background: rgba(40, 90, 130, 0.8); }
+.hud-stamp-button:disabled { opacity: 0.4; cursor: default; }
+.hud-stamp-button:focus-visible { outline: 2px solid #74e6ff; outline-offset: 2px; }
+
+/* 船の上の吹き出し */
+.stamp-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.stamp-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 4px 10px 6px;
+  border-radius: 14px;
+  background: rgba(8, 12, 24, 0.75);
+  border: 2px solid hsl(var(--hue, 200) 75% 60%);
+  font-size: 26px;
+  line-height: 1.2;
+  white-space: nowrap;
+  will-change: transform;
+}
+.stamp-bubble.is-phrase { font-size: 14px; padding: 6px 12px; }
+.stamp-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-top-color: hsl(var(--hue, 200) 75% 60%);
+  border-bottom: 0;
+}
+.stamp-bubble.is-pop { animation: stamp-pop 0.25s ease-out; }
+@keyframes stamp-pop { from { opacity: 0; margin-top: 8px; } to { opacity: 1; margin-top: 0; } }
+@media (prefers-reduced-motion: reduce) { .stamp-bubble.is-pop { animation: none; } }
+
+@media (max-width: 720px), (pointer: coarse) {
+  .hud-stamps { max-width: calc(100vw - 180px); }
+  .hud-stamp-palette { grid-template-columns: repeat(4, 40px); }
+}
+@media (max-height: 500px) {
+  .hud-stamp-log { display: none; }
 }

@@ -10,7 +10,9 @@ import { SolarSystemView } from './render/solar-system-view';
 import { ChaseCamera } from './controls/chase-camera';
 import { hullLengthKm } from './render/ship-models';
 import { shipApi } from './net/ship-repository';
-import { HULLS, SHIP_DESIGN_VERSION, type ShipDesign } from './world/ship-design';
+import { defaultDesignFor, HULLS, SHIP_DESIGN_VERSION, type ShipDesign } from './world/ship-design';
+import { StampBubbles } from './ui/stamp-bubbles';
+import { STAMP_LOG_SIZE, stampText } from './world/stamps';
 import { AsteroidField, type AsteroidFile } from './render/asteroid-field';
 import { REQUIRED_TEXTURES, TEXTURE_FILES } from './render/body-looks';
 import { WarpView } from './render/warp-view';
@@ -37,6 +39,9 @@ import { KM_PER_AU, KM_PER_PC } from './world/units';
 import { add, length, mulVec, normalize, scale, sub } from './world/vec';
 import { arriveAt, planWarpHere, warpPositionKm } from './world/warp';
 import { MAX_WARPS_PER_PLAYER, type WarpHole } from './world/warp-schema';
+
+/** 自分の船の吹き出しの id */
+const SELF_BUBBLE = 'self';
 
 const FOV = 60;
 const HUD_INTERVAL_MS = 100;
@@ -140,6 +145,21 @@ async function main() {
   const shipView = new ShipView();
   solar.scene.add(shipView.group);
   const link = new SpaceLink();
+
+  // スタンプ（要件 F6）。届いたら、送った人の船の上に吹き出しを出し、画面の隅の履歴にも残す
+  const bubbles = new StampBubbles(document.getElementById('ui')!);
+  let stampKey = 0;
+  link.onStamp = ({ from, hue, k }) => {
+    const mine = from === link.selfId;
+    const text = stampText(k);
+    bubbles.show(mine ? SELF_BUBBLE : from, text, hue, performance.now());
+    const log = [{ key: ++stampKey, hue, text, mine }, ...hudStore.get().stampLog].slice(0, STAMP_LOG_SIZE);
+    hudStore.set({ stampLog: log });
+  };
+  hudActions.sendStamp = (id) => {
+    if (!link.sendStamp(id)) showNotice('宇宙の部屋につながっていないため、スタンプを送れません', 4000);
+  };
+  const projected = new THREE.Vector3();
 
   // ワープホール（要件 F9）。全員で共有する。サーバーにつながらなくても、宇宙は見られるようにする
   let warps: WarpHole[] = [];
@@ -374,6 +394,29 @@ async function main() {
     const q = controls.orientation;
     shipView.setOwn(cam.mode === 'third', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w });
     starCamera.quaternion.copy(camera.quaternion);
+
+    // スタンプの吹き出しを、船の少し上に置く。自分の船は、一人称のときは画面の下の方に出す
+    camera.updateMatrixWorld();
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    bubbles.update(nowMs, (id) => {
+      let rel: { x: number; y: number; z: number };
+      let size: number;
+      if (id === SELF_BUBBLE) {
+        if (cam.mode === 'first') return { x: w / 2, y: h * 0.72 };
+        rel = { x: 0, y: 0, z: 0 };
+        size = hullLengthKm(shownHull);
+      } else {
+        const o = others.find((x) => x.id === id);
+        if (!o) return null;
+        rel = sub(shipPositionKm(o.state, date), abs);
+        size = hullLengthKm((o.design ?? defaultDesignFor(o.id)).hull);
+      }
+      const up = new THREE.Vector3(0, size * 0.8, 0).applyQuaternion(camera.quaternion);
+      projected.set(rel.x + up.x, rel.y + up.y, rel.z + up.z).project(camera);
+      if (projected.z > 1 || Math.abs(projected.x) > 1.2 || Math.abs(projected.y) > 1.2) return null;
+      return { x: ((projected.x + 1) / 2) * w, y: ((1 - projected.y) / 2) * h };
+    });
     starCamera.position.set(abs.x / KM_PER_PC, abs.y / KM_PER_PC, abs.z / KM_PER_PC);
     galaxy.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
 
@@ -413,6 +456,7 @@ async function main() {
         })(),
         speedKmS: controls.speedKmS,
         nearbyShips: online ? (link.connected ? others.length : null) : null,
+        stampReady: online && link.connected,
         radar: radarBlips(abs, controls.orientation, targets),
         warps: warps.map((w) => ({
           id: w.id,

@@ -4,6 +4,7 @@ import { hudActions, hudStore } from './hud-store';
 import { Radar } from './Radar';
 import { WarpPanel } from './WarpPanel';
 import { ShipBuilder } from './ShipBuilder';
+import { StampPanel } from './StampPanel';
 import './hud.css';
 
 export function Hud() {
@@ -11,16 +12,19 @@ export function Hud() {
   const utc = s.date.toISOString().replace('T', ' ').slice(0, 19);
   return (
     <>
-      <div className="hud-panel hud-status">
-        <div className="hud-title">STAR VESSEL</div>
-        <div>UTC {utc}</div>
-        <div>
-          {s.anchorName}の表面から {formatDistance(s.altitudeKm)}
+      <div className="hud-left">
+        <div className="hud-panel hud-status">
+          <div className="hud-title">STAR VESSEL</div>
+          <div>UTC {utc}</div>
+          <div>
+            {s.anchorName}の表面から {formatDistance(s.altitudeKm)}
+          </div>
+          <div>{formatSpeed(s.speedKmS)}</div>
+          {s.nearbyShips !== null && <div>近くのプレイヤー：{s.nearbyShips} 人</div>}
+          <div className="hud-muted">描画：{s.backend}</div>
+          {s.status && <div className="hud-warn">{s.status}</div>}
         </div>
-        <div>{formatSpeed(s.speedKmS)}</div>
-        {s.nearbyShips !== null && <div>近くのプレイヤー：{s.nearbyShips} 人</div>}
-        <div className="hud-muted">描画：{s.backend}</div>
-        {s.status && <div className="hud-warn">{s.status}</div>}
+        {!s.shipBuilder && <StampPanel ready={s.stampReady} log={s.stampLog} />}
       </div>
       {s.notice && <div className="hud-panel hud-notice">{s.notice}</div>}
       <div className="hud-dock" style={s.shipBuilder ? { display: 'none' } : undefined}>
@@ -51,6 +55,7 @@ export function Hud() {
         </div>
       </div>
       {s.shipBuilder && <ShipBuilder state={s.shipBuilder} />}
+
       <div className="hud-speed-buttons hud-touch-only" style={s.shipBuilder ? { display: 'none' } : undefined}>
         <button type="button" className="hud-button" onClick={() => hudActions.changeSpeed(1)} aria-label="速くする">
           速く

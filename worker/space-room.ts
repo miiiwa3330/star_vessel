@@ -21,6 +21,7 @@ import {
 import { nearestIndices, shipPositionKm } from '../src/world/ships';
 import { designOrNone } from '../src/world/ship-schema';
 import type { ShipDesign } from '../src/world/ship-design';
+import { isStampId, STAMP_MIN_INTERVAL_MS } from '../src/world/stamps';
 
 const BROADCAST_MS = 1000 / SHIP_SEND_HZ;
 const MAX_MESSAGE_BYTES = 2048;
@@ -34,6 +35,8 @@ interface Attachment {
   design?: ShipDesign;
   /** 状態を受け取った時刻（ms） */
   at: number;
+  /** 最後にスタンプを送った時刻（ms） */
+  stampAt?: number;
 }
 
 /**
@@ -69,14 +72,18 @@ export class SpaceRoom extends DurableObject<Env> {
     if (typeof message !== 'string' || message.length > MAX_MESSAGE_BYTES) return;
     const a = ws.deserializeAttachment() as Attachment;
     const now = Date.now();
-    if (now - a.at < SHIP_MIN_INTERVAL_MS) return;
     let parsed: unknown;
     try {
       parsed = JSON.parse(message);
     } catch {
       return;
     }
-    const m = parsed as { t?: unknown; s?: unknown; d?: unknown };
+    const m = parsed as { t?: unknown; s?: unknown; d?: unknown; k?: unknown };
+    if (m.t === 'stamp') {
+      this.stamp(ws, a, m.k, now);
+      return;
+    }
+    if (now - a.at < SHIP_MIN_INTERVAL_MS) return;
     if (m.t !== 'state' || !isShipState(m.s)) return;
     a.state = m.s;
     a.design = designOrNone(m.d) ?? a.design;
@@ -95,6 +102,34 @@ export class SpaceRoom extends DurableObject<Env> {
     } catch {
       // すでに閉じている
     }
+  }
+
+  /**
+   * スタンプ（要件 F6）。送った人の船が「近い順 MAX_SHIPS_SENT 隻」に入っている人（＝その船が見えている人）と、送った本人に届ける。
+   * 続けて送れるのは STAMP_MIN_INTERVAL_MS に 1 回まで。まだ自分の状態を送っていない人のスタンプは捨てる。
+   * 近さは、届いている最後の位置で決める（ふだんの配る処理と違い、古い位置の船も含める）
+   */
+  private stamp(ws: WebSocket, a: Attachment, k: unknown, now: number): void {
+    if (!isStampId(k) || !a.state) return;
+    if (a.stampAt !== undefined && now - a.stampAt < STAMP_MIN_INTERVAL_MS) return;
+    a.stampAt = now;
+    ws.serializeAttachment(a);
+    const date = new Date(now);
+    // 位置の古さは問わない（タブを一時的に裏に回した直後などでも届くように）。最後に受け取った位置で近さを決める
+    const all = this.ctx.getWebSockets().map((s) => ({ ws: s, a: s.deserializeAttachment() as Attachment }));
+    const active = all.filter((e) => e.a.state);
+    const positions = active.map((e) => roughPositionKm(e.a.state as ShipState, date));
+    const senderIndex = active.findIndex((e) => e.a.sid === a.sid);
+    const msg = JSON.stringify({ t: 'stamp', now, from: a.sid, hue: a.hue, k } satisfies ServerMessage);
+    active.forEach((e, i) => {
+      const sees = e.a.sid === a.sid || nearestIndices(positions[i], positions, MAX_SHIPS_SENT, i).includes(senderIndex);
+      if (!sees) return;
+      try {
+        e.ws.send(msg);
+      } catch {
+        // 閉じかけの接続は次の機会に消える
+      }
+    });
   }
 
   /** 1 人ずつ、その人から近い船を最大 MAX_SHIPS_SENT 隻、まとめて 1 通で送る */
