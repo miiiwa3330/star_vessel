@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "stars": "node tools/build-stars.mjs",
+    "exoplanets": "node tools/build-exoplanets.mjs",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "auth:schema": "node tools/gen-auth-schema.ts"
   },

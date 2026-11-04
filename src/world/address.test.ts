@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addressCode, addressPrefix, isSystemCode, knownSystemArm, nearestSystem, readAddress } from './address';
+import { addressCode, addressPrefix, bodyAddress, isSystemCode, knownSystemArm, nearestSystem, readAddress, toRoman } from './address';
 import { cellOf, galactoToEqjPc, generateCell } from './galaxy';
 import { KM_PER_PC } from './units';
 
@@ -68,5 +68,38 @@ describe('readAddress', () => {
     expect(readAddress('MW-ORI-SOL-0-0-001')).toBe('天の川銀河 オリオン腕 太陽系 1番');
     expect(readAddress('MW-ORI-H32263-0-0-004')).toBe('天の川銀河 オリオン腕 恒星 H32263 4番');
     expect(readAddress('MW-PER-G0000000000A-0-0-001')).toBe('天の川銀河 ペルセウス腕 恒星 G0000000000A 1番');
+  });
+});
+
+describe('bodyAddress（天体の id から住所の番号）', () => {
+  it('太陽系の衛星は正式な番号、小惑星は A＋小惑星番号', () => {
+    expect(addressPrefix('S5.1', 'SOL', 'ORI')).toBe('MW-ORI-SOL-5-1');
+    expect(addressPrefix('S6.6', 'SOL', 'ORI')).toBe('MW-ORI-SOL-6-6');
+    expect(addressPrefix('A1', 'SOL', 'ORI')).toBe('MW-ORI-SOL-A1-0');
+  });
+
+  it('系外惑星は恒星系の記号＋恒星に近い順の番号', () => {
+    expect(addressPrefix('H70666.2', 'H70666', 'ORI')).toBe('MW-ORI-H70666-2-0');
+    expect(addressPrefix('EABCDEF1.3~2', 'EABCDEF1', 'ORI')).toBe('MW-ORI-EABCDEF1-3-0');
+  });
+
+  it('基準の天体が別の恒星系のものなら 0-0', () => {
+    expect(addressPrefix('Earth', 'H32263', 'ORI')).toBe('MW-ORI-H32263-0-0');
+  });
+
+  it('形の正しくない id は受け付けない', () => {
+    expect(bodyAddress('S0.1')).toBeNull();
+    expect(bodyAddress('A0')).toBeNull();
+    expect(bodyAddress('SOL.1')).toBeNull();
+    expect(bodyAddress('X1.1')).toBeNull();
+    expect(bodyAddress('H70666.0')).toBeNull();
+    expect(bodyAddress('H70666.1~1')).toBeNull();
+  });
+
+  it('衛星の番号はローマ数字で読む', () => {
+    expect(toRoman(6)).toBe('VI');
+    expect(toRoman(14)).toBe('XIV');
+    expect(readAddress('MW-ORI-SOL-6-6-001')).toBe('天の川銀河 オリオン腕 太陽系 土星 第VI衛星 1番');
+    expect(readAddress('MW-ORI-SOL-A1-0-001')).toBe('天の川銀河 オリオン腕 太陽系 小惑星 (1) 1番');
   });
 });

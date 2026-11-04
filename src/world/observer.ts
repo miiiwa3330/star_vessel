@@ -5,8 +5,9 @@
  * 地球は太陽のまわりを秒速約 30 km で回っているので、太陽を基準にしたままだと、
  * 止まっているつもりでも地球が離れていく。基準の天体と一緒に動くことで、それを防ぐ。
  * 理由と決め方は docs/tech/world-model.md の「自分の位置の持ち方」。
+ * 基準にする範囲（影響圏）は、天体ごとに src/world/solar-system.ts の anchorRadiusKm に持つ。
  */
-import { heliocentricPositionKm, type BodyId } from './solar-system';
+import { allBodies, heliocentricPositionKm, type BodyId } from './solar-system';
 import { add, length, normalize, scale, sub, type Vec3 } from './vec';
 
 export interface Observer {
@@ -15,24 +16,6 @@ export interface Observer {
   /** 基準の天体の中心からの位置（km・EQJ） */
   offsetKm: Vec3;
 }
-
-/**
- * 天体の影響圏（km）。この中にいる間は、その天体を基準にする。
- * Laplace の影響圏 r = a·(m/M)^(2/5) の値。出典は docs/tech/world-model.md。
- * 太陽は影響圏の外すべて（ここには書かない）。
- */
-export const SPHERE_OF_INFLUENCE_KM: Partial<Record<BodyId, number>> = {
-  Mercury: 1.12e5,
-  Venus: 6.16e5,
-  Earth: 9.25e5,
-  Moon: 6.61e4,
-  Mars: 5.77e5,
-  Jupiter: 4.82e7,
-  Saturn: 5.48e7,
-  Uranus: 5.18e7,
-  Neptune: 8.66e7,
-  Pluto: 3.08e6,
-};
 
 export const absolutePositionKm = (o: Observer, date: Date): Vec3 =>
   add(heliocentricPositionKm(o.anchor, date), o.offsetKm);
@@ -47,10 +30,11 @@ export function reanchor(o: Observer, date: Date): Observer {
   const abs = absolutePositionKm(o, date);
   let best: BodyId = 'Sun';
   let bestRadius = Number.POSITIVE_INFINITY;
-  for (const [id, radius] of Object.entries(SPHERE_OF_INFLUENCE_KM) as [BodyId, number][]) {
-    if (radius >= bestRadius) continue;
-    if (length(sub(abs, heliocentricPositionKm(id, date))) < radius) {
-      best = id;
+  for (const b of allBodies()) {
+    const radius = b.anchorRadiusKm;
+    if (radius === undefined || radius >= bestRadius) continue;
+    if (length(sub(abs, heliocentricPositionKm(b.id, date))) < radius) {
+      best = b.id;
       bestRadius = radius;
     }
   }

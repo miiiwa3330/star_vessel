@@ -78,3 +78,15 @@ describe('isWarpHole', () => {
     expect(isWarpHole({ ...w, mine: undefined })).toBe(false);
   });
 });
+
+describe('系外惑星のそばに置くワープホール', () => {
+  it('基準の天体がその恒星系の惑星なら受け付け、別の恒星系の惑星なら受け付けない', async () => {
+    const { isWarpPlacement } = await import('./warp-schema');
+    const base = { offsetKm: { x: 1e4, y: 0, z: 0 }, facing: { x: 1, y: 0, z: 0 }, arm: 'ORI' };
+    expect(isWarpPlacement({ ...base, anchor: 'H70666.2', system: 'H70666' })).toBe(true);
+    expect(isWarpPlacement({ ...base, anchor: 'H70666.2', system: 'H32263' })).toBe(false);
+    expect(isWarpPlacement({ ...base, anchor: 'Sun', system: 'E1WHADEK' })).toBe(true);
+    expect(isWarpPlacement({ ...base, anchor: 'S6.6', system: 'SOL' })).toBe(true);
+    expect(isWarpPlacement({ ...base, anchor: 'S6.6', system: 'H70666' })).toBe(false);
+  });
+});

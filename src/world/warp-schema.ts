@@ -2,7 +2,7 @@
  * ワープホールのデータの形と、その確かめ方。サーバー（worker/）とブラウザの両方で使う。
  * three.js・DOM・astronomy-engine を読み込まない。
  */
-import { isArmCode, isSystemCode, knownSystemArm, SOL_BODY_NUMBERS, SYSTEM_SOL } from './address';
+import { bodyAddress, isArmCode, isBodyId, isSystemCode, knownSystemArm } from './address';
 import type { ArmCode } from './galaxy';
 import type { BodyId } from './solar-system';
 import type { Vec3 } from './vec';
@@ -37,7 +37,7 @@ export interface WarpHole {
   mine: boolean;
 }
 
-export const isBodyId = (v: unknown): v is BodyId => typeof v === 'string' && Object.hasOwn(SOL_BODY_NUMBERS, v);
+export { isBodyId };
 
 /** 基準の天体からの距離の上限（km）。太陽系の外は太陽を基準にするので、銀河の大きさ（約 10 万光年）まで許す */
 const MAX_OFFSET_KM = 1e18;
@@ -57,8 +57,8 @@ export function isWarpPlacement(v: unknown): v is WarpPlacement {
   // サーバーが自分で腕を決められる恒星系（太陽系・自動で作った星）は、ブラウザの値と合っていなければ受け付けない
   const arm = knownSystemArm(p.system);
   if (arm !== null && arm !== p.arm) return false;
-  // 太陽系の外の恒星系は、太陽を基準にしているときだけ
-  if (p.system !== SYSTEM_SOL && p.anchor !== 'Sun') return false;
+  // 基準の天体は、その恒星系の天体か、太陽（恒星系の間の宇宙・系外の恒星のそばは、太陽中心の位置で持つ）
+  if (p.anchor !== 'Sun' && bodyAddress(p.anchor)?.system !== p.system) return false;
   if (len(p.offsetKm) > MAX_OFFSET_KM) return false;
   return Math.abs(len(p.facing) - 1) < 1e-6;
 }

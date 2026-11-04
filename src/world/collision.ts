@@ -2,7 +2,7 @@
  * 天体に一定の距離より近づけないようにする（要件 F11）。
  * 決め方と理由は docs/tech/world-model.md の「天体に近づける距離」。
  */
-import { BODIES, heliocentricPositionKm } from './solar-system';
+import { allBodies, heliocentricPositionKm } from './solar-system';
 import { absolutePositionKm, type Observer } from './observer';
 import { add, length, scale, sub } from './vec';
 
@@ -13,7 +13,7 @@ export const minAltitudeKm = (radiusKm: number): number => Math.max(100, radiusK
 export function keepOutsideBodies(o: Observer, date: Date): Observer {
   let abs = absolutePositionKm(o, date);
   let moved = false;
-  for (const body of BODIES) {
+  for (const body of allBodies()) {
     const center = heliocentricPositionKm(body.id, date);
     const rel = sub(abs, center);
     const d = length(rel);
