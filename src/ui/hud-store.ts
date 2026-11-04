@@ -4,7 +4,6 @@
  * 毎フレーム React を動かさないため（docs/tech/stack.md「2. 3D と画面の部品のつなぎ方」）。
  */
 import type { RadarBlip } from '../world/radar';
-import type { BodyId } from '../world/solar-system';
 
 export interface WarpListItem {
   id: string;
@@ -18,7 +17,8 @@ export interface WarpListItem {
 
 export interface HudState {
   date: Date;
-  anchor: BodyId;
+  /** 基準の天体の名前 */
+  anchorName: string;
   /** 基準の天体の表面からの高さ（km） */
   altitudeKm: number;
   speedKmS: number;
@@ -36,7 +36,7 @@ export interface HudState {
 
 let state: HudState = {
   date: new Date(),
-  anchor: 'Earth',
+  anchorName: '地球',
   altitudeKm: 0,
   speedKmS: 0,
   nearbyShips: null,

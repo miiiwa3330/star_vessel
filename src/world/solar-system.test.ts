@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { RotationAxis, Body } from 'astronomy-engine';
 import { bodyFixedToEqj, heliocentricPositionKm } from './solar-system';
 import { KM_PER_AU } from './units';
-import { length, mulVec, normalize, scale, transpose } from './vec';
+import { length, mulVec, normalize, scale, sub, transpose } from './vec';
 
 /** 太陽が真上に来る地点（緯度・経度、度）。地球の向きが現実と合っているかの確かめに使う */
 function subsolarPoint(date: Date) {
@@ -68,5 +68,26 @@ describe('bodyFixedToEqj', () => {
   it('夏至には太陽の真下は北緯約 23.4 度、冬至には南緯約 23.4 度', () => {
     expect(subsolarPoint(new Date('2026-06-21T12:00:00Z')).lat).toBeCloseTo(23.4, 0);
     expect(subsolarPoint(new Date('2026-12-21T12:00:00Z')).lat).toBeCloseTo(-23.4, 0);
+  });
+});
+
+describe('ガリレオ衛星', () => {
+  it('木星からの距離は軌道長半径に近い（イオ 42.2 万 km・カリスト 188.3 万 km）', async () => {
+    const { heliocentricPositionKm: pos } = await import('./solar-system');
+    const d = new Date('2026-11-04T00:00:00Z');
+    const dist = (id: string) => length(sub(pos(id, d), pos('Jupiter', d)));
+    expect(dist('S5.1')).toBeGreaterThan(415_000);
+    expect(dist('S5.1')).toBeLessThan(430_000);
+    expect(dist('S5.4')).toBeGreaterThan(1_850_000);
+    expect(dist('S5.4')).toBeLessThan(1_910_000);
+  });
+
+  it('潮汐ロック：本初子午線（x 軸）はいつも木星の方を向く', () => {
+    for (const iso of ['2026-11-04T00:00:00Z', '2026-11-05T07:00:00Z']) {
+      const d = new Date(iso);
+      const x = mulVec(bodyFixedToEqj('S5.2', d), { x: 1, y: 0, z: 0 });
+      const toJ = normalize(sub(heliocentricPositionKm('Jupiter', d), heliocentricPositionKm('S5.2', d)));
+      expect(x.x * toJ.x + x.y * toJ.y + x.z * toJ.z).toBeCloseTo(1, 9);
+    }
   });
 });

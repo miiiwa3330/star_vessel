@@ -7,6 +7,7 @@ import { WarpApiError, warpApi } from './net/warp-repository';
 import { SpaceLink } from './net/space-link';
 import { createStarfield } from './render/starfield';
 import { SolarSystemView } from './render/solar-system-view';
+import { REQUIRED_TEXTURES, TEXTURE_FILES } from './render/body-looks';
 import { WarpView } from './render/warp-view';
 import { ShipView } from './render/ship-view';
 import { GalaxyView } from './render/galaxy-view';
@@ -19,11 +20,11 @@ import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/obs
 import { radarBlips, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
 import { predictShip, shipPositionKm } from './world/ships';
-import { BODIES, bodyInfo, heliocentricPositionKm } from './world/solar-system';
+import { allBodies, bodyInfo, heliocentricPositionKm } from './world/solar-system';
 import { decodeStars, STAR_STRIDE } from './world/stars';
 import { nearestSystem, readAddress } from './world/address';
 import { KM_PER_PC } from './world/units';
-import { length, sub } from './world/vec';
+import { add, length, scale, sub } from './world/vec';
 import { arriveAt, planWarpHere, warpPositionKm } from './world/warp';
 import { MAX_WARPS_PER_PLAYER, type WarpHole } from './world/warp-schema';
 
@@ -56,15 +57,23 @@ async function main() {
     t.anisotropy = 8;
     return t;
   };
-  const [earthMap, moonMap, starsBin] = await Promise.all([
-    loadTexture('/textures/2k_earth_daymap.jpg'),
-    loadTexture('/textures/2k_moon.jpg'),
+  // 天体の画像。地球と月は必ずある。ほかは置いてあれば使い、無ければ模様を自動で描く（src/render/body-looks.ts）
+  const textureEntries = Object.entries(TEXTURE_FILES).map(async ([id, file]) => {
+    try {
+      return [id, await loadTexture(`/textures/${file}`)] as const;
+    } catch (e) {
+      if (REQUIRED_TEXTURES.includes(id)) throw e;
+      return null;
+    }
+  });
+  const [textures, starsBin] = await Promise.all([
+    Promise.all(textureEntries),
     fetch('/data/stars.bin').then((r) => {
       if (!r.ok) throw new Error('星のデータ（/data/stars.bin）が読めない。npm run stars で作る');
       return r.arrayBuffer();
     }),
   ]);
-  const solar = new SolarSystemView({ Earth: earthMap, Moon: moonMap });
+  const solar = new SolarSystemView(Object.fromEntries(textures.filter((t) => t !== null)));
   const stars = decodeStars(starsBin);
   starScene.add(createStarfield(stars).sprite);
   const galaxy = new GalaxyView();
@@ -164,6 +173,17 @@ async function main() {
         observer = reanchor({ anchor: 'Sun', offsetKm: { x: p.x * KM_PER_PC, y: p.y * KM_PER_PC, z: p.z * KM_PER_PC } }, worldNow());
         controls.lookAt({ x: lookAtPc.x - p.x, y: lookAtPc.y - p.y, z: lookAtPc.z - p.z }, { x: 0, y: 0, z: 1 });
       },
+      /** 天体（id）のそばへ行き、その天体の方を向く。distanceKm は中心からの距離（省略すると半径の 4 倍） */
+      teleportBody(id: string, distanceKm?: number) {
+        const d = worldNow();
+        const info = bodyInfo(id);
+        const center = heliocentricPositionKm(id, d);
+        // 恒星の光が当たっている側から見る
+        const toLight = center.x === 0 && center.y === 0 && center.z === 0 ? { x: 1, y: 0, z: 0 } : scale(center, -1 / length(center));
+        const p = add(center, scale(toLight, distanceKm ?? info.radiusKm * 4));
+        observer = reanchor({ anchor: 'Sun', offsetKm: p }, d);
+        controls.lookAt(sub(center, p), { x: 0, y: 0, z: 1 });
+      },
       /** 銀河中心の座標（kpc）で瞬間移動する */
       teleportGalacto(g: { x: number; y: number; z: number }, lookAtG = { x: 0, y: 0, z: 0 }) {
         devTools.teleportPc(galactoToEqjPc(g), galactoToEqjPc(lookAtG));
@@ -221,7 +241,7 @@ async function main() {
     if (nowMs - lastHud > HUD_INTERVAL_MS) {
       lastHud = nowMs;
       const targets: RadarTarget[] = [
-        ...BODIES.map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date) })),
+        ...allBodies().map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date) })),
         ...others.map((o) => ({ kind: 'ship' as const, id: o.id, label: '', positionKm: shipPositionKm(o.state, date) })),
         // レーダーは狭いので、住所の恒星系から後ろだけを出す（例：SOL-3-0-001）
         ...warps.map((w) => ({
@@ -233,7 +253,7 @@ async function main() {
       ];
       hudStore.set({
         date,
-        anchor: observer.anchor,
+        anchorName: bodyInfo(observer.anchor).nameJa,
         altitudeKm: length(observer.offsetKm) - bodyInfo(observer.anchor).radiusKm,
         speedKmS: controls.speedKmS,
         nearbyShips: online ? (link.connected ? others.length : null) : null,
