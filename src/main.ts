@@ -27,9 +27,10 @@ import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/obs
 import { radarBlips, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
 import { predictShip, shipPositionKm } from './world/ships';
-import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
+import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, unregisterBodies, type BodyInfo, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
 import { decodeExoplanets } from './world/exoplanet-data';
-import { largeAsteroidBodies, moonBodies, type LargeAsteroid, type MoonRecord } from './world/small-bodies';
+import { largeAsteroidBodies, moonBodies, smallAsteroidBody, type LargeAsteroid, type MoonRecord } from './world/small-bodies';
+import { findAsteroidByNumber, findNearbyAsteroids } from './world/asteroid-search';
 import { StarSystems } from './world/star-systems';
 import { starBodyId } from './world/planets';
 import { createExtraStarfield } from './render/starfield';
@@ -94,6 +95,7 @@ async function main() {
   ]);
   // 太陽系の衛星と、大きな小惑星・準惑星（要件 F20・F21）。読めなくても宇宙は見られるようにする
   let asteroidFiles: AsteroidFile[] = [];
+  const largeAsteroidNumbers = new Set<number>();
   await Promise.all([
     fetch('/data/moons.json')
       .then((r) => r.json())
@@ -102,6 +104,7 @@ async function main() {
       .then((r) => r.json())
       .then((d: { large: LargeAsteroid[]; files: AsteroidFile[] }) => {
         registerBodies(largeAsteroidBodies(d.large));
+        d.large.forEach((a) => largeAsteroidNumbers.add(a.number));
         asteroidFiles = d.files;
       }),
   ]).catch((e: unknown) => console.error('衛星・小惑星のデータが読めない', e));
@@ -112,7 +115,21 @@ async function main() {
   // 系外惑星（要件 F22）。いる恒星系の恒星と惑星を、天体の一覧に入れ替えて登録する
   const realSystems = decodeExoplanets(exoplanetsJson);
   const systems = new StarSystems(stars.data, realSystems);
-  setBodyResolver((id) => systems.findBody(id));
+  // 一覧に無い天体：遠くの恒星系の天体、または光の点として描いている小さな小惑星（A＋番号）
+  const smallAsteroidCache = new Map<string, BodyInfo | null>();
+  setBodyResolver((id) => {
+    const exo = systems.findBody(id);
+    if (exo) return exo;
+    const m = /^A([0-9]+)$/.exec(id);
+    if (!m) return null;
+    if (!smallAsteroidCache.has(id)) {
+      const a = findAsteroidByNumber(asteroids.chunks, Number(m[1]));
+      // データがまだ読み込めていなければ覚えない（あとでもう一度探す）
+      if (!a && asteroids.chunks.length === 0) return null;
+      smallAsteroidCache.set(id, a ? smallAsteroidBody(a) : null);
+    }
+    return smallAsteroidCache.get(id) ?? null;
+  });
   const extraStars = systems.extraStars();
   starScene.add(createExtraStarfield(extraStars).sprite);
   setAddressNameLookup(({ system, planet, moon }) => {
@@ -350,6 +367,8 @@ async function main() {
   let lastHud = 0;
   let lastSend = 0;
   let lastRoomCheck = -Infinity;
+  /** いま球として一覧に入れている、小さな小惑星の id */
+  const shownSmallAsteroids = new Set<string>();
   let velocityKmS = { x: 0, y: 0, z: 0 };
   hudStore.set({ status: null });
 
@@ -372,6 +391,19 @@ async function main() {
       lastRoomCheck = nowMs;
       const system = systemAt(abs).system;
       systems.enter(system);
+      // 近くの小さな小惑星（200 万 km 以内の近い順 8 個）を、球の天体として一覧に入れる
+      const near =
+        system === SYSTEM_SOL && asteroids.chunks.length > 0
+          ? findNearbyAsteroids(asteroids.chunks, abs, date, 2e6, 8).filter((a) => !largeAsteroidNumbers.has(a.number))
+          : [];
+      const nextIds = new Set(near.map((a) => `A${a.number}`));
+      // 基準にしている小惑星は外さない（外すと位置が分からなくなる）
+      const drop = [...shownSmallAsteroids].filter((id) => !nextIds.has(id) && id !== observer.anchor);
+      if (drop.length > 0) unregisterBodies(drop);
+      const add = near.filter((a) => !shownSmallAsteroids.has(`A${a.number}`)).map(smallAsteroidBody);
+      if (add.length > 0) registerBodies(add);
+      drop.forEach((id) => shownSmallAsteroids.delete(id));
+      add.forEach((b) => shownSmallAsteroids.add(b.id));
       if (online) link.setRoom(system);
     }
     if (online) {

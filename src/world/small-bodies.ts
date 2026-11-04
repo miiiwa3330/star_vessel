@@ -7,6 +7,7 @@
  * 位置はケプラーの軌道（src/world/kepler.ts）。月とガリレオ衛星は astronomy-engine の方が正確なので、データからは作らない。
  */
 import { periodDaysFromAxis, type KeplerElements } from './kepler';
+import { diameterFromH, type NearbyAsteroid } from './asteroid-search';
 import { hashInts, mulberry32 } from './random';
 import type { Atmosphere, BodyInfo, BodyKind } from './solar-system';
 import type { SurfaceLook } from './surface';
@@ -158,6 +159,41 @@ export interface LargeAsteroid {
   periDeg: number;
   meanAnomalyDeg: number;
   epochJd: number;
+}
+
+/** 光の点として描いている小さな小惑星を、近づいたときに球の天体にする（src/world/asteroid-search.ts） */
+export function smallAsteroidBody(a: NearbyAsteroid): BodyInfo {
+  const rand = mulberry32(hashInts(a.number, 0x41535452));
+  const aKm = a.aAu * KM_PER_AU;
+  const radiusKm = diameterFromH(a.H) / 2;
+  return {
+    id: `A${a.number}`,
+    nameJa: `小惑星 (${a.number})`,
+    radiusKm,
+    kind: 'asteroid',
+    parent: 'Sun',
+    motion: {
+      type: 'kepler',
+      parent: 'Sun',
+      elements: {
+        aKm,
+        e: a.e,
+        iRad: a.iRad,
+        nodeRad: a.nodeRad,
+        periRad: a.periRad,
+        meanAnomalyRad: a.meanAnomalyRad,
+        epochMs: Date.UTC(2000, 0, 1, 12) + a.epochDays * 86_400_000,
+        periodDays: periodDaysFromAxis(aKm, 1),
+        frame: ECLIPTIC_TO_EQJ,
+      },
+    },
+    spin: { type: 'steady', pole: raDecToVec(rand() * 360, Math.asin(2 * rand() - 1) / DEG), periodHours: 2 + 20 * rand(), phaseRad: rand() * 2 * Math.PI },
+    anchorRadiusKm: radiusKm * ANCHOR_RADII_WITHOUT_MASS,
+    surface: {
+      look: { kind: 'rocky', colors: [[70, 66, 62], [120, 114, 108], [170, 164, 156]], craters: 0.5 },
+      seed: hashInts(a.number, 7),
+    },
+  };
 }
 
 /** IAU が準惑星と認めている天体（冥王星は別に持つ） */

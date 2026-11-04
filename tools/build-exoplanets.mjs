@@ -5,6 +5,7 @@
 // - 恒星は、星のデータ（public/data/stars.bin。先に npm run stars で作る）の中から、方向と距離が合う星を探す。
 //   見つかればその星の恒星系（H＋HYG の id）、見つからなければ新しい恒星（E＋名前のハッシュ）として足す
 import { execFileSync } from 'node:child_process';
+import { gunzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -124,6 +125,48 @@ for (let i = 0; i < starCount; i++) {
   starDir[i * 3 + 1] = y / d;
   starDir[i * 3 + 2] = z / d;
 }
+// ── 名前での照合（HYG の CSV があれば）。連星の中の星（プロキシマ・ケンタウリなど）を正しく当てるため ──
+// HYG の CSV は npm run stars が tools/.cache/ に置く（または同じ場所に置く）
+const hygCsv = join(cacheDir, 'hyg_v44.csv.gz');
+const inStarsBin = new Set();
+for (let i = 0; i < starCount; i++) inStarsBin.add(stars[i * STRIDE + 5]);
+/** 正規化した名前（例：HIP 70890、HD 209458、HR 5459、GL 551、PROXIMA CENTAURI）→ HYG の id */
+const byName = new Map();
+const normalizeName = (raw) => {
+  const n = raw.trim().toUpperCase().replace(/\s+/g, ' ');
+  const m = /^(HIP|HD|HR|GJ|GL|GLIESE)\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Z])?$/.exec(n);
+  if (!m) return n;
+  const cat = m[1] === 'GJ' || m[1] === 'GLIESE' ? 'GL' : m[1];
+  return `${cat} ${m[2]}${m[3] ?? ''}`;
+};
+if (existsSync(hygCsv)) {
+  const lines = gunzipSync(readFileSync(hygCsv)).toString('utf8').split('\n');
+  const header = lines[0].split(',').map((h) => h.replace(/"/g, ''));
+  const col = Object.fromEntries(['id', 'hip', 'hd', 'hr', 'gl', 'proper'].map((k) => [k, header.indexOf(k)]));
+  for (const line of lines.slice(1)) {
+    if (!line) continue;
+    const f = line.split(',').map((v) => v.replace(/"/g, ''));
+    const id = Number(f[col.id]);
+    if (!inStarsBin.has(id)) continue;
+    const add = (name) => name && !byName.has(normalizeName(name)) && byName.set(normalizeName(name), id);
+    if (f[col.hip]) add(`HIP ${f[col.hip]}`);
+    if (f[col.hd]) add(`HD ${f[col.hd]}`);
+    if (f[col.hr]) add(`HR ${f[col.hr]}`);
+    if (f[col.gl]) add(f[col.gl]);
+    if (f[col.proper]) add(f[col.proper]);
+  }
+  console.log(`名前での照合：HYG の名前 ${byName.size} 個`);
+} else {
+  console.log('HYG の CSV が無いので、名前では照合しない（方向と距離だけ）');
+}
+const matchByName = (names) => {
+  for (const n of names) {
+    const id = byName.get(normalizeName(n));
+    if (id !== undefined) return id;
+  }
+  return null;
+};
+
 const cosMax = Math.cos(MATCH_MAX_DEG * DEG);
 function matchStar(dir, dist) {
   let best = -1;
@@ -146,6 +189,7 @@ const out = [];
 const usedCodes = new Map();
 const skipped = { notConfirmed: 0, noDistance: 0, noOrbit: 0, solarSystem: 0 };
 let matched = 0;
+let matchedByName = 0;
 
 for (const file of files) {
   const sys = kid(parseXml(readFileSync(join(repoDir, 'systems', file), 'utf8')), 'system');
@@ -175,10 +219,17 @@ for (const file of files) {
   const magV = host ? num(host, 'magV') : null;
 
   const dir = [Math.cos(dec * DEG) * Math.cos(ra * DEG), Math.cos(dec * DEG) * Math.sin(ra * DEG), Math.sin(dec * DEG)];
-  const hit = matchStar(dir, dist);
+  // まず恒星の名前（HIP・HD・HR・Gliese の番号、固有名）で探し、無ければ方向と距離で探す
+  const hostNames = host ? kids(host, 'name').map((n) => n.text) : [];
+  const byNameId = matchByName(hostNames);
+  const hit = byNameId === null ? matchStar(dir, dist) : -1;
   let code;
   const entry = { name: sysName };
-  if (hit >= 0) {
+  if (byNameId !== null) {
+    code = `H${byNameId}`;
+    matched++;
+    matchedByName++;
+  } else if (hit >= 0) {
     code = `H${stars[hit * STRIDE + 5]}`;
     matched++;
   } else {
@@ -259,6 +310,6 @@ writeFileSync(
     license,
 );
 console.log(
-  `恒星系 ${systems.length}（星のデータと一致 ${matched}・新しい恒星 ${systems.length - matched}）、惑星 ${planetCount}。外したもの:`,
+  `恒星系 ${systems.length}（星のデータと一致 ${matched}〈うち名前で ${matchedByName}〉・新しい恒星 ${systems.length - matched}）、惑星 ${planetCount}。外したもの:`,
   skipped,
 );
