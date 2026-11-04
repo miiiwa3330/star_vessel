@@ -78,7 +78,10 @@ export function Hud() {
           星：<a href="https://codeberg.org/astronexus/hyg">HYG v4.4</a>（
           <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>） ／ 系外惑星：
           <a href="https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue">Open Exoplanet Catalogue</a>（MIT） ／ 衛星・小惑星：
-          <a href="https://ssd.jpl.nasa.gov/">NASA/JPL</a> ／ 天体の画像：
+          <a href="https://ssd.jpl.nasa.gov/">NASA/JPL</a> ／ 人工衛星：
+          <a href="https://db.satnogs.org/">SatNOGS DB</a>（
+          <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>） ／ 星団・白色矮星・パルサー・ブラックホール：
+          <a href="https://vizier.cfa.harvard.edu/">VizieR</a>（Hunt &amp; Reffert 2023 ほか） ／ 天体の画像：
           <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>（
           <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>）
         </div>
