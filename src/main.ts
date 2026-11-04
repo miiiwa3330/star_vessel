@@ -148,8 +148,8 @@ async function main() {
     warpView.setWarps(warps);
   };
   const refreshWarps = async () => setWarps(await warpApi.list());
-  /** 自分の宇宙船の設計（要件 F27）。サーバーから読むまでは仮にアロー */
-  let myDesign: ShipDesign = { v: SHIP_DESIGN_VERSION, hull: 'arrow' };
+  /** 自分の宇宙船の設計（要件 F27）。サーバーから読むまでは仮にソーサー */
+  let myDesign: ShipDesign = { v: SHIP_DESIGN_VERSION, hull: 'saucer' };
   let online = false;
   try {
     await ensureSession();
@@ -176,6 +176,7 @@ async function main() {
   previewCam.mode = 'third';
   previewCam.pitch = 0.2;
   previewCam.distanceFactor = 2.4;
+  previewCam.aimBelow = 0.35;
   controls.onOrbit = (dx, dy) => {
     if (chase.mode === 'third') chase.orbit(dx, dy);
   };

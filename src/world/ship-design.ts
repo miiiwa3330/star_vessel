@@ -10,8 +10,11 @@
 /** 設計の版。欄を足すときは版を上げ、前の版も読めるようにする */
 export const SHIP_DESIGN_VERSION = 1;
 
-/** 船体の種類（いまは 3 種類） */
-export const HULL_TYPES = ['arrow', 'disk', 'hauler'] as const;
+/**
+ * 船体の種類（いまは 3 種類。どれも UFO の形。2026-11-05 にオーナーが決めた）。
+ * 以前のアロー・ディスク・ホーラー（arrow・disk・hauler）はやめた。本番に出す前なので、古い id の保存は正しくないものとして扱う
+ */
+export const HULL_TYPES = ['saucer', 'bell', 'ring'] as const;
 export type HullType = (typeof HULL_TYPES)[number];
 
 export interface ShipDesign {
@@ -19,11 +22,11 @@ export interface ShipDesign {
   hull: HullType;
 }
 
-/** 船体ごとの名前（仮）と説明、全長（km） */
+/** 船体ごとの名前（仮）と説明、大きさ（直径・km） */
 export const HULLS: Readonly<Record<HullType, { nameJa: string; descriptionJa: string; lengthKm: number }>> = {
-  arrow: { nameJa: 'アロー（仮）', descriptionJa: '細長い矢の形の小型船。全長 40 m', lengthKm: 0.04 },
-  disk: { nameJa: 'ディスク（仮）', descriptionJa: '円盤の形の船。直径 30 m', lengthKm: 0.03 },
-  hauler: { nameJa: 'ホーラー（仮）', descriptionJa: '箱を連ねた大型の運搬船。全長 80 m', lengthKm: 0.08 },
+  saucer: { nameJa: 'ソーサー（仮）', descriptionJa: '平たい円盤に小さなドーム。いちばん UFO らしい形。直径 30 m', lengthKm: 0.03 },
+  bell: { nameJa: 'ベル（仮）', descriptionJa: '背の高いドームに丸窓、下に 3 つの球。直径 24 m', lengthKm: 0.024 },
+  ring: { nameJa: 'リング（仮）', descriptionJa: '光る球のまわりに 2 重の輪。直径 36 m', lengthKm: 0.036 },
 };
 
 export const isHullType = (v: unknown): v is HullType => typeof v === 'string' && (HULL_TYPES as readonly string[]).includes(v);

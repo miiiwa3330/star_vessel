@@ -19,7 +19,8 @@ describe('宇宙船の設計', () => {
   });
 
   it('部屋に届いた設計は、正しくなければ捨てる（状態は別に確かめる）', () => {
-    expect(designOrNone({ v: 1, hull: 'disk' })).toEqual({ v: 1, hull: 'disk' });
+    expect(designOrNone({ v: 1, hull: 'bell' })).toEqual({ v: 1, hull: 'bell' });
+    expect(designOrNone({ v: 1, hull: 'arrow' })).toBeUndefined(); // やめた船体
     expect(designOrNone({ v: 1, hull: '<script>' })).toBeUndefined();
     expect(isShipState({ anchor: 'Earth', offsetKm: { x: 1, y: 0, z: 0 }, velocityKmS: { x: 0, y: 0, z: 0 }, orientation: { x: 0, y: 0, z: 0, w: 1 } })).toBe(true);
   });
