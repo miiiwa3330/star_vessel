@@ -33,6 +33,8 @@ import { largeAsteroidBodies, moonBodies, smallAsteroidBody, type LargeAsteroid,
 import { findAsteroidByNumber, findNearbyAsteroids } from './world/asteroid-search';
 import { SatelliteCatalog, type SatelliteRecord } from './world/satellites';
 import { SatelliteField } from './render/satellite-field';
+import { ClusterView } from './render/cluster-view';
+import { clusterAt, clusterLabel, decodeClusters, type Cluster } from './world/clusters';
 import { StarSystems } from './world/star-systems';
 import { starBodyId } from './world/planets';
 import { createExtraStarfield } from './render/starfield';
@@ -167,6 +169,16 @@ async function main() {
   });
   const galaxy = new GalaxyView();
   starScene.add(galaxy.group);
+  // 星団（Hunt & Reffert 2023）。読めなくても宇宙は見られるようにする
+  const clusters = await fetch('/data/clusters.json')
+    .then((r) => r.json())
+    .then(decodeClusters)
+    .catch((e: unknown) => {
+      console.error('星団のデータが読めない', e);
+      return [] as Cluster[];
+    });
+  const clusterView = new ClusterView(clusters);
+  starScene.add(clusterView.group);
   /** いる場所の恒星系と腕（本物の星・系外惑星のデータの星・自動で作った星のうち、いちばん近い星） */
   const systemAt = (posKm: { x: number; y: number; z: number }) =>
     nearestSystem(posKm, stars.data, STAR_STRIDE, [...galaxy.localStars, ...extraStars]);
@@ -297,6 +309,7 @@ async function main() {
     renderer.setSize(w, h, false);
     camera.aspect = starCamera.aspect = w / h;
     galaxy.setViewport(h, FOV);
+    clusterView.setViewport(h, FOV);
     camera.updateProjectionMatrix();
     starCamera.updateProjectionMatrix();
   };
@@ -486,6 +499,7 @@ async function main() {
     });
     starCamera.position.set(abs.x / KM_PER_PC, abs.y / KM_PER_PC, abs.z / KM_PER_PC);
     galaxy.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
+    clusterView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, nowMs);
 
     renderer.clear();
     renderer.render(starScene, starCamera);
@@ -524,6 +538,10 @@ async function main() {
         speedKmS: controls.speedKmS,
         nearbyShips: online ? (link.connected ? others.length : null) : null,
         stampReady: online && link.connected,
+        region: (() => {
+          const c = clusterAt(clusters, { x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
+          return c ? `${c.kind === 'globular' ? '球状星団' : '散開星団'}：${clusterLabel(c)}` : null;
+        })(),
         radar: radarBlips(abs, controls.orientation, targets),
         warps: warps.map((w) => ({
           id: w.id,

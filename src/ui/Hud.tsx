@@ -20,6 +20,7 @@ export function Hud() {
             {s.anchorName}の表面から {formatDistance(s.altitudeKm)}
           </div>
           <div>{formatSpeed(s.speedKmS)}</div>
+          {s.region && <div>{s.region}</div>}
           {s.nearbyShips !== null && <div>近くのプレイヤー：{s.nearbyShips} 人</div>}
           <div className="hud-muted">描画：{s.backend}</div>
           {s.status && <div className="hud-warn">{s.status}</div>}

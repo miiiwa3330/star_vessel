@@ -62,6 +62,8 @@ export interface HudState {
   /** スタンプを送れるか（宇宙の部屋につながっているか） */
   stampReady: boolean;
   stampLog: StampLogItem[];
+  /** いる場所の目印（星団の中なら、その名前） */
+  region: string | null;
 }
 
 let state: HudState = {
@@ -82,6 +84,7 @@ let state: HudState = {
   shipReady: false,
   stampReady: false,
   stampLog: [],
+  region: null,
 };
 const listeners = new Set<() => void>();
 
