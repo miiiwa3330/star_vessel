@@ -7,13 +7,16 @@
  */
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 import type { Vec3 } from '../world/vec';
+import { MAX_SPEED_KM_S } from '../world/ship-schema';
 
 const LOOK_RAD_PER_PX = 0.003;
 const ROLL_RAD_PER_S = 1.2;
 const SPEED_STEP = 1.25;
 export const MIN_SPEED_KM_S = 0.1;
-/** 約 1 光年／秒。銀河を渡るのはワープ（未実装）の役目なので、手で操縦する速さはここまで */
-export const MAX_SPEED_KM_S = 9.46e12;
+/** 手で操縦する速さの上限（要件 F17・仮）は ship-schema.ts の MAX_SPEED_KM_S。サーバーも同じ値で確かめる */
+export { MAX_SPEED_KM_S };
+/** Shift を押しながらだと、1 段で速さを 10 倍にする（秒速 500 km から上限まで、約 13 段） */
+const FAST_SPEED_STEP = 10;
 
 export class FlightControls {
   readonly orientation = new Quaternion();
@@ -80,8 +83,10 @@ export class FlightControls {
     this.orientation.multiply(this.q).normalize();
   }
 
-  private changeSpeed(steps: number) {
-    this.speedKmS = Math.min(MAX_SPEED_KM_S, Math.max(MIN_SPEED_KM_S, this.speedKmS * SPEED_STEP ** steps));
+  /** 速さを steps 段変える。fast なら 1 段で 10 倍 */
+  changeSpeed(steps: number, fast = false): void {
+    const step = fast ? FAST_SPEED_STEP : SPEED_STEP;
+    this.speedKmS = Math.min(MAX_SPEED_KM_S, Math.max(MIN_SPEED_KM_S, this.speedKmS * step ** steps));
   }
 
   private onPointerDown = (e: PointerEvent) => {
@@ -109,12 +114,12 @@ export class FlightControls {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    this.changeSpeed(e.deltaY < 0 ? 1 : -1);
+    this.changeSpeed(e.deltaY < 0 ? 1 : -1, e.shiftKey);
   };
 
   private onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === '+' || e.key === '=' || e.key === ']') this.changeSpeed(1);
-    else if (e.key === '-' || e.key === '[') this.changeSpeed(-1);
+    if (e.key === '+' || e.key === '=' || e.key === ']') this.changeSpeed(1, e.shiftKey);
+    else if (e.key === '-' || e.key === '_' || e.key === '[') this.changeSpeed(-1, e.shiftKey);
     else this.keys.add(e.code);
   };
 

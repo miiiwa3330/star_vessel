@@ -1,0 +1,77 @@
+/**
+ * 宇宙の部屋（worker/space-room.ts）とのつながり。部屋は恒星系ごと。
+ * 自分の状態を送り、近くの船の状態を受け取る。切れたら、間をあけてつなぎ直す。
+ */
+import type { ServerMessage, ShipSnapshot, ShipState, StateMessage } from '../world/ship-schema';
+
+const MAX_RETRY_MS = 10_000;
+
+export class SpaceLink {
+  /** 近くの船（最後に受け取ったもの） */
+  ships: ShipSnapshot[] = [];
+  /** 自分の色相（サーバーが決める） */
+  hue: number | null = null;
+  /** サーバーの時計 − 自分の時計（ms）。船の予測はサーバーの時計で行う */
+  clockOffsetMs = 0;
+  private ws: WebSocket | null = null;
+  private room: string | null = null;
+  private retryMs = 1_000;
+  private retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+  get connected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /** いる恒星系の部屋に入る。同じ部屋なら何もしない */
+  setRoom(system: string): void {
+    if (system === this.room) return;
+    this.room = system;
+    this.ships = [];
+    this.retryMs = 1_000;
+    clearTimeout(this.retryTimer);
+    this.ws?.close();
+    this.connect();
+  }
+
+  send(state: ShipState): void {
+    if (!this.connected) return;
+    const msg: StateMessage = { t: 'state', s: state };
+    this.ws?.send(JSON.stringify(msg));
+  }
+
+  /** サーバーの時計でのいまの時刻（ms） */
+  serverNow(): number {
+    return Date.now() + this.clockOffsetMs;
+  }
+
+  private connect(): void {
+    const room = this.room;
+    if (!room) return;
+    const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${scheme}://${location.host}/api/space/${encodeURIComponent(room)}`);
+    this.ws = ws;
+    ws.onmessage = (e) => {
+      let m: ServerMessage;
+      try {
+        m = JSON.parse(String(e.data)) as ServerMessage;
+      } catch {
+        return;
+      }
+      // 届くまでの時間は気にしない（数十 ms）。予測の誤差は見た目に出ない
+      this.clockOffsetMs = m.now - Date.now();
+      if (m.t === 'hello') {
+        this.hue = m.hue;
+        this.retryMs = 1_000;
+      } else if (m.t === 'ships' && Array.isArray(m.ships)) {
+        this.ships = m.ships;
+      }
+    };
+    ws.onclose = () => {
+      if (this.ws !== ws) return; // 部屋を変えたために閉じた
+      this.ws = null;
+      this.ships = [];
+      this.retryTimer = setTimeout(() => this.connect(), this.retryMs);
+      this.retryMs = Math.min(MAX_RETRY_MS, this.retryMs * 2);
+    };
+  }
+}

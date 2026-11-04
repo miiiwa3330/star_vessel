@@ -11,3 +11,4 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-04 | [土台作り：地球と星空を表示する](entries/2026-11-04-world-foundation.md) |
 | 2026-11-05 | [レーダーとワープホール](entries/2026-11-05-radar-warp.md) |
 | 2026-11-05 | [ワープホールを全員で共有する](entries/2026-11-05-shared-warps.md) |
+| 2026-11-05 | [他のプレイヤーの宇宙船と、銀河の形](entries/2026-11-05-ships-and-galaxy.md) |

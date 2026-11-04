@@ -4,13 +4,14 @@ import { isWarpHole, isWarpPlacement } from './warp-schema';
 import { absolutePositionKm, type Observer } from './observer';
 import { heliocentricPositionKm } from './solar-system';
 import { minAltitudeKm } from './collision';
+import { knownSystemArm } from './address';
 import { length, sub } from './vec';
 
 const now = new Date('2026-11-05T00:00:00Z');
 const later = new Date('2026-12-01T00:00:00Z');
 const nearMars: Observer = { anchor: 'Mars', offsetKm: { x: 10_000, y: 0, z: 0 } };
 const forwardY = { x: 0, y: 1, z: 0 };
-const sol = () => 'SOL';
+const sol = () => ({ system: 'SOL', arm: 'ORI' as const });
 const plan = (o: Observer, forward = forwardY) => planWarpHere(o, forward, now, sol);
 
 describe('planWarpHere', () => {
@@ -42,7 +43,7 @@ describe('planWarpHere', () => {
     let asked: unknown = null;
     planWarpHere(nearMars, forwardY, now, (pos) => {
       asked = pos;
-      return 'SOL';
+      return sol();
     });
     expect(length(sub(asked as never, warpPositionKm(plan(nearMars), now)))).toBeLessThan(1e-6);
   });
@@ -60,6 +61,12 @@ describe('isWarpPlacement', () => {
     expect(isWarpPlacement({ ...ok, offsetKm: { x: Number.NaN, y: 0, z: 0 } })).toBe(false);
     expect(isWarpPlacement({ ...ok, system: 'H32263' })).toBe(false); // 火星を基準にしたまま、ほかの恒星系
     expect(isWarpPlacement({ ...ok, anchor: 'Sun', system: 'H32263' })).toBe(true);
+    expect(isWarpPlacement({ ...ok, arm: 'PER' })).toBe(false); // 太陽系はオリオン腕
+    expect(isWarpPlacement({ ...ok, arm: 'XXX' })).toBe(false);
+    // 自動で作った星の恒星系では、腕はマス目から決まる。違う腕を名乗っても受け付けない
+    const g = 'GHU8I00I007T';
+    expect(isWarpPlacement({ ...ok, anchor: 'Sun', system: g, arm: knownSystemArm(g) })).toBe(true);
+    expect(isWarpPlacement({ ...ok, anchor: 'Sun', system: g, arm: 'PER' })).toBe(false);
     expect(isWarpPlacement(null)).toBe(false);
   });
 });

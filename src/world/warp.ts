@@ -13,6 +13,7 @@ import { heliocentricPositionKm } from './solar-system';
 import { absolutePositionKm, type Observer } from './observer';
 import { add, normalize, scale, type Vec3 } from './vec';
 import type { WarpHole, WarpPlacement } from './warp-schema';
+import type { SystemAndArm } from './address';
 
 /** 自分とワープホールの間の距離（km）。輪の半径（300 km）の数倍 */
 export const WARP_STANDOFF_KM = 2_000;
@@ -20,13 +21,13 @@ export const WARP_STANDOFF_KM = 2_000;
 /**
  * いる場所に置くワープホールの位置を決める。forward は自分の進む向き（EQJ）。
  * 前方が天体にふさがれているときは、天体に近づける距離の外まで押し戻した位置に置く。
- * systemOf は位置（太陽中心・km）から恒星系の記号を決める関数（src/world/address.ts の nearestSystem）。
+ * systemOf は位置（太陽中心・km）から恒星系と腕を決める関数（src/world/address.ts の nearestSystem）。
  */
 export function planWarpHere(
   observer: Observer,
   forward: Vec3,
   date: Date,
-  systemOf: (positionKm: Vec3) => string,
+  systemOf: (positionKm: Vec3) => SystemAndArm,
 ): WarpPlacement {
   const dir = normalize(forward);
   const ahead = keepOutsideBodies(
@@ -37,7 +38,7 @@ export function planWarpHere(
     anchor: ahead.anchor,
     offsetKm: ahead.offsetKm,
     facing: scale(dir, -1),
-    system: systemOf(absolutePositionKm(ahead, date)),
+    ...systemOf(absolutePositionKm(ahead, date)),
   };
 }
 

@@ -15,5 +15,8 @@
       "migrations_dir": "migrations"
     }
   ],
+  // 宇宙の部屋（恒星系ごと）。無料プランでも使える SQLite 型として作る
+  "durable_objects": { "bindings": [{ "name": "SPACE", "class_name": "SpaceRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SpaceRoom"] }],
   "vars": { "BETTER_AUTH_URL": "http://localhost:5173" }
 }

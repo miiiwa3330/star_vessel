@@ -2,7 +2,8 @@
  * ワープホールのデータの形と、その確かめ方。サーバー（worker/）とブラウザの両方で使う。
  * three.js・DOM・astronomy-engine を読み込まない。
  */
-import { isSystemCode, SOL_BODY_NUMBERS, SYSTEM_SOL } from './address';
+import { isArmCode, isSystemCode, knownSystemArm, SOL_BODY_NUMBERS, SYSTEM_SOL } from './address';
+import type { ArmCode } from './galaxy';
 import type { BodyId } from './solar-system';
 import type { Vec3 } from './vec';
 
@@ -16,8 +17,10 @@ export interface WarpPlacement {
   offsetKm: Vec3;
   /** 輪の正面の向き（単位ベクトル・EQJ） */
   facing: Vec3;
-  /** 恒星系の記号（SOL か H+HYG の id）。ブラウザが星のデータから決める */
+  /** 恒星系の記号（SOL・H＋HYG の id・G＋マス目）。ブラウザが星のデータから決める */
   system: string;
+  /** 恒星系のある腕 */
+  arm: ArmCode;
 }
 
 /** サーバーが返す、置かれたワープホール */
@@ -50,7 +53,10 @@ export function isWarpPlacement(v: unknown): v is WarpPlacement {
   if (typeof v !== 'object' || v === null) return false;
   const p = v as Record<string, unknown>;
   if (!isBodyId(p.anchor) || !isVec(p.offsetKm) || !isVec(p.facing) || typeof p.system !== 'string') return false;
-  if (!isSystemCode(p.system)) return false;
+  if (!isSystemCode(p.system) || !isArmCode(p.arm)) return false;
+  // サーバーが自分で腕を決められる恒星系（太陽系・自動で作った星）は、ブラウザの値と合っていなければ受け付けない
+  const arm = knownSystemArm(p.system);
+  if (arm !== null && arm !== p.arm) return false;
   // 太陽系の外の恒星系は、太陽を基準にしているときだけ
   if (p.system !== SYSTEM_SOL && p.anchor !== 'Sun') return false;
   if (len(p.offsetKm) > MAX_OFFSET_KM) return false;

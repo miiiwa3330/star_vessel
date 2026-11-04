@@ -41,7 +41,9 @@ export function Radar({ blips }: { blips: RadarBlip[] }) {
         const fill = b.above ? color : 'none';
         return (
           <g key={`${b.kind}:${b.id}`} opacity={b.clamped ? 0.5 : 1}>
-            {b.kind === 'warp' ? (
+            {b.kind === 'ship' ? (
+              <path d={`M ${cx} ${cy - 0.04} L ${cx + 0.033} ${cy + 0.03} L ${cx - 0.033} ${cy + 0.03} Z`} fill={fill} stroke={color} strokeWidth={0.015} />
+            ) : b.kind === 'warp' ? (
               <rect x={cx - 0.035} y={cy - 0.035} width={0.07} height={0.07} transform={`rotate(45 ${cx} ${cy})`} fill={fill} stroke={color} strokeWidth={0.02} />
             ) : (
               <circle cx={cx} cy={cy} r={b.id === 'Sun' ? 0.05 : 0.03} fill={fill} stroke={color} strokeWidth={0.02} />

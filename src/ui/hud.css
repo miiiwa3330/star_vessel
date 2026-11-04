@@ -30,11 +30,14 @@
 .hud-credits a { color: inherit; }
 .hud-touch-only { display: none; }
 
+.hud-speed-buttons { position: absolute; left: 16px; flex-direction: column; gap: 6px; }
+
 /* スマホ：操作の説明はタッチだけにし、下の 2 つは縦に並べる */
 @media (max-width: 720px), (pointer: coarse) {
   .hud-bottom { flex-direction: column; align-items: stretch; }
   .hud-keyboard-only { display: none; }
   .hud-touch-only { display: block; }
+  .hud-speed-buttons.hud-touch-only { display: flex; bottom: 190px; }
 }
 
 /* 右の列：レーダーとワープの操作 */

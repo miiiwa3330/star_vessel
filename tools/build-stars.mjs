@@ -48,16 +48,18 @@ const col = (name) => {
   if (i < 0) throw new Error(`列が無い: ${name}`);
   return i;
 };
-const [iId, iX, iY, iZ, iMag, iCi] = ['id', 'x', 'y', 'z', 'mag', 'ci'].map(col);
+const [iId, iX, iY, iZ, iAbsMag, iCi, iDist] = ['id', 'x', 'y', 'z', 'absmag', 'ci', 'dist'].map(col);
 
 const stars = [];
 for (const line of lines.slice(1)) {
   const f = parseLine(line);
   if (f[iId] === '0') continue; // 太陽は太陽系の側で描く
+  // 距離の分からない星（HYG では距離が 100,000 pc の仮の値）は、3 次元の場所に置けないので外す
+  if (Number(f[iDist]) >= 100_000) continue;
   const ci = f[iCi] === '' ? Number.NaN : Number(f[iCi]);
-  stars.push([Number(f[iX]), Number(f[iY]), Number(f[iZ]), Number(f[iMag]), ci, Number(f[iId])]);
+  stars.push([Number(f[iX]), Number(f[iY]), Number(f[iZ]), Number(f[iAbsMag]), ci, Number(f[iId])]);
 }
-// 明るい順に並べる。性能の低い端末では先頭から一部だけを描けばよい
+// 本来の明るさ（絶対等級）の明るい順に並べる。性能の低い端末では先頭から一部だけを描けばよい
 stars.sort((a, b) => a[3] - b[3]);
 
 const data = new Float32Array(stars.length * STRIDE);
@@ -71,7 +73,7 @@ writeFileSync(
     'This data is derived from the HYG Database v4.4 by David Nash (astronexus), https://codeberg.org/astronexus/hyg',
     'Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0):',
     'https://creativecommons.org/licenses/by-sa/4.0/',
-    'Changes: kept only x, y, z (parsec, J2000 equatorial), apparent magnitude, B-V color index and the HYG id; removed the Sun; sorted by magnitude; stored as little-endian float32.',
+    'Changes: kept only x, y, z (parsec, J2000 equatorial), absolute magnitude, B-V color index and the HYG id; removed the Sun and stars without a known distance; sorted by absolute magnitude; stored as little-endian float32.',
     '',
   ].join('\n'),
 );

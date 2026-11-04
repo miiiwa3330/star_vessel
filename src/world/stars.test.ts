@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bvToRgb, decodeStars, starAppearance, STAR_STRIDE } from './stars';
+import { apparentMagnitude, bvToRgb, decodeStars, starAppearance, STAR_STRIDE } from './stars';
 
 describe('starAppearance', () => {
   it('明るい星（等級が小さい）ほど大きく明るい', () => {
@@ -15,9 +15,24 @@ describe('starAppearance', () => {
     expect(starAppearance(6.5).intensity).toBeGreaterThan(starAppearance(9).intensity);
   });
 
-  it('どんなに暗い星も、明るさ 0・大きさ 1 ピクセル未満にはならない', () => {
-    expect(starAppearance(12).intensity).toBeGreaterThan(0);
+  it('10 等までは消えず、大きさも 1 ピクセルより小さくならない', () => {
+    expect(starAppearance(10).intensity).toBeGreaterThan(0);
     expect(starAppearance(12).sizePx).toBeGreaterThanOrEqual(1);
+  });
+
+  it('14 等より暗い星は消える（銀河の外から見て、遠くの星が重なって光らないように）', () => {
+    expect(starAppearance(14).intensity).toBe(0);
+    expect(starAppearance(12).intensity).toBeLessThan(starAppearance(10).intensity);
+  });
+});
+
+describe('apparentMagnitude', () => {
+  it('10 pc では絶対等級と同じ、10 倍遠いと 5 等暗い', () => {
+    expect(apparentMagnitude(4.83, 10)).toBeCloseTo(4.83, 9);
+    expect(apparentMagnitude(4.83, 100)).toBeCloseTo(9.83, 9);
+  });
+  it('シリウス（絶対等級 1.45・2.64 pc）は約 −1.4 等', () => {
+    expect(apparentMagnitude(1.45, 2.637)).toBeCloseTo(-1.44, 1);
   });
 });
 

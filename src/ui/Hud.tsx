@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { bodyInfo } from '../world/solar-system';
 import { formatDistance, formatSpeed } from './format';
-import { hudStore } from './hud-store';
+import { hudActions, hudStore } from './hud-store';
 import { Radar } from './Radar';
 import { WarpPanel } from './WarpPanel';
 import './hud.css';
@@ -18,6 +18,7 @@ export function Hud() {
           {bodyInfo(s.anchor).nameJa}の表面から {formatDistance(s.altitudeKm)}
         </div>
         <div>{formatSpeed(s.speedKmS)}</div>
+        {s.nearbyShips !== null && <div>近くのプレイヤー：{s.nearbyShips} 人</div>}
         <div className="hud-muted">描画：{s.backend}</div>
         {s.status && <div className="hud-warn">{s.status}</div>}
       </div>
@@ -26,13 +27,21 @@ export function Hud() {
         <Radar blips={s.radar} />
         <WarpPanel warps={s.warps} ready={s.warpsReady} />
       </div>
+      <div className="hud-speed-buttons hud-touch-only">
+        <button type="button" className="hud-button" onClick={() => hudActions.changeSpeed(1)} aria-label="速くする">
+          速く
+        </button>
+        <button type="button" className="hud-button" onClick={() => hudActions.changeSpeed(-1)} aria-label="遅くする">
+          遅く
+        </button>
+      </div>
       <div className="hud-bottom">
         <div className="hud-panel hud-help">
           <div className="hud-keyboard-only">
-            ドラッグ：向きを変える ／ W・S：前後 ／ A・D：左右 ／ R・F：上下 ／ Q・E：傾き ／ ホイール・＋−：速さ
+            ドラッグ：向きを変える ／ W・S：前後 ／ A・D：左右 ／ R・F：上下 ／ Q・E：傾き ／ ホイール・＋−：速さ（Shift で 10 倍ずつ）
           </div>
           <div className="hud-touch-only">1 本指：向きを変える ／ 2 本指で触れている間：前へ</div>
-          <div className="hud-muted">レーダー：上が進む方向 ／ ●自分より上 ○下 ／ ◆ワープホール</div>
+          <div className="hud-muted">レーダー：上が進む方向 ／ ●自分より上 ○下 ／ ◆ワープホール ／ ▲ほかのプレイヤー</div>
         </div>
         <div className="hud-panel hud-credits">
           星：<a href="https://codeberg.org/astronexus/hyg">HYG v4.4</a>（

@@ -55,7 +55,7 @@ warps.post('/', async (c) => {
   if (!isWarpPlacement(body)) return c.json({ error: 'invalid' }, 400);
 
   const id = crypto.randomUUID();
-  const prefix = addressPrefix(body.anchor, body.system);
+  const prefix = addressPrefix(body.anchor, body.system, body.arm);
   const now = new Date().toISOString();
   const underLimit = '(SELECT COUNT(*) FROM warps WHERE owner_id = ?) < ?';
   // batch は 1 つのトランザクションで順に動く。上限の確かめ・番号を振る・置く、を同時に行い、重なりや上限の超えを防ぐ

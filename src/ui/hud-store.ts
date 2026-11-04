@@ -22,6 +22,8 @@ export interface HudState {
   /** 基準の天体の表面からの高さ（km） */
   altitudeKm: number;
   speedKmS: number;
+  /** 近くにいるほかのプレイヤーの数（部屋につながっていなければ null） */
+  nearbyShips: number | null;
   backend: 'WebGPU' | 'WebGL2' | '準備中';
   status: string | null;
   /** 一時的なお知らせ（ワープホールを置いた、など） */
@@ -37,6 +39,7 @@ let state: HudState = {
   anchor: 'Earth',
   altitudeKm: 0,
   speedKmS: 0,
+  nearbyShips: null,
   backend: '準備中',
   status: '読み込み中…',
   notice: null,
@@ -65,6 +68,8 @@ export const hudActions = {
   removeWarp: (_id: string): void => {},
   /** 一覧を開いたときに、全員のワープホールを取り直す */
   refreshWarps: (): void => {},
+  /** 速さを変える（スマホのボタン用） */
+  changeSpeed: (_steps: number): void => {},
 };
 
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;

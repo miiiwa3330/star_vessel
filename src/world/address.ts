@@ -7,17 +7,16 @@
  * 決まりと理由は docs/tech/world-model.md の「宇宙の住所」。
  * このファイルはサーバー（worker/）とブラウザの両方で使う。three.js・DOM・astronomy-engine を読み込まない。
  */
+import { ARM_CODES, ARM_NAMES_JA, armAt, cellCenterGalacto, eqjPcToGalacto, parseGeneratedSystem, type ArmCode } from './galaxy';
 import type { BodyId } from './solar-system';
 import { KM_PER_PC } from './units';
 import type { Vec3 } from './vec';
 
 /** 天の川銀河 */
 export const GALAXY_MILKY_WAY = 'MW';
-/**
- * オリオン腕（太陽のある腕）。銀河の腕を決めるモデルはまだ無いので、本物のデータの範囲（太陽から約 3,200 光年）は
- * すべてオリオン腕として扱う（仮。docs/tech/world-model.md）
- */
-export const ARM_ORION = 'ORI';
+/** 太陽のある腕（オリオン腕）。銀河のモデル（src/world/galaxy.ts）で太陽の場所を調べた結果と同じ（テストで確かめている） */
+export const SUN_ARM: ArmCode = 'ORI';
+export const isArmCode = (s: unknown): s is ArmCode => typeof s === 'string' && (ARM_CODES as string[]).includes(s);
 /** 太陽系 */
 export const SYSTEM_SOL = 'SOL';
 
@@ -37,44 +36,81 @@ export const SOL_BODY_NUMBERS: Record<BodyId, { planet: number; moon: number }> 
   Pluto: { planet: 9, moon: 0 },
 };
 
-const SYSTEM_PATTERN = /^(SOL|H[1-9][0-9]{0,6})$/;
+/** SOL：太陽系、H＋数字：本物の星（HYG の id）、G＋36 進 11 桁：自動で作った星（src/world/galaxy.ts） */
+const SYSTEM_PATTERN = /^(SOL|H[1-9][0-9]{0,6}|G[0-9A-Z]{11})$/;
 export const isSystemCode = (s: string): boolean => SYSTEM_PATTERN.test(s);
 
 /** HYG の星の恒星系の記号（例：シリウスは H32263） */
 export const hygSystemCode = (hygId: number): string => `H${hygId}`;
 
 /**
- * 番号の前までの住所（例：MW-ORI-SOL-3-1）。
+ * 番号の前までの住所（例：MW-ORI-SOL-3-1）。arm は恒星系のある腕（systemArm で決める）。
  * 太陽系の外（system が SOL 以外）では、惑星・衛星はまだ無いので 0-0。
  */
-export function addressPrefix(anchor: BodyId, system: string): string {
+export function addressPrefix(anchor: BodyId, system: string, arm: ArmCode): string {
   if (!isSystemCode(system)) throw new Error(`恒星系の記号が正しくない: ${system}`);
+  if (!isArmCode(arm)) throw new Error(`腕の記号が正しくない: ${arm}`);
   const { planet, moon } = system === SYSTEM_SOL ? SOL_BODY_NUMBERS[anchor] : { planet: 0, moon: 0 };
-  return [GALAXY_MILKY_WAY, ARM_ORION, system, planet, moon].join('-');
+  return [GALAXY_MILKY_WAY, arm, system, planet, moon].join('-');
+}
+
+/**
+ * 恒星系のある腕を、サーバーが自分で決められるか。太陽系は SUN_ARM、自動で作った星はマス目の中心の腕。
+ * 本物の星（H…）は位置のデータをサーバーが持たないので、決められない（null。ブラウザの値を信じる）
+ */
+export function knownSystemArm(system: string): ArmCode | null {
+  if (system === SYSTEM_SOL) return SUN_ARM;
+  const g = parseGeneratedSystem(system);
+  return g ? armAt(cellCenterGalacto(g.cell)) : null;
 }
 
 /** 番号を付けた住所。番号は 3 桁まで 0 で埋める（1000 以上はそのまま） */
 export const addressCode = (prefix: string, serial: number): string => `${prefix}-${String(serial).padStart(3, '0')}`;
 
+export interface SystemAndArm {
+  system: string;
+  arm: ArmCode;
+}
+
 /**
- * いる場所がどの恒星系か。太陽を含めて、いちばん近い恒星の恒星系にする。
- * stars は STAR_STRIDE 個ずつ並んだ星のデータ（x・y・z が pc、6 番目が HYG の id）。
+ * いる場所がどの恒星系か。太陽・本物の星（HYG）・自動で作った星のうち、いちばん近い恒星の恒星系にする。
+ * 腕は、その恒星のある腕（自動で作った星は、マス目の中心の腕。サーバーと同じ決め方）。
+ * stars は STAR_STRIDE 個ずつ並んだ本物の星のデータ（x・y・z が pc、6 番目が HYG の id）。
  */
-export function nearestSystem(positionKm: Vec3, stars: Float32Array, stride: number): string {
+export function nearestSystem(
+  positionKm: Vec3,
+  stars: Float32Array,
+  stride: number,
+  generated: readonly { position: Vec3; system: string }[] = [],
+): SystemAndArm {
   const x = positionKm.x / KM_PER_PC;
   const y = positionKm.y / KM_PER_PC;
   const z = positionKm.z / KM_PER_PC;
-  let best = SYSTEM_SOL;
   let bestD2 = x * x + y * y + z * z; // 太陽は原点
+  let best: SystemAndArm = { system: SYSTEM_SOL, arm: SUN_ARM };
+  let bestHyg = -1;
   for (let o = 0; o + stride <= stars.length; o += stride) {
-    const dx = stars[o] - x;
-    const dy = stars[o + 1] - y;
-    const dz = stars[o + 2] - z;
-    const d2 = dx * dx + dy * dy + dz * dz;
+    const d2 = (stars[o] - x) ** 2 + (stars[o + 1] - y) ** 2 + (stars[o + 2] - z) ** 2;
     if (d2 < bestD2) {
       bestD2 = d2;
-      best = hygSystemCode(stars[o + 5]);
+      bestHyg = o;
     }
+  }
+  let bestGen = -1;
+  generated.forEach((g, i) => {
+    const d2 = (g.position.x - x) ** 2 + (g.position.y - y) ** 2 + (g.position.z - z) ** 2;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      bestGen = i;
+    }
+  });
+  if (bestGen >= 0) {
+    const system = generated[bestGen].system;
+    return { system, arm: knownSystemArm(system) ?? SUN_ARM };
+  }
+  if (bestHyg >= 0) {
+    const pos = { x: stars[bestHyg], y: stars[bestHyg + 1], z: stars[bestHyg + 2] };
+    best = { system: hygSystemCode(stars[bestHyg + 5]), arm: armAt(eqjPcToGalacto(pos)) };
   }
   return best;
 }
@@ -90,7 +126,7 @@ export function readAddress(code: string): string {
   const moon = Number(moonS);
   const words: string[] = [
     galaxy === GALAXY_MILKY_WAY ? '天の川銀河' : galaxy,
-    arm === ARM_ORION ? 'オリオン腕' : arm,
+    isArmCode(arm) ? ARM_NAMES_JA[arm] : arm,
     system === SYSTEM_SOL ? '太陽系' : `恒星 ${system}`,
   ];
   if (planet > 0) words.push(system === SYSTEM_SOL ? (SOL_PLANET_NAMES[planet] ?? `第${planet}惑星`) : `第${planet}惑星`);
