@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { paintRing, paintSurface, type SurfaceLook } from './surface';
+import { lattice, paintRing, paintSurface, type SurfaceLook } from './surface';
+import { hashInts } from './random';
 
 const banded: SurfaceLook = { kind: 'banded', colors: [[100, 50, 0], [250, 240, 200]], bands: 8, turbulence: 0.3 };
 const rocky: SurfaceLook = { kind: 'rocky', colors: [[60, 60, 60], [200, 200, 200]], craters: 0.4 };
@@ -49,5 +50,13 @@ describe('paintRing', () => {
     // 250 km（すき間）は左から (250−100)/300 = 半分の位置
     expect(img.data[150 * 4 + 3]).toBe(0);
     expect(img.data[10 * 4 + 3]).toBeGreaterThan(100);
+  });
+});
+
+describe('lattice', () => {
+  it('hashInts と同じ値', () => {
+    for (const [s, x, y, z] of [[1, 2, 3, 4], [-5, 0, 99, -1000], [123456789, -7, 7, 0]]) {
+      expect(lattice(s, x, y, z)).toBe(hashInts(s, x, y, z) / 4294967296);
+    }
   });
 });

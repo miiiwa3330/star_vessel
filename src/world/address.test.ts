@@ -103,3 +103,13 @@ describe('bodyAddress（天体の id から住所の番号）', () => {
     expect(readAddress('MW-ORI-SOL-A1-0-001')).toBe('天の川銀河 オリオン腕 太陽系 小惑星 (1) 1番');
   });
 });
+
+describe('系外惑星の衛星', () => {
+  it('id は 恒星系.惑星.衛星 で、住所の衛星の番号になる', () => {
+    expect(bodyAddress('H70666.2.1')).toEqual({ planet: '2', moon: 1, system: 'H70666' });
+    expect(bodyAddress('GHU8I00I007T.3.12~2')).toEqual({ planet: '3', moon: 12, system: 'GHU8I00I007T' });
+    expect(bodyAddress('H70666.2.0')).toBeNull();
+    expect(addressPrefix('H70666.2.1', 'H70666', 'ORI')).toBe('MW-ORI-H70666-2-1');
+    expect(readAddress('MW-ORI-H70666-2-3-001')).toBe('天の川銀河 オリオン腕 恒星 H70666 第2惑星 第3衛星 1番');
+  });
+});

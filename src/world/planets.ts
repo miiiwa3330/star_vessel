@@ -10,11 +10,11 @@
  * three.js・DOM・astronomy-engine を読み込まない。
  */
 import { exoplanetId } from './address';
-import { axisKmFromPeriod, meanAnomalyFromTrue, type KeplerElements } from './kepler';
+import { axisKmFromPeriod, meanAnomalyFromTrue, orbitNormal, periodDaysFromAxis, type KeplerElements } from './kepler';
 import type { RealPlanet, RealSystem } from './exoplanet-data';
 import { hashInts, mulberry32 } from './random';
 import type { BodyInfo, Spin } from './solar-system';
-import type { Rgb, SurfaceLook } from './surface';
+import type { Rgb, RingZone, SurfaceLook } from './surface';
 import { DEG, KM_PER_AU, KM_PER_PC } from './units';
 import { length, normalize, scale, type Mat3, type Vec3 } from './vec';
 
@@ -205,6 +205,8 @@ interface PlanetSpec {
   look: SurfaceLook;
   seed: number;
   spin: Spin;
+  /** 温度（K。データ、無ければ平衡温度） */
+  tempK: number;
 }
 
 function spinFor(periodDays: number, pole: Vec3, rand: () => number): Spin {
@@ -257,6 +259,7 @@ function realPlanets(sys: RealSystem, host: HostStar, star: StarModel): PlanetSp
       massSun,
       elements,
       look: planetLook(radiusEarth, tempK, rand),
+      tempK,
       seed,
       spin: spinFor(p.periodDays, { x: 0, y: 0, z: 1 }, rand),
     };
@@ -325,6 +328,7 @@ function generatedPlanetsV1(host: HostStar, star: StarModel): PlanetSpec[] {
       massSun: massEarth * M_EARTH_SUN,
       elements: { aKm, e, iRad, nodeRad, periRad, meanAnomalyRad, epochMs: J2000_MS, periodDays, frame: IDENTITY },
       look: planetLook(radiusEarth, equilibriumK(star, aKm), lookRand),
+      tempK: equilibriumK(star, aKm),
       seed: hashInts(charSeed(host.system), k, 0x53454544),
       spin: spinFor(periodDays, { x: 0, y: 0, z: 1 }, spinRand),
     });
@@ -358,17 +362,171 @@ export function systemBodies(host: HostStar, real: RealSystem | null): BodyInfo[
   const generation = real ? 1 : PLANET_GENERATION;
   const planets = real ? realPlanets(real, host, star) : generatedPlanetsV1(host, star);
   for (const p of planets) {
+    const id = exoplanetId(host.system, p.n, generation);
+    const radiusEarth = p.radiusKm / R_EARTH_KM;
+    // 自動で作る惑星だけ、自転の軸を公転の面から傾け、衛星と環を作る（実在の惑星に架空の衛星を付けないため）
+    const extra = real ? null : moonsAndRings(host.system, p, star, id, generation);
     bodies.push({
-      id: exoplanetId(host.system, p.n, generation),
+      id,
       nameJa: p.nameJa,
       radiusKm: p.radiusKm,
       kind: 'exoplanet',
       parent: starId,
       motion: { type: 'kepler', parent: starId, elements: p.elements },
-      spin: p.spin,
+      spin: extra?.spin ?? p.spin,
       anchorRadiusKm: Math.max(p.radiusKm * 3, laplaceSoiKm(p.elements.aKm, p.massSun, star.massSun)),
       surface: { look: p.look, seed: p.seed },
+      atmosphere: planetAtmosphere(radiusEarth, p.tempK, p.look, mulberry32(hashInts(charSeed(host.system), p.n, 0x41544d4f))),
+      rings: extra?.rings,
+      ringColor: extra?.ringColor,
     });
+    if (extra) bodies.push(...extra.moons);
   }
   return bodies;
+}
+
+// ── 大気・衛星・環（要件 F25・F26） ─────────────────────────
+
+const mean = (cs: readonly Rgb[]): [number, number, number] => {
+  const m = cs[Math.floor(cs.length / 2)];
+  return [m[0] / 255, m[1] / 255, m[2] / 255];
+};
+const lighten = (c: [number, number, number], k: number): [number, number, number] => [
+  c[0] + (1 - c[0]) * k,
+  c[1] + (1 - c[1]) * k,
+  c[2] + (1 - c[2]) * k,
+];
+
+/**
+ * 系外惑星の大気（見た目のための決まり）。ガス・氷の惑星はいつも、岩の惑星は 0.7 地球半径以上で
+ * 温度が 180〜700 K のとき 6 割（暑いと金星のような黄色い厚い大気、ほどよいと青い薄い大気）
+ */
+export function planetAtmosphere(radiusEarth: number, tempK: number, look: SurfaceLook, rand: () => number) {
+  if (radiusEarth > 6) return { color: lighten(mean(look.colors), 0.3), thickness: 0.012, strength: 0.5 };
+  if (radiusEarth > 1.6) return { color: lighten(mean(look.colors), 0.35), thickness: 0.02, strength: 0.6 };
+  if (radiusEarth < 0.7 || tempK < 180 || tempK > 700 || rand() >= 0.6) return undefined;
+  return tempK > 400
+    ? { color: [1.0, 0.9, 0.65] as const, thickness: 0.03, strength: 0.9 }
+    : { color: [0.35, 0.6, 1.0] as const, thickness: 0.025, strength: 0.8 };
+}
+
+/** 太陽の質量（kg）。IAU 2015 の公称値の GM☉ を万有引力定数 6.6743e-11 で割った値 */
+const KG_PER_SUN = 1.98841e30;
+
+const cross = (a: Vec3, b: Vec3): Vec3 => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
+
+/** 軸 pole を z にした、回らない座標（衛星の軌道の基準の面＝惑星の赤道の面） */
+export function equatorFrame(pole: Vec3): Mat3 {
+  const z = normalize(pole);
+  const c = cross({ x: 0, y: 0, z: 1 }, z);
+  const x = length(c) > 1e-9 ? normalize(c) : { x: 1, y: 0, z: 0 };
+  const y = cross(z, x);
+  return [x.x, y.x, z.x, x.y, y.y, z.y, x.z, y.z, z.z];
+}
+
+/** 公転の面の北を、角度 tilt だけ傾けた向き */
+function tiltedPole(normal: Vec3, tilt: number, azimuth: number): Vec3 {
+  const f = equatorFrame(normal);
+  const x = { x: f[0], y: f[3], z: f[6] };
+  const y = { x: f[1], y: f[4], z: f[7] };
+  const s = Math.sin(tilt);
+  return normalize({
+    x: normal.x * Math.cos(tilt) + (x.x * Math.cos(azimuth) + y.x * Math.sin(azimuth)) * s,
+    y: normal.y * Math.cos(tilt) + (x.y * Math.cos(azimuth) + y.y * Math.sin(azimuth)) * s,
+    z: normal.z * Math.cos(tilt) + (x.z * Math.cos(azimuth) + y.z * Math.sin(azimuth)) * s,
+  });
+}
+
+/** 衛星の数と大きさの決まり（太陽系を手本にした割合。docs/tech/exoplanets.md） */
+const MOON_RULES = {
+  gas: { hasMoons: 0.9, maxCount: 6, radiusKm: [300, 2700], firstOrbitRadii: [4, 7], ringChance: 0.3 },
+  ice: { hasMoons: 0.6, maxCount: 4, radiusKm: [150, 1400], firstOrbitRadii: [5, 9], ringChance: 0.15 },
+  rocky: { hasMoons: 0.15, maxCount: 1, radiusKm: [0, 0], firstOrbitRadii: [20, 60], ringChance: 0 },
+} as const;
+
+function moonsAndRings(system: string, p: PlanetSpec, star: StarModel, planetId: string, generation: number) {
+  const rand = mulberry32(hashInts(charSeed(system), p.n, 0x4d4f4f4e));
+  const radiusEarth = p.radiusKm / R_EARTH_KM;
+  const kind = radiusEarth > 6 ? 'gas' : radiusEarth > 1.6 ? 'ice' : 'rocky';
+  const rule = MOON_RULES[kind];
+  // 自転の軸：ほとんどは 30 度まで、5% は大きく傾く（天王星のように）
+  const el = p.elements;
+  const tilt = rand() < 0.05 ? (60 + 50 * rand()) * DEG : 30 * rand() * rand() * DEG;
+  const pole = tiltedPole(orbitNormal(el), tilt, rand() * 2 * Math.PI);
+  const spin: Spin = p.spin.type === 'steady' ? { ...p.spin, pole } : p.spin;
+  const frame = equatorFrame(pole);
+
+  // 恒星のすぐそば（周期 10 日より短い）は、恒星の引力で衛星も環も保てないので作らない
+  const close = el.periodDays < 10;
+  const moons: BodyInfo[] = [];
+  let firstMoonAKm = Number.POSITIVE_INFINITY;
+  if (!close && rand() < rule.hasMoons) {
+    const count = 1 + Math.floor(rand() * rule.maxCount);
+    // ヒル球の 0.4 倍より外の衛星は作らない。比べるのは 3 乗どうし（掛け算だけ）
+    const hill3 = el.aKm ** 3 * (p.massSun / (3 * star.massSun)) * 0.064;
+    let orbitRadii = rule.firstOrbitRadii[0] + (rule.firstOrbitRadii[1] - rule.firstOrbitRadii[0]) * rand();
+    for (let m = 1; m <= count; m++) {
+      if (m > 1) orbitRadii *= 1.4 + 0.8 * rand();
+      const aKm = orbitRadii * p.radiusKm;
+      if (aKm * aKm * aKm > hill3) break;
+      const radiusKm =
+        kind === 'rocky'
+          ? p.radiusKm * (0.1 + 0.2 * rand())
+          : rule.radiusKm[0] + (rule.radiusKm[1] - rule.radiusKm[0]) * rand() * rand();
+      const icy = p.tempK < 200;
+      const density = icy ? 1500 : 3000; // kg/m³（氷が多い衛星・岩の衛星のおおよその値）
+      const massSun = ((4 / 3) * Math.PI * (radiusKm * 1000) ** 3 * density) / KG_PER_SUN;
+      const lookRand = mulberry32(hashInts(charSeed(system), p.n, m, 0x4d4c4f4b));
+      const volcanic = kind === 'gas' && m === 1 && lookRand() < 0.3;
+      const colors: readonly Rgb[] = volcanic
+        ? [rgb(0x8a5a1c), rgb(0xd9c25a), rgb(0xf2e6a0)]
+        : icy
+          ? [rgb(0x7a7a80), rgb(0xc8ccd4), rgb(0xf0f2f6)]
+          : [rgb(0x4a4440), rgb(0x8a8078), rgb(0xb8b0a6)];
+      const elements: KeplerElements = {
+        aKm,
+        e: 0.02 * rand(),
+        iRad: 2 * rand() * DEG,
+        nodeRad: rand() * 2 * Math.PI,
+        periRad: rand() * 2 * Math.PI,
+        meanAnomalyRad: rand() * 2 * Math.PI,
+        epochMs: J2000_MS,
+        periodDays: periodDaysFromAxis(aKm, p.massSun),
+        frame,
+      };
+      if (m === 1) firstMoonAKm = aKm;
+      moons.push({
+        id: exoplanetId(system, p.n, generation, m),
+        nameJa: `${p.nameJa}の第${m}衛星`,
+        radiusKm,
+        kind: 'moon',
+        parent: planetId,
+        motion: { type: 'kepler', parent: planetId, elements },
+        spin: { type: 'locked' },
+        anchorRadiusKm: Math.max(radiusKm * 3, laplaceSoiKm(aKm, massSun, p.massSun)),
+        surface: { look: { kind: 'rocky', colors, craters: volcanic ? 0.1 : 0.2 + 0.3 * lookRand() }, seed: hashInts(charSeed(system), p.n, m) },
+      });
+    }
+  }
+
+  let rings: RingZone[] | undefined;
+  let ringColor: Rgb | undefined;
+  if (!close && rand() < rule.ringChance) {
+    const inner = p.radiusKm * (1.2 + 0.3 * rand());
+    // 環は、いちばん内側の衛星の軌道より内側に収める
+    const outer = Math.min(p.radiusKm * (2.0 + 0.5 * rand()), firstMoonAKm * 0.8);
+    if (outer > inner * 1.1) {
+      const parts = 2 + Math.floor(rand() * 3);
+      rings = [];
+      for (let k = 0; k < parts; k++) {
+        const a = inner + ((outer - inner) * k) / parts;
+        const b = inner + ((outer - inner) * (k + 1)) / parts;
+        const gap = k < parts - 1 && rand() < 0.5 ? (b - a) * 0.15 : 0;
+        const opacity = kind === 'gas' ? 0.3 + 0.65 * rand() : 0.05 + 0.25 * rand();
+        rings.push({ innerKm: a, outerKm: b - gap, opacity });
+      }
+      ringColor = kind === 'gas' && p.tempK < 300 ? rgb(0xd8c8a4) : rgb(0x6a6660);
+    }
+  }
+  return { spin, moons, rings, ringColor };
 }

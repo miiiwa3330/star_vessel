@@ -60,7 +60,7 @@ describe('自動で作る惑星', () => {
     for (let i = 0; i < 300; i++) {
       const bodies = systemBodies(host(`H${i + 1}`, -1, 1.5), null); // 赤色巨星（半径が大きい）
       const star = bodies[0];
-      for (const b of bodies.slice(1)) {
+      for (const b of bodies.filter((x) => x.kind === 'exoplanet')) {
         if (b.motion.type === 'kepler') expect(b.motion.elements.aKm).toBeGreaterThan(star.radiusKm * 2);
       }
     }
@@ -86,5 +86,69 @@ describe('実在の惑星', () => {
     const towardSun = normalize(scale(sys.positionPc!, -KM_PER_PC));
     const along = (rel.x * towardSun.x + rel.y * towardSun.y + rel.z * towardSun.z) / length(rel);
     expect(along).toBeGreaterThan(0.99);
+  });
+});
+
+describe('系外惑星の衛星と環（要件 F26）', () => {
+  const baseline = JSON.parse(readFileSync('src/world/__fixtures__/generated-planets-v1.json', 'utf8')) as Record<
+    string,
+    { id: string; radiusKm: number; el: unknown }[]
+  >;
+  const hostFor = (code: string, i: number): HostStar => ({
+    system: code,
+    positionPc: { x: 100 + i, y: -50, z: 20 },
+    absMag: 2 + (i % 12),
+    bv: 0.2 + (i % 9) * 0.15,
+  });
+
+  it('衛星と環を足しても、惑星（id・大きさ・軌道）は世代 1 のまま変わらない', () => {
+    Object.keys(baseline).forEach((code, i) => {
+      const planets = systemBodies(hostFor(code, i), null)
+        .filter((b) => b.kind === 'exoplanet')
+        .map((b) => ({ id: b.id, radiusKm: b.radiusKm, el: (b.motion as { elements: unknown }).elements }));
+      expect(JSON.parse(JSON.stringify(planets))).toEqual(baseline[code]);
+    });
+  });
+
+  it('衛星は惑星に近い順の番号で、惑星のヒル球の 0.4 倍の内側を回る', () => {
+    let moonCount = 0;
+    for (let i = 0; i < 300; i++) {
+      const bodies = systemBodies(host(`H${5000 + i}`), null);
+      for (const planet of bodies.filter((b) => b.kind === 'exoplanet')) {
+        const moons = bodies.filter((b) => b.parent === planet.id);
+        const axes = moons.map((m) => (m.motion as { elements: KeplerElements }).elements.aKm);
+        expect([...axes].sort((a, b) => a - b)).toEqual(axes);
+        moons.forEach((m, k) => {
+          expect(bodyAddress(m.id)).toMatchObject({ moon: k + 1, planet: bodyAddress(planet.id)!.planet });
+          expect(axes[k]).toBeGreaterThan(planet.radiusKm * 2);
+        });
+        if (planet.rings && axes.length > 0) {
+          expect(Math.max(...planet.rings.map((r) => r.outerKm))).toBeLessThan(axes[0]);
+        }
+        moonCount += moons.length;
+      }
+    }
+    expect(moonCount).toBeGreaterThan(50);
+  });
+
+  it('木星型の惑星の大半は衛星を持つ', () => {
+    let giants = 0;
+    let withMoons = 0;
+    for (let i = 0; i < 3000; i++) {
+      const bodies = systemBodies(host(`H${20000 + i}`), null);
+      for (const p of bodies.filter((b) => b.kind === 'exoplanet' && b.radiusKm > 6 * 6378.1)) {
+        if ((p.motion as { elements: KeplerElements }).elements.periodDays < 10) continue;
+        giants++;
+        if (bodies.some((b) => b.parent === p.id)) withMoons++;
+      }
+    }
+    expect(giants).toBeGreaterThan(30);
+    expect(withMoons / giants).toBeGreaterThan(0.75);
+  });
+
+  it('実在の惑星には衛星と環を付けない', () => {
+    const sys = [...real.values()].find((s) => s.name === 'TRAPPIST-1')!;
+    const bodies = systemBodies(host(sys.code, sys.absMag!, sys.bv!, sys.positionPc!), sys);
+    expect(bodies.some((b) => b.kind === 'moon' || b.rings)).toBe(false);
   });
 });

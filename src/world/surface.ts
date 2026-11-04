@@ -8,7 +8,6 @@
  *
  * three.js・DOM を読み込まない（テストのため）。
  */
-import { hashInts } from './random';
 
 export type Rgb = readonly [number, number, number];
 
@@ -25,9 +24,20 @@ export interface SurfaceImage {
   data: Uint8Array;
 }
 
-/** 格子の点の値（0〜1）。整数の計算だけで決める */
-function lattice(seed: number, x: number, y: number, z: number): number {
-  return hashInts(seed, x, y, z) / 4294967296;
+/** hashInts の 1 回分の混ぜ方 */
+function mix(h: number, v: number): number {
+  h = Math.imul(h ^ (v | 0), 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  return h ^ (h >>> 16);
+}
+
+/**
+ * 格子の点の値（0〜1）。整数の計算だけで決める。
+ * hashInts(seed, x, y, z) と同じ値（速くするため、可変長の引数を使わずに書き下した。テストで同じことを確かめている）
+ */
+export function lattice(seed: number, x: number, y: number, z: number): number {
+  return (mix(mix(mix(mix(0x9e3779b9, seed), x), y), z) >>> 0) / 4294967296;
 }
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -143,4 +153,14 @@ export function paintRing(zones: readonly RingZone[], color: Rgb, seed: number, 
     data[i * 4 + 3] = Math.round(a * 255);
   }
   return { width, height: 1, data };
+}
+
+/** 北極が上の画像を、three.js の球の向き（画像の 1 行目が v=0＝南極）に合わせて上下を入れ替える */
+export function flipRows(img: SurfaceImage): SurfaceImage {
+  const rowBytes = img.width * 4;
+  const out = new Uint8Array(img.data.length);
+  for (let r = 0; r < img.height; r++) {
+    out.set(img.data.subarray(r * rowBytes, (r + 1) * rowBytes), (img.height - 1 - r) * rowBytes);
+  }
+  return { ...img, data: out };
 }
