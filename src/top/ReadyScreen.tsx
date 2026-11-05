@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { currentAccount, ensureSession, type Account } from '../net/auth';
 import { shipApi } from '../net/ship-repository';
-import { AccountPanel } from './AccountPanel';
+import { AccountPanel, type AccountMode } from './AccountPanel';
 import { Credit } from './Credit';
 import { onlineText, useOnline } from './online';
 import { playUrl } from './routes';
@@ -18,7 +18,9 @@ const FALLBACK_HUE = 200;
  * 準備画面（要件 F48）。宇宙船を選び、必要ならアカウントを登録して、「出発する」で世界（/play）へ。
  * 開いたとき、登録なしのアカウントを作る（船の色がアカウントで決まるので、本当の色で見せるため。どのみち出発すれば作る）。
  */
-export function ReadyScreen({ onBack }: { onBack: () => void }) {
+export function ReadyScreen({ onBack, initialMode }: { onBack: () => void; initialMode?: AccountMode }) {
+  // initialMode：タイトル画面の SIGN IN・SIGN UP から来たとき、アカウントの入力を開いておく（親の TopApp が持つ。履歴の状態や、
+  // 描画の途中の副作用に頼ると、React が描画をやり直したときに失われることがあったため）
   const [account, setAccount] = useState<Account | null>(null);
   const [hull, setHull] = useState<HullType>(HULL_TYPES[0]);
   /** 自分で船を選んだか（選んだあとの登録・ログインの読み直しで、選んだ船を上書きしないため） */
@@ -117,7 +119,7 @@ export function ReadyScreen({ onBack }: { onBack: () => void }) {
         {noServer ? (
           <p className="top-error" role="alert">サーバーにつながらないため、アカウントと宇宙船の保存は使えません。</p>
         ) : (
-          account && <AccountPanel account={account} onChanged={() => void load()} />
+          account && <AccountPanel account={account} onChanged={() => void load()} initialMode={initialMode} />
         )}
 
         <div className="top-depart">

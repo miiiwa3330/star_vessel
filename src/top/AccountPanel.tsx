@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AccountError, loginAccount, loginWithPasskey, logoutAccount, passkeySupported, registerAccount, type Account } from '../net/auth';
 import { recoveryApi, type RecoveryStatus } from '../net/recovery';
 import { credentialProblem, passwordProblem, PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, USERNAME_MIN } from '../world/account';
@@ -11,6 +11,9 @@ import { RecoveryCodeDialog } from './RecoveryCodeDialog';
 /** closed：閉じている、register・login：入力、recover：回復コードで戻す、code：登録したあとに回復コードを作る・作り直す */
 type Mode = 'closed' | 'register' | 'login' | 'recover' | 'code';
 
+/** 開いたときに、最初から開いておく入力（タイトル画面の SIGN IN・SIGN UP から来たとき） */
+export type AccountMode = 'login' | 'register';
+
 const GENERIC = 'うまくいきませんでした。しばらくしてからもう一度お試しください';
 const messageOf = (e: unknown): string => (e instanceof AccountError ? e.message : GENERIC);
 
@@ -19,9 +22,14 @@ const messageOf = (e: unknown): string => (e instanceof AccountError ? e.message
  * ほかの端末でも続きから遊べ、いまの記録（宇宙船・ワープホール・訪れた天体）も引き継がれる。
  * メールアドレスは集めないので、忘れたときに戻す手段は、登録のあとに 1 回だけ見せる回復コード。
  */
-export function AccountPanel({ account, onChanged }: { account: Account; onChanged: () => void }) {
-  const [mode, setMode] = useState<Mode>('closed');
-  const [username, setUsername] = useState('');
+export function AccountPanel({ account, onChanged, initialMode }: { account: Account; onChanged: () => void; initialMode?: AccountMode }) {
+  const [mode, setMode] = useState<Mode>(initialMode ?? 'closed');
+  const [username, setUsername] = useState(() => (initialMode === 'login' ? lastUsername() : ''));
+  const sectionRef = useRef<HTMLElement>(null);
+  // タイトル画面から来て、入力が最初から開いているときは、画面の中に入れる（スマホで、下にあるため）
+  useEffect(() => {
+    if (initialMode) sectionRef.current?.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+  }, [initialMode]);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -207,7 +215,7 @@ export function AccountPanel({ account, onChanged }: { account: Account; onChang
 
   return (
     <>
-    <section className="top-section" aria-labelledby="top-account-title">
+    <section ref={sectionRef} className="top-section" aria-labelledby="top-account-title">
       <h2 id="top-account-title" className="top-section-title">アカウント</h2>
       <p className="top-line top-muted">登録しなくても遊べます。登録すると、ほかの端末でも続きから遊べます。</p>
       {notice && <p className="top-line" role="status">{notice}</p>}
