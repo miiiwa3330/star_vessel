@@ -21,3 +21,6 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-05 | [星座と実データの追加](entries/2026-11-05-real-data-and-constellations.md) |
 | 2026-11-05 | [動くものを滑らかにする](entries/2026-11-05-smooth-motion.md) |
 | 2026-11-06 | [遠くの星のそばの精度（サイズの見え方・点が消える・減速で止まる）](entries/2026-11-06-far-star-precision.md) |
+| 2026-11-06 | [タイトル画面と準備画面（画面の分け方・ユーザー名での登録・人数の数え方）](entries/2026-11-06-top-screen.md) |
+| 2026-11-06 | [ユーザー名とパスワードを忘れたときの回復コード](entries/2026-11-06-account-recovery.md) |
+| 2026-11-06 | [パスキー](entries/2026-11-06-passkey.md) |

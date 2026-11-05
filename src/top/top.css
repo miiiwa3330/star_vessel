@@ -1,0 +1,214 @@
+/*
+ * タイトル画面と準備画面（要件 F48）。見た目の決まりは docs/design/README.md。
+ * 色と部品は、操縦席の画面（src/ui/hud.css）と同じ：暗い半透明の面、水色の線、system-ui。
+ */
+.top {
+  --top-ink: #e8ecf4;
+  --top-accent: #74e6ff;
+  --top-panel: rgba(8, 12, 24, 0.62);
+  --top-line: rgba(160, 190, 255, 0.18);
+  --top-button: rgba(30, 60, 90, 0.7);
+  --top-button-hover: rgba(40, 90, 130, 0.8);
+  --top-warn: #ffd38a;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  color: var(--top-ink);
+  background: radial-gradient(ellipse at 50% 120%, #0a1830 0%, #05070f 55%, #020306 100%);
+}
+
+/* ---- 背景：星空と地球の縁 ---- */
+.top-backdrop { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+.top-stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+.top-earth {
+  position: absolute;
+  left: 50%;
+  top: 80%;
+  width: 190vmax;
+  height: 190vmax;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 60% 14% at 50% 0%, rgba(150, 215, 255, 0.55), transparent 70%),
+    radial-gradient(circle at 50% 0%, #123a66 0%, #0a2342 6%, #06142a 22%, #030a16 60%);
+  box-shadow:
+    0 -2px 3px rgba(190, 235, 255, 0.85),
+    0 -6px 18px 2px rgba(116, 230, 255, 0.45),
+    0 -22px 70px 12px rgba(60, 140, 255, 0.28);
+}
+/* 地平線の向こうの太陽の光 */
+.top-earth::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3%;
+  width: 46%;
+  height: 8%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 214, 160, 0.38), transparent 70%);
+  filter: blur(8px);
+}
+
+/* ---- タイトル画面 ---- */
+.top-title-screen {
+  position: relative;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 24px 16px 22vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 18px;
+}
+.top-title {
+  margin: 0;
+  font-size: clamp(28px, 7vw, 64px);
+  font-weight: 300;
+  letter-spacing: 0.32em;
+  /* 文字の幅の分だけ右にずれて見えるのを戻す（letter-spacing は文字の右にも入るため） */
+  padding-left: 0.32em;
+  text-shadow: 0 0 28px rgba(116, 230, 255, 0.35);
+}
+.top-tagline { margin: 0; text-wrap: balance; font-size: clamp(13px, 2.6vw, 17px); line-height: 1.8; opacity: 0.85; max-width: 32em; }
+.top-online { margin: 0; font-size: 12px; opacity: 0.6; min-height: 1.6em; }
+
+/* ---- 部品 ---- */
+.top-button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--top-ink);
+  background: var(--top-button);
+  border: 1px solid rgba(116, 230, 255, 0.45);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-height: 36px;
+  cursor: pointer;
+}
+/* ホバーは、マウスのように「触れずに指せる」端末だけ（スマホでは、タップした場所に色が残るため） */
+@media (hover: hover) {
+  .top-button:hover:not(:disabled) { background: var(--top-button-hover); }
+  .top-ship-option:hover { background: rgba(30, 60, 90, 0.5); }
+}
+.top-button:focus-visible, .top-tab:focus-visible, .top-ship-option:focus-visible, .top-field input:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 2px; }
+.top-button:disabled { opacity: 0.55; cursor: default; }
+.top-button-primary { font-size: 16px; letter-spacing: 0.2em; padding: 12px 36px; min-height: 48px; border-radius: 999px; box-shadow: 0 0 24px rgba(116, 230, 255, 0.18); }
+.top-button-small { min-height: 32px; padding: 5px 12px; font-size: 12px; }
+.top-button-quiet { background: transparent; border-color: var(--top-line); }
+.top-muted { opacity: 0.6; }
+.top-small { font-size: 11px; }
+.top-strong { font-weight: 600; color: var(--top-accent); }
+
+/* ---- 準備画面 ---- */
+.top-ready-screen { position: relative; min-height: 100%; box-sizing: border-box; padding: 24px 16px 32px; display: flex; justify-content: center; align-items: flex-start; }
+.top-card {
+  width: min(520px, 100%);
+  box-sizing: border-box;
+  padding: 16px 18px 18px;
+  background: var(--top-panel);
+  border: 1px solid var(--top-line);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.top-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.top-heading { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; }
+.top-section { display: flex; flex-direction: column; gap: 8px; }
+.top-section + .top-section, .top-card > .top-section + .top-depart { border-top: 1px solid var(--top-line); padding-top: 14px; }
+.top-section-title { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; opacity: 0.75; }
+.top-line { margin: 0; }
+.top-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.top-hint { margin: 0; font-size: 11px; opacity: 0.6; }
+.top-error { margin: 0; font-size: 12px; color: var(--top-warn); }
+
+.top-ship-stage { height: clamp(150px, 30vh, 230px); border-radius: 10px; background: radial-gradient(ellipse at 50% 100%, rgba(40, 90, 150, 0.35), rgba(4, 8, 16, 0.4) 70%); border: 1px solid var(--top-line); overflow: hidden; }
+.top-ship-canvas { width: 100%; height: 100%; display: block; }
+.top-ship-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.top-ship-option {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: rgba(8, 12, 24, 0.5);
+  border: 1px solid var(--top-line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.top-ship-option.is-selected { border-color: rgba(116, 230, 255, 0.8); background: rgba(30, 60, 90, 0.7); }
+.top-ship-option-name { font-weight: 600; font-size: 12px; }
+
+.top-form { display: flex; flex-direction: column; gap: 8px; }
+.top-tabs { display: flex; gap: 6px; }
+.top-tab { font: inherit; font-size: 12px; color: inherit; background: transparent; border: 1px solid var(--top-line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.top-tab.is-selected { border-color: rgba(116, 230, 255, 0.8); background: rgba(30, 60, 90, 0.7); }
+.top-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.top-field input {
+  font: inherit;
+  /* 16px 未満だと、iPhone の Safari が入力のたびに拡大する */
+  font-size: 16px;
+  color: var(--top-ink);
+  background: rgba(4, 8, 16, 0.6);
+  border: 1px solid var(--top-line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  min-height: 38px;
+  box-sizing: border-box;
+}
+
+.top-depart { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
+
+@media (max-width: 480px) {
+  .top-ship-options { grid-template-columns: 1fr; }
+  .top-ship-option { flex-direction: row; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .top-button, .top-ship-option { transition: none; }
+}
+
+/* ---- 回復コード（要件 F51） ---- */
+.top-warn { margin: 0; font-size: 12px; color: var(--top-warn); }
+.top-link { align-self: flex-start; font: inherit; font-size: 12px; color: var(--top-accent); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.top-link:focus-visible, .top-check input:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 2px; }
+.top-row-end { justify-content: flex-end; }
+.top-dialog {
+  width: min(460px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 18px;
+  color: var(--top-ink);
+  background: #070b16;
+  border: 1px solid rgba(116, 230, 255, 0.45);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.top-dialog[open] { display: flex; flex-direction: column; gap: 12px; }
+.top-dialog::backdrop { background: rgba(2, 4, 10, 0.75); }
+.top-code {
+  margin: 0;
+  padding: 12px 8px;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(14px, 4.2vw, 18px);
+  letter-spacing: 0.04em;
+  user-select: all;
+  overflow-wrap: anywhere;
+  background: rgba(30, 60, 90, 0.45);
+  border: 1px solid var(--top-line);
+  border-radius: 8px;
+}
+.top-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.top-check input { width: 18px; height: 18px; accent-color: var(--top-accent); }
+
+/* ---- パスキー（要件 F52） ---- */
+.top-passkey { align-items: center; }
+.top-passkey > span { flex: 1 1 auto; }
+.top-row-note { align-self: center; }
