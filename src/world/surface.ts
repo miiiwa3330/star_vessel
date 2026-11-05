@@ -143,9 +143,13 @@ export function paintRing(zones: readonly RingZone[], color: Rgb, seed: number, 
   const data = new Uint8Array(width * 4);
   for (let i = 0; i < width; i++) {
     const r = inner + ((i + 0.5) / width) * (outer - inner);
-    const zone = zones.find((z) => r >= z.innerKm && r < z.outerKm);
+    const r0 = inner + (i / width) * (outer - inner);
+    const r1 = inner + ((i + 1) / width) * (outer - inner);
+    // 1 列の幅より細い帯（天王星の環など）が抜けないよう、1 列の中で帯が占める割合で足し合わせる
+    let covered = 0;
+    for (const z of zones) covered += (z.opacity * Math.max(0, Math.min(r1, z.outerKm) - Math.max(r0, z.innerKm))) / (r1 - r0);
     const streak = 0.7 + 0.6 * (fbm(seed, r / 900, 0, 0, 4) - 0.5);
-    const a = zone ? Math.min(1, zone.opacity * streak) : 0;
+    const a = Math.min(1, covered * streak);
     const shade = 0.85 + 0.3 * (fbm(seed + 3, r / 2500, 0, 0, 3) - 0.5);
     data[i * 4] = Math.round(Math.min(255, color[0] * shade));
     data[i * 4 + 1] = Math.round(Math.min(255, color[1] * shade));

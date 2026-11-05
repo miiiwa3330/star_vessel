@@ -4,7 +4,7 @@
 // - 軌道：JPL Planetary Satellite Mean Elements（https://ssd.jpl.nasa.gov/sats/elem/）
 // - 半径・GM：JPL Planetary Satellite Physical Parameters（https://ssd.jpl.nasa.gov/sats/phys_par/）。
 //   載っていない衛星は Horizons（https://ssd.jpl.nasa.gov/api/horizons.api）の半径、無ければ絶対等級から推定
-// - 正式な番号（JPL の 3 桁の id：惑星の番号 × 100 ＋ 衛星の番号）を持つ衛星だけ使う（要件 F20）
+// - 正式な番号を持つ衛星は JPL の 3 桁の id（惑星の番号 × 100 ＋ 衛星の番号）、仮符号の衛星は 5 桁の id（要件 F20）
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -148,13 +148,15 @@ async function horizonsRadius(code) {
 }
 
 const out = [];
-const skipped = { provisional: 0, duplicate: 0 };
+const skipped = { other: 0, duplicate: 0, meanElements: 0 };
 const sources = {};
 for (const r of elemRows.slice(1)) {
   if (r.length < header.length) continue;
   const code = r[C.code];
-  if (!/^[3-9]\d{2}$/.test(code)) {
-    skipped.provisional++;
+  // 正式な番号の無い衛星（仮符号。Horizons の番号は 5 桁：惑星の番号＋数字）も入れる。住所の衛星の番号は 0 にする（要件 F20。docs/tech/small-bodies.md）
+  const provisional = /^[3-9]\d{4}$/.test(code);
+  if (!provisional && !/^[3-9]\d{2}$/.test(code)) {
+    skipped.other++;
     continue;
   }
   // 表に同じ衛星が 2 回出ることがある（2026-11-05 にパック〈715〉が 2 行あった）。最初の行だけを使う
@@ -175,11 +177,18 @@ for (const r of elemRows.slice(1)) {
     source = 'unknown';
   }
   sources[source] = (sources[source] ?? 0) + 1;
-  const o = await osculating(code, code[0]);
+  let o = await osculating(code, code[0]);
+  // 見つかったばかりの衛星は、その時刻の接触軌道が楕円にならないことがある（2026-11-05：S/2023 S 38 と S/2025 U 1）。
+  // そのときは、平均軌道要素の表の値を使う（向きの基準が違うので、軌道の面の向きは正しくない。docs/tech/small-bodies.md）
+  if (!(o.e < 1 && o.a > 0)) {
+    console.log(`接触軌道要素が楕円でないので、平均軌道要素を使う: ${r[C.name]} (e=${o.e})`);
+    skipped.meanElements++;
+    o = { epoch: `${ELEMENTS_EPOCH}.0`, e: num(r[C.e]), i: num(r[C.i]), node: num(r[C.node]), w: num(r[C.w]), M: num(r[C.M]), a: num(r[C.a]) };
+  }
   out.push({
     code,
     planet: Number(code[0]),
-    number: Number(code.slice(1)),
+    number: provisional ? 0 : Number(code.slice(1)),
     name: r[C.name],
     frame: 'icrf',
     ...o,
@@ -189,7 +198,7 @@ for (const r of elemRows.slice(1)) {
     sizeSource: source,
   });
 }
-out.sort((a, b) => a.planet - b.planet || a.number - b.number);
+out.sort((a, b) => a.planet - b.planet || a.number - b.number || a.code.localeCompare(b.code));
 writeFileSync(
   join(root, 'public/data/moons.json'),
   JSON.stringify({

@@ -304,6 +304,8 @@
 .hud-info-lines { list-style: none; margin: 4px 0 0; padding: 0; }
 .hud-info-actions { display: flex; gap: 6px; margin-top: 6px; }
 @media (max-width: 720px), (pointer: coarse) {
+  /* スマホ：お知らせは画面の下に出す（上の .hud-notice の top を消さないと、上下に伸びて画面を覆う） */
+  .hud-notice { top: auto; }
   /* スマホ：左上の状態の下に重ならないよう、カードは右上に小さく */
   .hud-left .hud-info-card { position: static; transform: none; width: min(230px, calc(100vw - 32px)); font-size: 12px; line-height: 1.5; }
   .hud-list-panel { width: calc(100vw - 32px - 138px); max-height: 36vh; }
@@ -340,6 +342,8 @@
   background: rgba(8, 12, 24, 0.45);
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
 }
+/* 照準の先の天体の下に、星座の名前を出す */
+.hud-aim-second { top: 44px; }
 
 /* スマホ：左上の状態を、右上のレーダーとボタン（130px）に重ならない幅にする */
 @media (max-width: 720px), (pointer: coarse) {

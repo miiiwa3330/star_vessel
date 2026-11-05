@@ -91,6 +91,22 @@ export function clusterStars(c: Cluster): ClusterStar[] {
   return out;
 }
 
+/**
+ * 本物のメンバーの星（public/data/cluster-members/。tools/build-cluster-members.mjs）を読む。1 つの星は 5 個の数。
+ * 本物の星のデータの範囲（1,000 pc 以内）では、HYG に入っている明るさの星は入れない（同じ星が 2 つにならないように）
+ */
+export function readRealMembers(data: Float32Array, start: number, count: number, c: Cluster): ClusterStar[] {
+  const distPc = Math.hypot(c.positionPc.x, c.positionPc.y, c.positionPc.z);
+  const brightLimit = distPc < REAL_DATA_RADIUS_PC ? HYG_COMPLETE_MAG - 5 * Math.log10(distPc / 10) : -Infinity;
+  const out: ClusterStar[] = [];
+  for (let i = start; i < start + count; i++) {
+    const o = i * 5;
+    if (data[o + 3] < brightLimit) continue;
+    out.push({ position: { x: data[o], y: data[o + 1], z: data[o + 2] }, absMag: data[o + 3], bv: data[o + 4] });
+  }
+  return out;
+}
+
 /** cameraPc（太陽中心の EQJ・pc）から近い星団を、近い順に最大 max 個。within は星団ごとの「近い」の範囲（pc） */
 export function nearbyClusters(clusters: readonly Cluster[], cameraPc: Vec3, max: number): Cluster[] {
   return clusters

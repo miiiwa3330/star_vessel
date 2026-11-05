@@ -2,6 +2,7 @@
  * 宇宙の部屋（worker/space-room.ts）とのつながり。部屋は恒星系ごと。
  * 自分の状態を送り、近くの船の状態を受け取る。切れたら、間をあけてつなぎ直す。
  */
+import { setClockOffsetMs } from '../world/clock';
 import type { ServerMessage, ShipSnapshot, ShipState, StampMessage, StateMessage } from '../world/ship-schema';
 import { isStampId, type StampId } from '../world/stamps';
 import type { ShipDesign } from '../world/ship-design';
@@ -73,6 +74,7 @@ export class SpaceLink {
       }
       // 届くまでの時間は気にしない（数十 ms）。予測の誤差は見た目に出ない
       this.clockOffsetMs = m.now - Date.now();
+      setClockOffsetMs(this.clockOffsetMs);
       if (m.t === 'hello') {
         this.hue = m.hue;
         this.selfId = m.id;

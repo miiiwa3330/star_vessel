@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { apparentMagnitude, bvToRgb, decodeStars, starAppearance, STAR_STRIDE, STAR_LIMITS, DEFAULT_STAR_LIMIT } from './stars';
+import { applyStarMotion, apparentMagnitude, bvToRgb, decodeStars, starAppearance, STAR_STRIDE, STAR_LIMITS, DEFAULT_STAR_LIMIT, yearsSinceJ2000 } from './stars';
 
 describe('starAppearance', () => {
   it('明るい星（等級が小さい）ほど大きく明るい', () => {
@@ -63,5 +64,40 @@ describe('decodeStars', () => {
 
   it('長さが合わないデータは受け付けない', () => {
     expect(() => decodeStars(new Float32Array(7).buffer)).toThrow();
+  });
+});
+
+describe('星の動き（要件 F5）', () => {
+  it('Barnard 星（HYG 87665）を動かすと、Gaia DR3 の 2016 年の位置に合う', () => {
+    const buf = (p: string) => {
+      const b = readFileSync(p);
+      return b.buffer.slice(b.byteOffset, b.byteOffset + b.length) as ArrayBuffer;
+    };
+    const { data } = decodeStars(buf('public/data/stars.bin'));
+    const motion = new Float32Array(buf('public/data/stars-motion.bin'));
+    let o = -1;
+    for (let i = 0; i < data.length; i += STAR_STRIDE) if (data[i + 5] === 87665) o = i;
+    const dirOf = () => {
+      const d = Math.hypot(data[o], data[o + 1], data[o + 2]);
+      return { ra: (Math.atan2(data[o + 1], data[o]) * 180) / Math.PI + 360, dec: (Math.asin(data[o + 2] / d) * 180) / Math.PI };
+    };
+    const before = dirOf();
+    applyStarMotion(data, motion, 16);
+    const after = dirOf();
+    // Gaia DR3（2016.0）：赤経 269.448503 度、赤緯 4.739420 度
+    // HYG の速さの桁が少ないので、8 秒角くらいのずれが残る（動かさなければ 165 秒角ずれる）
+    expect(Math.abs(after.dec - 4.73942)).toBeLessThan(15 / 3600);
+    expect(Math.abs(after.ra - 269.448503)).toBeLessThan(15 / 3600);
+    // 16 年で 2.7 分角くらい北へ動く
+    expect(after.dec - before.dec).toBeGreaterThan(2 / 60);
+  });
+
+  it('星のデータと長さが合わなければ失敗にする', () => {
+    expect(() => applyStarMotion(new Float32Array(6), new Float32Array(2), 1)).toThrow();
+  });
+
+  it('J2000.0 からの年数', () => {
+    expect(yearsSinceJ2000(new Date(Date.UTC(2000, 0, 1, 12)))).toBe(0);
+    expect(yearsSinceJ2000(new Date(Date.UTC(2026, 0, 1, 12)))).toBeCloseTo(26, 1);
   });
 });

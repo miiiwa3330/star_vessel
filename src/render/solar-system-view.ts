@@ -7,7 +7,8 @@
  * 大気・恒星の光・環の影は src/render/body-effects.ts（要件 F25）。
  */
 import * as THREE from 'three/webgpu';
-import { exp, float, instancedBufferAttribute, texture, uv } from 'three/tsl';
+import { dot, exp, float, instancedBufferAttribute, mix, normalView, normalWorld, positionView, smoothstep, texture, uv, vec3 } from 'three/tsl';
+import { tailLengthKm } from '../world/comets';
 import {
   allBodies,
   bodiesVersion,
@@ -63,6 +64,9 @@ interface Drawn {
   glow: THREE.Sprite | null;
   /** パルサーのビーム（自転軸のまわりを回す） */
   beams: THREE.Group | null;
+  /** 彗星の尾と、まわりの光（コマ） */
+  tail: THREE.Mesh | null;
+  coma: THREE.Sprite | null;
   /** この天体のために作った物（作り直すときに捨てる） */
   owned: { dispose(): void }[];
   removed: boolean;
@@ -82,6 +86,8 @@ export class SolarSystemView {
   private readonly q2 = new THREE.Quaternion();
   private readonly q3 = new THREE.Quaternion();
   private version = -1;
+  private earthClouds: THREE.Mesh | null = null;
+  private readonly sunward = new THREE.Vector3();
   /** 1 ピクセルの大きさを決める値（画面の高さの半分 ÷ tan(視野の半分)） */
   private pxPerRadian = 700;
   /**
@@ -125,7 +131,7 @@ export class SolarSystemView {
     const big = info.radiusKm > 1_000;
     const geometry = new THREE.SphereGeometry(info.radiusKm, big ? 96 : 32, big ? 48 : 16);
     owned.push(geometry);
-    const d: Drawn = { mesh: null as unknown as THREE.Mesh, info, uniforms, glow: null, beams: null, owned, removed: false };
+    const d: Drawn = { mesh: null as unknown as THREE.Mesh, info, uniforms, glow: null, beams: null, tail: null, coma: null, owned, removed: false };
 
     let material: THREE.Material;
     if (info.compact?.kind === 'black-hole') {
@@ -136,11 +142,11 @@ export class SolarSystemView {
       if (info.compact.disk) {
         // 遠くからも見えるよう、降着円盤の光の広がり
         d.glow = createStarGlow([1, 0.7, 0.4]);
-        d.glow.scale.setScalar(info.radiusKm * 400);
+        d.glow.scale.setScalar(info.radiusKm * (info.compact.glowRadii ?? 400));
         owned.push(d.glow.material);
         this.scene.add(d.glow);
       }
-    } else if (info.kind === 'satellite') {
+    } else if (info.kind === 'satellite' || info.kind === 'spacecraft') {
       // 人工衛星：箱の本体と、左右の太陽電池の板（見た目のための簡単な模型）
       const s = info.radiusKm * 2;
       const bodyGeo = new THREE.BoxGeometry(s * 0.25, s * 0.25, s * 0.4);
@@ -194,12 +200,15 @@ export class SolarSystemView {
         owned.push(ring.geometry);
         d.mesh.add(ring);
       }
+      if (info.id === 'Earth') this.decorateEarth(d, standard, owned);
+      if (info.kind === 'comet') this.addCometTail(d, owned);
       material = standard;
     }
     owned.push(material);
     if (!d.mesh) d.mesh = new THREE.Mesh(geometry, material);
     const mesh = d.mesh;
     mesh.name = info.id;
+    if (info.id === 'Earth' && this.earthClouds) mesh.add(this.earthClouds);
     mesh.matrixAutoUpdate = false;
     if (info.compact?.kind === 'neutron-star') {
       d.beams = createPulsarBeams(info.radiusKm);
@@ -217,6 +226,50 @@ export class SolarSystemView {
     return d;
   }
 
+  /**
+   * 地球の夜の灯りと雲（Solar System Scope の画像。NASA の観測から作られたもの）。夜の側だけ灯りを光らせる。
+   * 雲はいまの天気ではなく、ある時の雲の画像を地表と一緒に回しているだけ（docs/tech/world-model.md）
+   */
+  private decorateEarth(d: Drawn, standard: THREE.MeshStandardNodeMaterial, owned: { dispose(): void }[]): void {
+    const night = this.textures.EarthNight;
+    const clouds = this.textures.EarthClouds;
+    if (night) {
+      const dark = smoothstep(0.12, -0.12, dot(normalWorld, d.uniforms.toStar));
+      standard.emissiveNode = texture(night).xyz.mul(dark).mul(1.4);
+    }
+    if (clouds) {
+      const geo = new THREE.SphereGeometry(d.info.radiusKm * 1.002, 96, 48);
+      const mat = new THREE.MeshStandardNodeMaterial({ transparent: true, depthWrite: false, roughness: 1, metalness: 0 });
+      mat.colorNode = vec3(1, 1, 1);
+      mat.opacityNode = texture(clouds).r.mul(0.9);
+      owned.push(geo, mat);
+      this.earthClouds = new THREE.Mesh(geo, mat);
+      this.earthClouds.name = 'clouds';
+    }
+  }
+
+  /** 彗星の尾。太陽と反対の向きに伸びる、先が細い円すい。見た目のための形（本物は塵の尾と青いイオンの尾に分かれる） */
+  private addCometTail(d: Drawn, owned: { dispose(): void }[]): void {
+    const geo = new THREE.ConeGeometry(0.035, 1, 24, 1, true);
+    // 頂点（核のある側）を原点に、底を −Y に置く。太陽の向きを +Y にして使う
+    geo.translate(0, -0.5, 0);
+    const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    const viewDir = positionView.negate().normalize();
+    const soft = dot(normalView, viewDir).abs().pow(2);
+    const along = uv().y; // 1：核のそば、0：尾の先
+    const color = mix(vec3(0.55, 0.75, 1), vec3(0.9, 0.95, 1), along);
+    mat.colorNode = color.mul(soft).mul(along.pow(2.2)).mul(0.55);
+    owned.push(geo, mat);
+    d.tail = new THREE.Mesh(geo, mat);
+    d.tail.frustumCulled = false;
+    d.tail.visible = false;
+    this.scene.add(d.tail);
+    d.coma = createStarGlow([0.6, 0.85, 1]);
+    d.coma.visible = false;
+    owned.push(d.coma.material);
+    this.scene.add(d.coma);
+  }
+
   /** 天体の一覧が変わっていたら、描く物を合わせる */
   private sync(): void {
     if (this.version === bodiesVersion()) return;
@@ -227,6 +280,8 @@ export class SolarSystemView {
       this.scene.remove(d.mesh);
       if (d.glow) this.scene.remove(d.glow);
       if (d.beams) this.scene.remove(d.beams);
+      if (d.tail) this.scene.remove(d.tail);
+      if (d.coma) this.scene.remove(d.coma);
       d.removed = true;
       d.owned.forEach((o) => o.dispose());
       this.drawn.delete(id);
@@ -243,10 +298,13 @@ export class SolarSystemView {
       if (n >= MAX_POINTS) break;
       const k = d.info.kind;
       if (k === 'star' || k === 'blackhole' || k === 'satellite') continue;
+      // 彗星は光の点の群れの方で描く（src/render/comet-field.ts）
+      if (k === 'comet') continue;
       const rel = rels.get(id)!;
       const dist = Math.hypot(rel.x, rel.y, rel.z);
       const px = (d.info.radiusKm / Math.max(dist, 1e-9)) * this.pxPerRadian;
-      if (px > POINT_MAX_PX || px < POINT_MIN_PX) continue;
+      // 探査機はとても小さいが、探しに行けるよう遠くても点を残す
+      if (px > POINT_MAX_PX || (px < POINT_MIN_PX && k !== 'spacecraft')) continue;
       // 小さく遠いほど暗く（1/1000 ピクセルで 0.25、1 ピクセルで 1）。近づいて球が見え始めるところで消えていく
       const b = Math.min(1, 0.25 + 0.25 * Math.max(0, Math.log10(px * 1000))) * Math.min(1, (POINT_MAX_PX - px) / 0.5);
       this.pointPos.set([rel.x, rel.y, rel.z], n * 3);
@@ -288,6 +346,22 @@ export class SolarSystemView {
         this.q3.setFromAxisAngle(this.xAxis, Math.PI / 6);
         d.beams.quaternion.copy(this.q2).multiply(this.q1).multiply(this.q3);
         d.beams.position.set(rel.x, rel.y, rel.z);
+      }
+      if (d.tail && d.coma && d.info.comet) {
+        const abs = heliocentricPositionKm(id, date);
+        const r = Math.hypot(abs.x, abs.y, abs.z);
+        const len = tailLengthKm(d.info.comet, r);
+        d.tail.visible = len > 0;
+        d.coma.visible = len > 0;
+        if (len > 0) {
+          this.sunward.set(-abs.x / r, -abs.y / r, -abs.z / r);
+          this.q1.setFromUnitVectors(this.yAxis, this.sunward);
+          d.tail.quaternion.copy(this.q1);
+          d.tail.scale.setScalar(len);
+          d.tail.position.set(rel.x, rel.y, rel.z);
+          d.coma.position.set(rel.x, rel.y, rel.z);
+          d.coma.scale.setScalar(len * 0.05);
+        }
       }
       d.uniforms.center.value.set(rel.x, rel.y, rel.z);
       const pole = mulVec(orient, { x: 0, y: 0, z: 1 });

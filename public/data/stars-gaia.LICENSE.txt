@@ -1,0 +1,3 @@
+stars-gaia-*.bin は ESA Gaia DR3 を変換したデータです。
+This work has made use of data from the European Space Agency (ESA) mission Gaia (https://www.cosmos.esa.int/gaia), processed by the Gaia Data Processing and Analysis Consortium (DPAC, https://www.cosmos.esa.int/web/gaia/dpac/consortium).
+Gaia data license: https://www.cosmos.esa.int/web/gaia-users/license (CC BY-SA 3.0 IGO).

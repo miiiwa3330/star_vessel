@@ -3,6 +3,7 @@
  * 大きさは見た目のための値（半径 300 km）。遠くからは小さすぎて見えないので、レーダーで場所を示す。
  */
 import * as THREE from 'three/webgpu';
+import { findBody } from '../world/solar-system';
 import { warpPositionKm } from '../world/warp';
 import type { WarpHole } from '../world/warp-schema';
 import { sub, type Vec3 } from '../world/vec';
@@ -49,6 +50,9 @@ export class WarpView {
     for (const w of this.warps) {
       const mesh = this.meshes.get(w.id);
       if (!mesh) continue;
+      // 基準の天体が分からないワープホール（読み込み前の星の惑星など）は描かない
+      mesh.visible = findBody(w.anchor) !== null;
+      if (!mesh.visible) continue;
       const rel = sub(warpPositionKm(w, date), observerKm);
       mesh.position.set(rel.x, rel.y, rel.z);
       // 輪の面を、正面の向き（facing）に向ける。TorusGeometry の輪は XY 平面にあり、正面は +Z

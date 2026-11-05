@@ -31,6 +31,7 @@ export class FlightControls {
   onZoom: (steps: number) => void = () => {};
   /** 視点を切り替える（V キー） */
   onToggleView: () => void = () => {};
+  onToggleConstellations: () => void = () => {};
   /** ほとんど動かさずに離した（クリック・タップ）。画面の座標（CSS ピクセル）。main.ts が入れる */
   onTap: (x: number, y: number) => void = () => {};
   /** 押した位置と、そこから動いた量（タップか、ドラッグかを見分ける） */
@@ -151,6 +152,7 @@ export class FlightControls {
     if (e.key === '+' || e.key === '=' || e.key === ']') this.changeSpeed(1, e.shiftKey);
     else if (e.key === '-' || e.key === '_' || e.key === '[') this.changeSpeed(-1, e.shiftKey);
     else if (e.code === 'KeyV' && !e.repeat) this.onToggleView();
+    else if (e.code === 'KeyC' && !e.repeat) this.onToggleConstellations();
     else this.keys.add(e.code);
   };
 

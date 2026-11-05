@@ -62,7 +62,7 @@ const counts = { label: 0, title: 0, english: 0, provisional: 0 };
 data.moons = data.moons.filter((m) => !seen.has(m.code) && seen.add(m.code));
 for (const m of data.moons) {
   m.name = JPL_NAME_FIXES[m.code] ?? m.name;
-  const prov = /^S(\d{4})_([A-Z])_(\d+)$/.exec(m.name);
+  const prov = /^S(\d{4})_([A-Z])_?(\d+)$/.exec(m.name);
   if (prov) {
     m.nameJa = `S/${prov[1]} ${prov[2]} ${prov[3]}`;
     counts.provisional++;

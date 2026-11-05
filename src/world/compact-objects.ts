@@ -3,6 +3,7 @@
  * 実在のもの（public/data/compact.json。tools/build-compact.mjs）と、自動で作るもの（src/world/galaxy.ts の generateCell）がある。
  * 決まりと出典は docs/tech/compact-objects.md。three.js・DOM・astronomy-engine を読み込まない。
  */
+import { galactoToEqjPc } from './galaxy';
 import { hashInts, mulberry32 } from './random';
 import type { BodyInfo } from './solar-system';
 import { KM_PER_PC } from './units';
@@ -24,6 +25,8 @@ export interface CompactObject {
   teffK?: number;
   /** パルサーの自転の周期（秒） */
   periodS?: number;
+  /** ブラックホールの質量（太陽質量）。分からなければ典型的な値 */
+  massSun?: number;
 }
 
 /**
@@ -36,8 +39,22 @@ const BLACK_HOLE_ABS_MAG = 6;
 
 type Row = [string, string, number, number, number, ...(number | null)[]];
 
+/**
+ * いて座 A*（銀河の中心の超大質量ブラックホール）。質量 415.2 万太陽質量・距離 R0 はどちらも GRAVITY Collaboration（2019）。
+ * 場所は銀河のモデルの中心（galaxy.ts の R0_KPC と同じ数を使う）
+ */
+export const SGR_A_STAR: CompactObject = {
+  code: 'BSGRASTR',
+  name: 'いて座 A*',
+  kind: 'black-hole',
+  positionPc: galactoToEqjPc({ x: 0, y: 0, z: 0 }),
+  absMag: BLACK_HOLE_ABS_MAG,
+  bv: 1.2,
+  massSun: 4.152e6,
+};
+
 export function decodeCompact(json: { whiteDwarfs: Row[]; pulsars: Row[]; blackHoles: Row[] }): CompactObject[] {
-  const out: CompactObject[] = [];
+  const out: CompactObject[] = [SGR_A_STAR];
   for (const r of json.whiteDwarfs) {
     out.push({
       code: r[0],
@@ -89,6 +106,8 @@ export interface CompactLook {
   beamPeriodS?: number;
   /** ブラックホールのまわりに光る降着円盤があるか（X 線新星は有り、ひとりぼっちのブラックホールは無し） */
   disk?: boolean;
+  /** 降着円盤の光の広がりの大きさ（半径の何倍か）。無ければ 400 倍 */
+  glowRadii?: number;
 }
 
 const codeSeed = (s: string) => hashInts(...Array.from(s, (c) => c.charCodeAt(0)));
@@ -99,7 +118,7 @@ export function compactBody(
   name: string,
   kind: CompactKind,
   positionPc: Vec3,
-  opts: { teffK?: number; periodS?: number; real: boolean },
+  opts: { teffK?: number; periodS?: number; massSun?: number; real: boolean },
 ): BodyInfo {
   const rand = mulberry32(codeSeed(code));
   const pole = { x: rand() * 2 - 1, y: rand() * 2 - 1, z: rand() * 2 - 1 };
@@ -128,13 +147,14 @@ export function compactBody(
       compact: { kind, beamPeriodS: Math.max(1, period) },
     };
   }
-  const mass = opts.real ? BLACK_HOLE_MASS : 5 + 15 * rand();
+  const mass = opts.massSun ?? (opts.real ? BLACK_HOLE_MASS : 5 + 15 * rand());
   return {
     ...base,
     nameJa: opts.real ? name : `ブラックホール ${code}`,
     radiusKm: schwarzschildKm(mass),
     kind: 'blackhole',
     spin: { type: 'steady', pole, periodHours: 1, phaseRad: 0 },
-    compact: { kind, disk: opts.real },
+    // いて座 A* の円盤は暗い（X 線新星のように明るく光らない）ので、光の広がりを小さくする
+    compact: { kind, disk: opts.real, glowRadii: mass > 1e5 ? 12 : undefined },
   };
 }

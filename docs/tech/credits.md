@@ -17,6 +17,15 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | SatNOGS DB（人工衛星の軌道要素） | `public/data/satellites.json`（写し）と、サーバーの `/api/satellites` | https://db.satnogs.org/（Libre Space Foundation ほか） | CC BY-SA 4.0 | 画面に「人工衛星：SatNOGS DB（CC BY-SA 4.0）」とリンク。写しは同じライセンスで、変更点を `public/data/satellites.LICENSE.txt` に書く（必ず json と一緒に置く） |
 | Hunt & Reffert (2023) の星団の表 | `public/data/clusters.json`（変換したもの） | VizieR J/A+A/673/A114（ハーバード大学のミラー） | 論文のデータ。出典を書けば使える（CDS の利用の条件） | 画面に「星団・白色矮星・パルサー・ブラックホール：VizieR（Hunt & Reffert 2023 ほか）」とリンク |
 | 白色矮星（Gentile Fusillo ほか 2021）・ATNF Pulsar Catalogue（Manchester ほか 2005）・BlackCAT（Corral-Santana ほか 2016） | `public/data/compact.json`（変換したもの） | VizieR J/MNRAS/508/3877・B/psr・J/A+A/587/A61（ハーバード大学のミラー） | 同上 | 同上 |
+| d3-celestial（星座の線と名前） | `public/data/constellations.json`（変換したもの。`constellations.LICENSE.txt`） | https://github.com/ofrohn/d3-celestial（Olaf Frohn） | BSD 3-Clause | 画面に「星座の線：d3-celestial（BSD 3-Clause）」とリンク。著作権の表示と許諾の文を LICENSE に添える |
+| JPL Small-Body Database（彗星）・JPL Horizons（探査機・仮符号の衛星） | `public/data/comets.json`・`spacecraft.json`・`moons.json` | https://ssd-api.jpl.nasa.gov/ ・ https://ssd.jpl.nasa.gov/horizons/ | NASA/JPL のデータ（著作権の制限なし。出典を書く） | 画面に「探査機・彗星：NASA/JPL」 |
+| SIMBAD（星雲の位置・距離の測定値・大きさ） | `public/data/nebulae.json`（変換したもの） | https://simbad.cfa.harvard.edu/（CDS。ハーバード大学のミラー） | 出典を書けば使える（CDS の利用の条件） | 画面に「星雲：SIMBAD、OpenNGC」とリンク |
+| OpenNGC（星雲の大きさ・銀河の長軸の向き） | `public/data/nebulae.json`・`galaxies.json`（変換したもの） | https://github.com/mattiaverga/OpenNGC（Mattia Verga） | CC BY-SA 4.0 | 画面に「OpenNGC（CC BY-SA 4.0）」とリンク |
+| Updated Nearby Galaxy Catalog（Karachentsev ほか 2013） | `public/data/galaxies.json`（変換したもの） | VizieR J/AJ/145/101（ハーバード大学のミラー） | 論文のデータ。出典を書けば使える（CDS の利用の条件） | 画面に「銀河：Karachentsev ほか 2013（VizieR）」 |
+| NASA Exoplanet Archive（系外惑星） | `public/data/exoplanets.json` に足した | https://exoplanetarchive.ipac.caltech.edu/ | 公開データ。使ったことの表記を求められる | 画面に「系外惑星（追加）：NASA Exoplanet Archive」とリンク |
+| Hunt & Reffert (2023) の星団のメンバー（Gaia DR3 の星） | `public/data/cluster-members/`（変換したもの） | VizieR J/A+A/673/A114/members（ハーバード大学のミラー） | 出典を書けば使える（CDS の利用の条件）。もとの Gaia のデータは下の行 | 画面の星団のクレジットに含む |
+| ESA Gaia DR3（近くの星） | `public/data/stars-gaia-*.bin`（変換したもの。`stars-gaia.LICENSE.txt`） | GAVO の TAP（https://dc.g-vo.org/tap。`gcns.main`・`gaia.dr3lite`）。もとは ESA と Gaia Collaboration, Smart ほか 2021 | CC BY-SA 3.0 IGO | 画面に「星（近く）：ESA Gaia DR3（CC BY-SA 3.0 IGO）」とリンク。[`gaia-stars.md`](gaia-stars.md) |
+| 地球の夜の灯りと雲の画像（2k_earth_nightmap.jpg・2k_earth_clouds.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク |
 | 地球の画像（2k_earth_daymap.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク |
 | 月の画像（2k_moon.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |
 | 水星・金星・火星・木星・土星・天王星・海王星の画像（2k_*.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |

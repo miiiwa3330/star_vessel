@@ -27,7 +27,7 @@ import type { CompactLook } from './compact-objects';
  */
 export type BodyId = string;
 
-export type BodyKind = 'star' | 'planet' | 'dwarf' | 'moon' | 'asteroid' | 'exoplanet' | 'satellite' | 'blackhole';
+export type BodyKind = 'star' | 'planet' | 'dwarf' | 'moon' | 'asteroid' | 'comet' | 'exoplanet' | 'satellite' | 'spacecraft' | 'blackhole';
 
 /** 位置の決め方 */
 export type Motion =
@@ -73,6 +73,8 @@ export interface BodyInfo {
   glow?: readonly [number, number, number];
   /** 大気（ふちに光の輪を描く）。見た目のための値 */
   atmosphere?: Atmosphere;
+  /** 彗星の尾の長さを決める値（src/world/comets.ts の tailLengthKm） */
+  comet?: { m1: number | null };
   /** 星の燃えかす（白色矮星・中性子星・ブラックホール）の見た目。src/world/compact-objects.ts */
   compact?: CompactLook;
 }
@@ -111,6 +113,44 @@ export const SATURN_RINGS: readonly RingZone[] = [
   { innerKm: 117_580, outerKm: 122_170, opacity: 0.08 }, // カッシーニの間隙
   { innerKm: 122_170, outerKm: 136_775, opacity: 0.65 }, // A 環
 ];
+
+/**
+ * 木星・天王星・海王星の環（赤道の面）。半径は NASA の Rings Fact Sheet（Jupiter・Uranus・Neptune。2026-11-05 に確かめた）。
+ * 本物の環はとても薄くて暗く（光学的厚さ：木星 10⁻⁶ 前後、天王星のイプシロン環でも 2 程度）、本物どおりだと見えない。
+ * 濃さ（opacity）は、並びを保った見た目のための値。細い環は、幅が狭いほど画像の 1 列で薄くなる（paintRing）
+ */
+export const JUPITER_RINGS: readonly RingZone[] = [
+  { innerKm: 89_400, outerKm: 123_000, opacity: 0.04 }, // ハロー
+  { innerKm: 123_000, outerKm: 128_940, opacity: 0.22 }, // 主環
+  { innerKm: 128_940, outerKm: 181_350, opacity: 0.03 }, // アマルテア環
+  { innerKm: 181_350, outerKm: 221_900, opacity: 0.02 }, // テーベ環
+];
+const narrow = (radiusKm: number, widthKm: number, opacity: number): RingZone => ({ innerKm: radiusKm - widthKm / 2, outerKm: radiusKm + widthKm / 2, opacity });
+/** 天王星の環。細い環の幅は NASA の表の値（幅に範囲があるものは大きい方）のままだと見えないので、見た目のために 30 km より細くしない */
+export const URANUS_RINGS: readonly RingZone[] = [
+  narrow(41_837, 30, 0.5), // 6
+  narrow(42_234, 30, 0.6), // 5
+  narrow(42_571, 30, 0.5), // 4
+  narrow(44_718, 30, 0.6), // アルファ
+  narrow(45_661, 30, 0.5), // ベータ
+  narrow(47_176, 30, 0.5), // エータ
+  narrow(47_627, 30, 0.5), // ガンマ
+  narrow(48_300, 30, 0.6), // デルタ
+  narrow(50_024, 30, 0.3), // ラムダ
+  narrow(51_149, 96, 0.95), // イプシロン
+  narrow(67_300, 3_800, 0.012), // R/2003 U 2（ミュー環の内側）
+  narrow(97_700, 17_000, 0.008), // R/2003 U 1
+];
+/** 海王星の環。アダムス環のアーク（濃い部分）は描いていない */
+export const NEPTUNE_RINGS: readonly RingZone[] = [
+  narrow(41_900, 2_000, 0.03), // ガレ
+  narrow(53_200, 100, 0.25), // ルベリエ
+  narrow(55_200, 4_000, 0.015), // ラッセル（ルベリエからアラゴまで）
+  narrow(57_200, 100, 0.08), // アラゴ
+  narrow(62_933, 50, 0.4), // アダムス
+];
+/** 環の色。どれも暗い（NASA の表で反射率は土星よりずっと小さい）。見た目のための値 */
+const DARK_RING_COLOR = [150, 140, 130] as const;
 
 /**
  * 影響圏（km）。Laplace の影響圏 r = a·(m/M)^(2/5) の値。出典は docs/tech/world-model.md。
@@ -166,10 +206,10 @@ export const CORE_BODIES: readonly BodyInfo[] = [
   major('Earth', '地球', 6_371.0, 'planet', 'Sun'),
   major('Moon', '月', 1_737.4, 'moon', 'Earth'),
   major('Mars', '火星', 3_389.5, 'planet', 'Sun'),
-  major('Jupiter', '木星', 69_911, 'planet', 'Sun'),
+  { ...major('Jupiter', '木星', 69_911, 'planet', 'Sun'), rings: JUPITER_RINGS, ringColor: DARK_RING_COLOR },
   { ...major('Saturn', '土星', 58_232, 'planet', 'Sun'), rings: SATURN_RINGS },
-  major('Uranus', '天王星', 25_362, 'planet', 'Sun'),
-  major('Neptune', '海王星', 24_622, 'planet', 'Sun'),
+  { ...major('Uranus', '天王星', 25_362, 'planet', 'Sun'), rings: URANUS_RINGS, ringColor: DARK_RING_COLOR },
+  { ...major('Neptune', '海王星', 24_622, 'planet', 'Sun'), rings: NEPTUNE_RINGS, ringColor: DARK_RING_COLOR },
   major('Pluto', '冥王星', 1_188.3, 'dwarf', 'Sun'),
   // 木星の衛星（ガリレオ衛星）。id は住所の番号（木星＝5 の I〜IV）。半径は astronomy-engine の値
   galilean('S5.1', 'イオ', IO_RADIUS_KM, 0),

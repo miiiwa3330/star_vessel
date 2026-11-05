@@ -45,6 +45,12 @@ const SOL_MOON_ID = /^S([1-9])\.([1-9][0-9]{0,2})$/;
 const SATELLITE_ID = /^N([1-9][0-9]{0,8})$/;
 /** 小惑星・準惑星：A＋小惑星番号（例：ケレスは A1）。住所の惑星の位置にも A1 と書く */
 const ASTEROID_ID = /^A([1-9][0-9]{0,6})$/;
+/** 彗星：C＋JPL の記号の英数字（例：ハレー彗星は C1P、ヘール・ボップ彗星は CC1995O1）。住所の惑星の位置にも同じ記号を書く */
+const COMET_ID = /^C[0-9A-Z]{2,15}$/;
+/** 仮符号の衛星：S＋惑星の番号＋p＋JPL の 5 桁の番号。正式な番号が無いので、住所の衛星の番号は 0 */
+const PROVISIONAL_MOON_ID = /^S([1-9])p([0-9]{5})$/;
+/** 太陽系を飛んでいる探査機：V＋JPL の番号の絶対値。住所は惑星・衛星とも 0（太陽のまわり） */
+const SPACECRAFT_ID = /^V([1-9][0-9]{0,6})$/;
 /**
  * 系外惑星：恒星系の記号＋.＋恒星に近い順の番号。その衛星は、さらに .＋惑星に近い順の番号。
  * 自動で作った天体で、作り方の世代が 2 以上なら ~世代 を付ける
@@ -71,6 +77,10 @@ export function bodyAddress(anchor: string): BodyAddress | null {
   if (SATELLITE_ID.test(anchor)) return { planet: '3', moon: 0, system: SYSTEM_SOL };
   m = ASTEROID_ID.exec(anchor);
   if (m) return { planet: `A${m[1]}`, moon: 0, system: SYSTEM_SOL };
+  if (COMET_ID.test(anchor)) return { planet: anchor, moon: 0, system: SYSTEM_SOL };
+  m = PROVISIONAL_MOON_ID.exec(anchor);
+  if (m) return { planet: m[1], moon: 0, system: SYSTEM_SOL };
+  if (SPACECRAFT_ID.test(anchor)) return { planet: '0', moon: 0, system: SYSTEM_SOL };
   m = EXOPLANET_ID.exec(anchor);
   if (m && m[1] !== SYSTEM_SOL && SYSTEM_PATTERN.test(m[1])) return { planet: m[2], moon: m[3] ? Number(m[3]) : 0, system: m[1] };
   return null;
@@ -84,15 +94,17 @@ export const exoplanetId = (system: string, n: number, generation = 1, moon = 0)
   `${system}.${n}${moon > 0 ? `.${moon}` : ''}${generation >= 2 ? `~${generation}` : ''}`;
 
 /**
- * SOL：太陽系、H＋数字：本物の星（HYG の id）、G＋36 進 11 桁：自動で作った星（src/world/galaxy.ts）、
+ * SOL：太陽系、H＋数字：本物の星（HYG の id）、D＋数字：本物の星（Gaia DR3。docs/tech/gaia-stars.md）、G＋36 進 11 桁：自動で作った星（src/world/galaxy.ts）、
  * E＋36 進 7 桁：系外惑星のデータにだけある恒星（HYG に無い恒星。src/world/exoplanet-data.ts）、
  * P＋パルサーの J 名（+ は P、− は M）・W＋36 進 7 桁（白色矮星）・B＋36 進 7 桁（ブラックホール）：src/world/compact-objects.ts
  */
-const SYSTEM_PATTERN = /^(SOL|H[1-9][0-9]{0,6}|G[0-9A-Z]{11}|E[0-9A-Z]{7}|P[0-9A-Z]{1,15}|W[0-9A-Z]{7}|B[0-9A-Z]{7})$/;
+const SYSTEM_PATTERN = /^(SOL|H[1-9][0-9]{0,6}|D[0-9]{1,7}|G[0-9A-Z]{11}|E[0-9A-Z]{7}|P[0-9A-Z]{1,15}|W[0-9A-Z]{7}|B[0-9A-Z]{7})$/;
 export const isSystemCode = (s: string): boolean => SYSTEM_PATTERN.test(s);
 
 /** HYG の星の恒星系の記号（例：シリウスは H32263） */
-export const hygSystemCode = (hygId: number): string => `H${hygId}`;
+export const hygSystemCode = (hygId: number): string => (hygId >= GAIA_ID_BASE ? `D${hygId - GAIA_ID_BASE}` : `H${hygId}`);
+/** 星のデータの id の土台。これより大きい id は Gaia DR3 の星（tools/build-gaia.mjs と同じ数） */
+export const GAIA_ID_BASE = 1_000_000;
 
 /**
  * 番号の前までの住所（例：MW-ORI-SOL-3-1）。arm は恒星系のある腕（knownSystemArm・nearestSystem で決める）。
@@ -198,14 +210,14 @@ export function readAddress(code: string): string {
   const [galaxy, arm, system, planetS, moonS, serialS] = parts;
   const planet = Number(planetS);
   const moon = Number(moonS);
-  const asteroid = /^A[0-9]+$/.test(planetS);
+  const asteroid = /^A[0-9]+$/.test(planetS) || /^C[0-9A-Z]+$/.test(planetS);
   const words: string[] = [
     galaxy === GALAXY_MILKY_WAY ? '天の川銀河' : galaxy,
     isArmCode(arm) ? ARM_NAMES_JA[arm] : arm,
     system === SYSTEM_SOL ? '太陽系' : `恒星 ${nameOf({ system, planet: '', moon: 0 }) ?? system}`,
   ];
   if (asteroid) {
-    words.push(nameOf({ system, planet: planetS, moon: 0 }) ?? `小惑星 (${planetS.slice(1)})`);
+    words.push(nameOf({ system, planet: planetS, moon: 0 }) ?? (planetS.startsWith('C') ? `彗星 ${planetS.slice(1)}` : `小惑星 (${planetS.slice(1)})`));
   } else if (planet > 0) {
     words.push(
       system === SYSTEM_SOL

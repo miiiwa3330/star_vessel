@@ -94,10 +94,16 @@ export interface HudState {
   stampLog: StampLogItem[];
   /** いる場所の目印（星団の中なら、その名前） */
   region: string | null;
+  /** 中にいる星雲・銀河の名前 */
+  deepRegion: string | null;
   /** 地球の中心を原点にした自分の位置（km・EQJ。要件 F39） */
   fromEarthKm: { x: number; y: number; z: number };
   /** 星の見え方（要件 F34） */
   starLimit: StarLimitMode;
+  /** 星座の線を出しているか（要件 F40） */
+  constellations: boolean;
+  /** 照準の先の星座の名前（星座の線を出しているときだけ） */
+  aimConstellation: string | null;
   infoCard: InfoCardState | null;
   /** 照準の先の天体（照準の下に 1 行だけ出す。要件 F36） */
   aimLabel: { name: string; distance: string } | null;
@@ -128,8 +134,11 @@ let state: HudState = {
   stampReady: false,
   stampLog: [],
   region: null,
+  deepRegion: null,
   fromEarthKm: { x: 0, y: 0, z: 0 },
   starLimit: DEFAULT_STAR_LIMIT,
+  constellations: false,
+  aimConstellation: null,
   infoCard: null,
   aimLabel: null,
   selectedKey: null,
@@ -171,6 +180,8 @@ export const hudActions = {
   closeShipBuilder: (): void => {},
   /** 星の見え方を、肉眼 → 双眼鏡 → 写真 → 肉眼…と切り替える */
   cycleStarLimit: (): void => {},
+  /** 星座の線を出す・消す（要件 F40） */
+  toggleConstellations: (): void => {},
   /** スタンプを送る（要件 F6） */
   sendStamp: (_id: StampId): void => {},
   /** 天体を選ぶ（null で選ぶのをやめる。要件 F35） */
