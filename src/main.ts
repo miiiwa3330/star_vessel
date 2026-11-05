@@ -531,6 +531,8 @@ async function main() {
   // 開発サーバーのときだけ：画面の確かめのために、好きな場所へ瞬間移動できる（本番のビルドには入らない）
   if (import.meta.env.DEV) {
     const devTools = {
+      /** 動きの滑らかさを測るための入口（描いている物を直接読む） */
+      debug: { shipView, cometField, satelliteField, solar },
       /** 太陽中心の EQJ（pc）の場所へ行き、lookAtPc の方を向く */
       teleportPc(p: { x: number; y: number; z: number }, lookAtPc = { x: 0, y: 0, z: 0 }) {
         observer = reanchor({ anchor: 'Sun', offsetKm: { x: p.x * KM_PER_PC, y: p.y * KM_PER_PC, z: p.z * KM_PER_PC } }, worldNow());
@@ -656,8 +658,7 @@ async function main() {
         link.send({ ...observer, velocityKmS, orientation: { x: q.x, y: q.y, z: q.z, w: q.w } }, myDesign);
       }
     }
-    const serverNow = link.serverNow();
-    const others = link.ships.map((snap) => ({ id: snap.id, hue: snap.hue, state: predictShip(snap, serverNow), design: snap.d }));
+    const others = link.ships.map((snap) => ({ id: snap.id, hue: snap.hue, state: predictShip(snap, date.getTime()), design: snap.d }));
     shipView.update(others, date, abs);
 
     // 視点：宇宙船を作る画面を開いている間は、選んでいる船をゆっくり回して見せる

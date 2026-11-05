@@ -2,7 +2,7 @@
  * 宇宙の部屋（worker/space-room.ts）とのつながり。部屋は恒星系ごと。
  * 自分の状態を送り、近くの船の状態を受け取る。切れたら、間をあけてつなぎ直す。
  */
-import { setClockOffsetMs } from '../world/clock';
+import { reportServerTime } from '../world/clock';
 import type { ServerMessage, ShipSnapshot, ShipState, StampMessage, StateMessage } from '../world/ship-schema';
 import { isStampId, type StampId } from '../world/stamps';
 import type { ShipDesign } from '../world/ship-design';
@@ -18,8 +18,6 @@ export class SpaceLink {
   selfId: string | null = null;
   /** スタンプが届いたとき（要件 F6）。main.ts が入れる */
   onStamp: (s: { from: string; hue: number; k: StampId }) => void = () => {};
-  /** サーバーの時計 − 自分の時計（ms）。船の予測はサーバーの時計で行う */
-  clockOffsetMs = 0;
   private ws: WebSocket | null = null;
   private room: string | null = null;
   private retryMs = 1_000;
@@ -54,11 +52,6 @@ export class SpaceLink {
     return true;
   }
 
-  /** サーバーの時計でのいまの時刻（ms） */
-  serverNow(): number {
-    return Date.now() + this.clockOffsetMs;
-  }
-
   private connect(): void {
     const room = this.room;
     if (!room) return;
@@ -72,9 +65,7 @@ export class SpaceLink {
       } catch {
         return;
       }
-      // 届くまでの時間は気にしない（数十 ms）。予測の誤差は見た目に出ない
-      this.clockOffsetMs = m.now - Date.now();
-      setClockOffsetMs(this.clockOffsetMs);
+      reportServerTime(m.now);
       if (m.t === 'hello') {
         this.hue = m.hue;
         this.selfId = m.id;
