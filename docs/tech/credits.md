@@ -25,7 +25,7 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | NASA Exoplanet Archive（系外惑星） | `public/data/exoplanets.json` に足した | https://exoplanetarchive.ipac.caltech.edu/ | 公開データ。使ったことの表記を求められる | 画面に「系外惑星（追加）：NASA Exoplanet Archive」とリンク |
 | Hunt & Reffert (2023) の星団のメンバー（Gaia DR3 の星） | `public/data/cluster-members/`（変換したもの） | VizieR J/A+A/673/A114/members（ハーバード大学のミラー） | 出典を書けば使える（CDS の利用の条件）。もとの Gaia のデータは下の行 | 画面の星団のクレジットに含む |
 | ESA Gaia DR3（近くの星） | `public/data/stars-gaia-*.bin`（変換したもの。`stars-gaia.LICENSE.txt`） | GAVO の TAP（https://dc.g-vo.org/tap。`gcns.main`・`gaia.dr3lite`）。もとは ESA と Gaia Collaboration, Smart ほか 2021 | CC BY-SA 3.0 IGO | 画面に「星（近く）：ESA Gaia DR3（CC BY-SA 3.0 IGO）」とリンク。[`gaia-stars.md`](gaia-stars.md) |
-| 地球の夜の灯りと雲の画像（2k_earth_nightmap.jpg・2k_earth_clouds.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク |
+| 地球の夜の灯りと雲の画像（2k_earth_nightmap.jpg・2k_earth_clouds.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク。タイトル画面・準備画面でも使うので、下の端に「地球の画像：Solar System Scope（CC BY 4.0）」を小さく出す |
 | 地球の画像（2k_earth_daymap.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク |
 | 月の画像（2k_moon.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |
 | 水星・金星・火星・木星・土星・天王星・海王星の画像（2k_*.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |
@@ -49,5 +49,7 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | asn1js（パスキーが使う） | BSD-3-Clause |
 | reflect-metadata（パスキーが使う） | Apache-2.0 |
 | tslib（パスキーが使う） | 0BSD |
+| @fontsource/monoton（書体 Monoton。タイトル画面の名前。woff2 を配る） | OFL-1.1（SIL Open Font License）。著作権表示は「Copyright (c) 2011, Vernon Adams」。ライセンスの全文は `public/licenses/monoton.OFL.txt` |
+| @fontsource/josefin-sans（書体 Josefin Sans。「-START-」。woff2 を配る） | OFL-1.1。著作権表示は「Copyright 2010 The Josefin Sans Project Authors」。ライセンスの全文は `public/licenses/josefin-sans.OFL.txt` |
 | wrangler | MIT または Apache-2.0 |
 | typescript | Apache-2.0 |

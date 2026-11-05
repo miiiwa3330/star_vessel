@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { currentAccount, ensureSession, type Account } from '../net/auth';
 import { shipApi } from '../net/ship-repository';
 import { AccountPanel } from './AccountPanel';
+import { onlineText, useOnline } from './online';
 import { playUrl } from './routes';
 import { defaultDesignFor, HULL_TYPES, HULLS, SHIP_DESIGN_VERSION, type HullType } from '../world/ship-design';
 import { hueFromId } from '../world/ship-schema';
@@ -25,6 +26,7 @@ export function ReadyScreen({ onBack }: { onBack: () => void }) {
   const [offline, setOffline] = useState(false);
   const [departing, setDeparting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const online = onlineText(useOnline());
 
   /** アカウントと、保存してある宇宙船を読む（開いたとき・登録・ログイン・ログアウトのあと） */
   const load = useCallback(async () => {
@@ -73,7 +75,11 @@ export function ReadyScreen({ onBack }: { onBack: () => void }) {
     <main className="top-ready-screen">
       <div className="top-card">
         <header className="top-card-head">
-          <h1 className="top-heading">出発の準備</h1>
+          <div>
+            <h1 className="top-heading">出発の準備</h1>
+            {/* いま遊んでいる人数（要件 F50）。タイトル画面では出さない（2026-11-06）ので、ここに出す */}
+            {online && <p className="top-hint" role="status">{online}</p>}
+          </div>
           <button type="button" className="top-button top-button-small top-button-quiet" onClick={onBack}>
             タイトルへ
           </button>

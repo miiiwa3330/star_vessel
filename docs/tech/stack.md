@@ -45,6 +45,8 @@ Web アプリとして作り、PC とスマホの両方に対応する（[`../pr
 | React Three Fiber（9.8・MIT）で全部 React | 3D も React の部品として書く。作例・部品集（drei）が多い | 小さな場面には便利だが、世界全体を React の仕組みに通すと、毎フレームの更新を React の外へ逃がす工夫が増える |
 
 - **画面の切り替え（2026-11-06）**：タイトル画面（`/`）・準備画面（`/ready`）・世界（`/play`）の URL の振り分けは、ルーターのライブラリを使わず、`src/entry.ts` が `location.pathname` を見て、世界かタイトル側かを動的 import で分ける。画面は 3 つで、タイトルと準備の切り替えも `history.pushState` だけで足りるため。世界を読まないので、タイトル画面は軽く開く（本番ビルドで約 72 KB の gzip）。画面が増えて、URL の引数や入れ子が要るようになったら、ルーターのライブラリを選び直す
+- **書体（2026-11-06）**：タイトル画面の名前に Monoton（OFL-1.1。オーナーの指定）、「-START-」に Josefin Sans の 300（OFL-1.1）を使う。`@fontsource/monoton`・`@fontsource/josefin-sans`（どちらも 5.3.0）で、必要な 1 つの太さの woff2 だけを自分のサーバーから配る（Google Fonts のような外のサービスから読み込まない。通信が増えず、閲覧者の情報が外に出ない。16 KB と 12 KB）。ライセンスの写しは `public/licenses/`
+- **3D の地球（2026-11-06）**：タイトル画面と準備画面の背景に、世界と同じ three.js と天体の計算（astronomy-engine）を使う。新しいライブラリは足していない。タイトル画面を軽く開くため、画面が出て 250 ms たってから遅れて読み込む（`src/top/Backdrop.tsx` の lazy）
 - アカウントの username プラグインは、すでに入れている Better Auth に含まれる。パスキーは別のパッケージ `@better-auth/passkey`（1.7.17・MIT。2026-11-06 に追加）：WebAuthn の検証を自分で書くのは間違えると危ないので、Better Auth の公式のものを使う。版は Better Auth に合わせる。増えた量は、準備画面で約 7 KB（gzip）、Worker で約 135 KB（gzip。タイトル画面はほぼ変わらない）
 
 ### 3. 天体の位置・自転の計算

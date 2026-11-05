@@ -121,6 +121,20 @@ export class SpaceRoom extends DurableObject<Env> {
   }
 
   /**
+   * いま状態が届いている船（要件 F53。タイトル画面の背景のため）。Worker から呼ぶ（RPC）。
+   * 配る相手に合わせた絞り込みはしない。アカウントの ID は、もともと持っていない（接続ごとの短い ID だけ）
+   */
+  async currentShips(): Promise<ShipSnapshot[]> {
+    const now = Date.now();
+    const out: ShipSnapshot[] = [];
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment() as Attachment | null;
+      if (a?.state && now - a.at < SHIP_STALE_MS) out.push({ id: a.sid, hue: a.hue, s: a.state, d: a.design, at: a.at });
+    }
+    return out;
+  }
+
+  /**
    * いまの接続の数を、D1 の presence 表に書く（要件 F50）。失敗しても、宇宙の部屋の動きには影響させない。
    * exclude：閉じようとしている接続（閉じる処理の中では、まだ一覧に残っていることがあるので数えない）
    */

@@ -25,10 +25,13 @@
     "galaxies": "NODE_USE_ENV_PROXY=1 node tools/build-galaxies.mjs",
     "gaia": "NODE_USE_ENV_PROXY=1 node tools/build-gaia.mjs",
     "db:migrate": "wrangler d1 migrations apply DB --local",
-    "auth:schema": "node tools/gen-auth-schema.ts"
+    "auth:schema": "node tools/gen-auth-schema.ts",
+    "sim:ships": "node tools/sim-ships.mjs"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.17",
+    "@fontsource/josefin-sans": "^5.3.0",
+    "@fontsource/monoton": "^5.3.0",
     "astronomy-engine": "^2.1.19",
     "better-auth": "^1.7.17",
     "hono": "^4.13.16",

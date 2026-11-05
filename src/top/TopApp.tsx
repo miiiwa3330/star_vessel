@@ -34,6 +34,10 @@ export function TopApp() {
           <ReadyScreen onBack={() => go('title')} />
         </Suspense>
       )}
+      {/* 地球の画像の出典（CC BY 4.0 の表記）。控えめな 1 行。画面全体のタップとは別の場所に置くので、押しても「はじめる」にはならない */}
+      <p className="top-credit">
+        地球の画像：<a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">Solar System Scope</a>（CC BY 4.0）
+      </p>
     </div>
   );
 }

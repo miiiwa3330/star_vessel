@@ -1,5 +1,20 @@
-import { useEffect, useRef } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { mulberry32 } from '../world/random';
+
+// 3D の地球は three.js と画像を読み込むので大きい。画面が出てから、遅れて読み込む
+const EarthCanvas = lazy(() => import('./EarthCanvas'));
+
+/** 画面が出てから、3D の地球を読み込み始めるまでの待ち（ms） */
+const EARTH_DELAY_MS = 250;
+
+/**
+ * 3D の地球を使うか。通信量を節約する設定（Save-Data）のときと、URL に ?earth=css があるとき（確かめ用）は使わず、CSS の縁のままにする
+ */
+export function wantsEarth3d(): boolean {
+  if (new URLSearchParams(location.search).get('earth') === 'css') return false;
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  return !conn?.saveData;
+}
 
 /** 星の数の目安：画面の面積 ÷ この値 */
 const PX2_PER_STAR = 3600;
@@ -33,6 +48,15 @@ export function makeStars(count: number, seed = 20261106): Star[] {
  */
 export function Backdrop() {
   const ref = useRef<HTMLCanvasElement>(null);
+  const [load3d, setLoad3d] = useState(false);
+  const [ready3d, setReady3d] = useState(false);
+  const onReady = useCallback(() => setReady3d(true), []);
+
+  useEffect(() => {
+    if (!wantsEarth3d()) return;
+    const id = window.setTimeout(() => setLoad3d(true), EARTH_DELAY_MS);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -96,9 +120,15 @@ export function Backdrop() {
   }, []);
 
   return (
-    <div className="top-backdrop" aria-hidden="true">
+    <div className={`top-backdrop${ready3d ? ' is-3d' : ''}`} aria-hidden="true">
       <canvas ref={ref} className="top-stars" />
+      {/* 3D の地球が描けるまでは、この CSS の縁を出す。描けたら入れ替える */}
       <div className="top-earth" />
+      {load3d && (
+        <Suspense fallback={null}>
+          <EarthCanvas onReady={onReady} />
+        </Suspense>
+      )}
     </div>
   );
 }
