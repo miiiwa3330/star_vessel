@@ -236,3 +236,93 @@
 @media (max-height: 500px) {
   .hud-stamp-log { display: none; }
 }
+
+.hud-coords { font-variant-numeric: tabular-nums; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* 左の列のパネルの切り替え（スタンプ・近く・コレクション） */
+.hud-tabs { display: flex; gap: 4px; pointer-events: auto; }
+.hud-button.is-selected { border-color: #74e6ff; background: rgba(40, 90, 130, 0.85); }
+
+/* 近くの天体・コレクションの一覧（要件 F35・F38） */
+.hud-list-panel {
+  pointer-events: auto;
+  width: 280px;
+  max-height: min(48vh, 420px);
+  overflow-y: auto;
+  padding: 8px 10px;
+  /* 下のクレジットに重なっても読めるように、濃くして手前に出す */
+  background: rgba(8, 12, 24, 0.88);
+}
+.hud-left .hud-list-panel { position: relative; z-index: 2; }
+.hud-list-panel ul { list-style: none; margin: 0 0 6px; padding: 0; }
+.hud-list-title { margin-top: 4px; }
+.hud-list-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  min-height: 36px;
+}
+.hud-list-item:hover { background: rgba(40, 90, 130, 0.5); }
+.hud-list-item.is-selected { border-color: #74e6ff; background: rgba(40, 90, 130, 0.6); }
+.hud-list-item:focus-visible { outline: 2px solid #74e6ff; outline-offset: 1px; }
+.hud-list-row { display: flex; flex-direction: column; padding: 3px 6px; }
+.hud-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.hud-chip {
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: rgba(20, 40, 70, 0.5);
+  border: 1px solid rgba(160, 190, 255, 0.25);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.hud-chip.is-selected { border-color: #74e6ff; background: rgba(40, 90, 130, 0.7); }
+
+/* 情報のカード（要件 F36・F37）：画面の上の真ん中。宇宙の中には文字を出さない */
+.hud-left .hud-info-card { position: fixed; }
+.hud-info-card {
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  /* 左上の状態（約 270px）と右上のレーダー（200px）の間に収める */
+  width: clamp(200px, calc(100vw - 560px), 300px);
+  pointer-events: auto;
+}
+.hud-notice { top: 64px; }
+.hud-info-card.is-near { border-color: rgba(116, 230, 255, 0.6); }
+.hud-info-head { display: flex; justify-content: space-between; gap: 8px; }
+.hud-info-new { font-size: 11px; color: #ffd38a; }
+.hud-info-lines { list-style: none; margin: 4px 0 0; padding: 0; }
+.hud-info-actions { display: flex; gap: 6px; margin-top: 6px; }
+@media (max-width: 720px), (pointer: coarse) {
+  /* スマホ：左上の状態の下に重ならないよう、カードは右上に小さく */
+  .hud-left .hud-info-card { position: static; transform: none; width: min(230px, calc(100vw - 32px)); font-size: 12px; line-height: 1.5; }
+  .hud-list-panel { width: min(280px, calc(100vw - 32px)); max-height: 36vh; }
+}
+
+/* 選んだ天体の印 */
+.target-ring, .target-arrow { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; }
+.target-ring {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #74e6ff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(116, 230, 255, 0.6);
+}
+.target-arrow {
+  width: 0;
+  height: 0;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  border-left: 16px solid #74e6ff;
+}

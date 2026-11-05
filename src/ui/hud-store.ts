@@ -6,7 +6,37 @@
 import type { RadarBlip } from '../world/radar';
 import type { HullType } from '../world/ship-design';
 import type { StampId } from '../world/stamps';
+import { DEFAULT_STAR_LIMIT, type StarLimitMode } from '../world/stars';
 import type { ViewMode } from '../controls/chase-camera';
+import type { Visit } from '../world/visits';
+
+/** 情報のカード（要件 F36・F37） */
+export interface InfoCardState {
+  key: string;
+  name: string;
+  /** 照準の先・選んだ天体・近づいた天体 */
+  source: 'aimed' | 'selected' | 'near';
+  /** 自分からの距離（表示用の文字） */
+  distance: string;
+  details: string[];
+  /** はじめて訪れたとき（近づいたカードだけ） */
+  firstVisit: boolean;
+}
+
+/** 近くの天体の一覧の 1 行 */
+export interface NearbyItem {
+  key: string;
+  name: string;
+  kindJa: string;
+  distance: string;
+}
+export interface NearbySection {
+  title: string;
+  items: NearbyItem[];
+}
+
+/** 左の列で開いているパネル */
+export type LeftPanel = 'stamps' | 'nearby' | 'collection' | null;
 
 /** スタンプの履歴の 1 行 */
 export interface StampLogItem {
@@ -64,6 +94,17 @@ export interface HudState {
   stampLog: StampLogItem[];
   /** いる場所の目印（星団の中なら、その名前） */
   region: string | null;
+  /** 地球の中心を原点にした自分の位置（km・EQJ。要件 F39） */
+  fromEarthKm: { x: number; y: number; z: number };
+  /** 星の見え方（要件 F34） */
+  starLimit: StarLimitMode;
+  infoCard: InfoCardState | null;
+  /** 選んだ天体（印を付ける） */
+  selectedKey: string | null;
+  leftPanel: LeftPanel;
+  nearby: NearbySection[];
+  /** 訪れた天体（古い順） */
+  visits: Visit[];
 }
 
 let state: HudState = {
@@ -85,6 +126,13 @@ let state: HudState = {
   stampReady: false,
   stampLog: [],
   region: null,
+  fromEarthKm: { x: 0, y: 0, z: 0 },
+  starLimit: DEFAULT_STAR_LIMIT,
+  infoCard: null,
+  selectedKey: null,
+  leftPanel: null,
+  nearby: [],
+  visits: [],
 };
 const listeners = new Set<() => void>();
 
@@ -118,8 +166,18 @@ export const hudActions = {
   previewHull: (_hull: HullType): void => {},
   saveShip: (): void => {},
   closeShipBuilder: (): void => {},
+  /** 星の見え方を、肉眼 → 双眼鏡 → 写真 → 肉眼…と切り替える */
+  cycleStarLimit: (): void => {},
   /** スタンプを送る（要件 F6） */
   sendStamp: (_id: StampId): void => {},
+  /** 天体を選ぶ（null で選ぶのをやめる。要件 F35） */
+  selectTarget: (_key: string | null): void => {},
+  /** 選んだ天体の方を向く */
+  faceTarget: (): void => {},
+  /** 左の列のパネルを開く・閉じる（同じものを押すと閉じる） */
+  toggleLeftPanel: (panel: Exclude<LeftPanel, null>): void => {
+    hudStore.set({ leftPanel: hudStore.get().leftPanel === panel ? null : panel });
+  },
 };
 
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;

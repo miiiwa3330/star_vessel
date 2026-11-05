@@ -31,6 +31,10 @@ export class FlightControls {
   onZoom: (steps: number) => void = () => {};
   /** 視点を切り替える（V キー） */
   onToggleView: () => void = () => {};
+  /** ほとんど動かさずに離した（クリック・タップ）。画面の座標（CSS ピクセル）。main.ts が入れる */
+  onTap: (x: number, y: number) => void = () => {};
+  /** 押した位置と、そこから動いた量（タップか、ドラッグかを見分ける） */
+  private press: { x: number; y: number; moved: number; button: number } | null = null;
   private readonly keys = new Set<string>();
   private dragging: { x: number; y: number; orbit: boolean } | null = null;
   private touches = 0;
@@ -104,6 +108,7 @@ export class FlightControls {
   private onPointerDown = (e: PointerEvent) => {
     if (e.pointerType === 'touch' && this.touches >= 2) return;
     this.dragging = { x: e.clientX, y: e.clientY, orbit: e.button === 2 || this.dragMode === 'orbit' };
+    this.press = { x: e.clientX, y: e.clientY, moved: 0, button: e.button };
   };
 
   private onPointerMove = (e: PointerEvent) => {
@@ -111,6 +116,7 @@ export class FlightControls {
     const dx = e.clientX - this.dragging.x;
     const dy = e.clientY - this.dragging.y;
     this.dragging = { ...this.dragging, x: e.clientX, y: e.clientY };
+    if (this.press) this.press.moved += Math.abs(dx) + Math.abs(dy);
     if (this.dragging.orbit) {
       this.onOrbit(dx, dy);
       return;
@@ -119,13 +125,20 @@ export class FlightControls {
     this.rotateLocal(1, 0, 0, -dy * LOOK_RAD_PER_PX);
   };
 
-  private onPointerUp = () => {
+  private onPointerUp = (e: PointerEvent) => {
+    const p = this.press;
     this.dragging = null;
+    this.press = null;
+    // 6 px より動かしていなければ、クリック・タップとみなす（左ボタン・指だけ）
+    if (p && e.type === 'pointerup' && p.button === 0 && p.moved < 6 && this.touches < 2) this.onTap(p.x, p.y);
   };
 
   private onTouch = (e: TouchEvent) => {
     this.touches = e.touches.length;
-    if (this.touches >= 2) this.dragging = null;
+    if (this.touches >= 2) {
+      this.dragging = null;
+      this.press = null;
+    }
   };
 
   private onWheel = (e: WheelEvent) => {

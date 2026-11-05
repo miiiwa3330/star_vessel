@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three/webgpu';
 import { exp, float, instancedBufferAttribute, uv, vec3 } from 'three/tsl';
-import type { SatelliteCatalog } from '../world/satellites';
+import { satelliteSizeKm, type SatelliteCatalog } from '../world/satellites';
 import type { Vec3 } from '../world/vec';
 
 const HIDE_BEYOND_KM = 1e6;
@@ -35,6 +35,10 @@ export class SatelliteField {
     this.sprite.frustumCulled = false;
   }
 
+  /** 1 ピクセルの大きさを決める値（画面の高さの半分 ÷ tan(視野の半分)） */
+  pxPerRadian = 700;
+  private sizes: Float32Array | null = null;
+
   /** earthRelKm は自分から見た地球の中心の位置（km・EQJ） */
   update(earthRelKm: Vec3): void {
     if (Math.hypot(earthRelKm.x, earthRelKm.y, earthRelKm.z) > HIDE_BEYOND_KM) {
@@ -43,13 +47,17 @@ export class SatelliteField {
     }
     this.sprite.visible = true;
     const c = this.catalog;
+    if (!this.sizes) this.sizes = Float32Array.from(c.records, (r) => satelliteSizeKm(r.name));
     let n = 0;
     for (let i = 0; i < c.count; i++) {
       if (!c.isOk(i)) continue;
       const o = i * 3;
-      this.pos[n * 3] = earthRelKm.x + c.positions[o];
-      this.pos[n * 3 + 1] = earthRelKm.y + c.positions[o + 1];
-      this.pos[n * 3 + 2] = earthRelKm.z + c.positions[o + 2];
+      const x = earthRelKm.x + c.positions[o];
+      const y = earthRelKm.y + c.positions[o + 1];
+      const z = earthRelKm.z + c.positions[o + 2];
+      // 本物の大きさが画面で 1.5 ピクセルより大きいなら、点は描かない（模型が見える。要件 F33）
+      if ((this.sizes[i] / 2 / Math.max(Math.hypot(x, y, z), 1e-9)) * this.pxPerRadian > 1.5) continue;
+      this.pos.set([x, y, z], n * 3);
       n++;
     }
     this.sprite.count = n;

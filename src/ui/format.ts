@@ -13,3 +13,21 @@ export function formatSpeed(kmS: number): string {
   const d = formatDistance(kmS);
   return `秒速 ${d}`;
 }
+
+/**
+ * 地球を原点にした座標（要件 F39）。3 つの軸で単位をそろえるため、原点からの距離で単位を決める
+ * （km・天文単位・光年。formatDistance と同じ切り替え方）。例：「X +1.23 Y −0.45 Z +0.10 天文単位」
+ */
+export function formatCoordinates(v: { x: number; y: number; z: number }): { x: string; y: string; z: string; unit: string } {
+  const r = Math.hypot(v.x, v.y, v.z);
+  const sign = (n: string) => (n.startsWith('-') ? `−${n.slice(1)}` : `+${n}`);
+  if (r < 1e6) {
+    const f = (n: number) => sign(Math.round(n).toLocaleString('ja-JP'));
+    return { x: f(v.x), y: f(v.y), z: f(v.z), unit: 'km' };
+  }
+  const [div, unit] = r < 0.1 * KM_PER_LY ? [KM_PER_AU, '天文単位'] : [KM_PER_LY, '光年'];
+  // 大きさに合わせて小数の桁を決める（3 桁くらい読めるように）
+  const digits = Math.max(0, 2 - Math.floor(Math.log10(r / div)));
+  const f = (n: number) => sign((n / div).toLocaleString('ja-JP', { minimumFractionDigits: digits, maximumFractionDigits: digits }));
+  return { x: f(v.x), y: f(v.y), z: f(v.z), unit };
+}

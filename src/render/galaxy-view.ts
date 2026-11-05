@@ -27,7 +27,12 @@ const GLOW_COUNT = typeof matchMedia !== 'undefined' && matchMedia('(pointer: co
 /** 光の点の明るさ（重なって天の川の帯になる。見た目に合わせた値） */
 const GLOW_INTENSITY = 0.05;
 /** 自分からこの距離（pc）より近い光は消し、この距離で元の明るさに戻す */
-const GLOW_FADE_PC = { near: 300, far: 1500 };
+const GLOW_FADE_PC = { near: 1200, far: 4000 };
+/**
+ * 画面での見かけの大きさがこれ（ピクセル）より大きい光の点は消す。近くの光の点が「綿」のような塊に見えないように（要件 F32）。
+ * 天の川の帯は、遠くの小さな点だけで作る
+ */
+const GLOW_BLOB_PX = { start: 8, end: 20 };
 const GLOW_MAX_SIZE_PX = 64;
 /** まわりの星を作るマス目の範囲（自分のマス目から ±RADIUS） */
 const CELL_RADIUS = 2;
@@ -117,7 +122,9 @@ export class GalaxyView {
     m.sizeNode = drawnPx;
     m.colorNode = instancedBufferAttribute<'vec3'>(new THREE.InstancedBufferAttribute(color, 3), 'vec3').mul(flux).mul(dust);
     const d = uv().sub(0.5).length().mul(2);
-    m.opacityNode = exp(d.mul(d).mul(-6)).mul(smoothstep(GLOW_FADE_PC.near, GLOW_FADE_PC.far, dist));
+    m.opacityNode = exp(d.mul(d).mul(-6))
+      .mul(smoothstep(GLOW_FADE_PC.near, GLOW_FADE_PC.far, dist))
+      .mul(float(1).sub(smoothstep(GLOW_BLOB_PX.start, GLOW_BLOB_PX.end, sizePx)));
     const sprite = new THREE.Sprite(m);
     sprite.count = g.count;
     sprite.frustumCulled = false;
