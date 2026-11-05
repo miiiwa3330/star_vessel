@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { AuthLinks, type AuthMode } from './AuthLinks';
 import { ServiceDetails } from './ServiceDetails';
 import { SocialLinks } from './SocialLinks';
 
@@ -7,10 +8,10 @@ import { SocialLinks } from './SocialLinks';
  *   1. 最初の画面：景色が主役で、文字は名前・一言・「-START-」だけ。進むのは「-START-」のまわりをタップ（クリック）したとき
  *      （2026-11-06 に、画面全体から変更）。枠のあるボタンは置かない
  *   2. スクロールした先：サービスの詳細（ServiceDetails）。スクロールは、2 つの画面の間で止まらずに、どちらかへ吸い付く（top.css の scroll-snap）
- * 右上に、X と Miiiwa のアイコン。
+ * 右上に、SIGN IN と SIGN UP（AuthLinks。押すと、準備画面でアカウントの入力が開く）。右下に、X と Miiiwa のアイコン。
  * 宇宙の中に文字を出さない決まり（docs/design/README.md）と同じく、景色をふさがない。
  */
-export function TitleScreen({ onStart }: { onStart: () => void }) {
+export function TitleScreen({ onStart, onAuth }: { onStart: () => void; onAuth: (mode?: AuthMode) => void }) {
   // 1 回の操作で 2 回進まないように（ボタンを Enter で押すと、キーとクリックの両方が届くことがある）
   const started = useRef(false);
   const start = useCallback(() => {
@@ -36,6 +37,7 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
 
   return (
     <main className="top-title-screen">
+      <AuthLinks onAuth={onAuth} />
       <SocialLinks />
       <section className="top-hero">
         <h1 className="top-title">STAR VESSEL</h1>

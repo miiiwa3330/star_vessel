@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import type { AuthMode } from './AuthLinks';
 import { Backdrop, type ScrollState } from './Backdrop';
 import { TitleScreen } from './TitleScreen';
 // 準備画面はアカウントの部品（Better Auth）を使うので大きい。タイトル画面を軽く開くため、開くときに読み込む
@@ -13,18 +14,25 @@ import { attachSectionWheel } from './section-scroll';
  */
 export function TopApp() {
   const [screen, setScreen] = useState<TopScreen>(() => screenForPath(location.pathname));
+  /** タイトル画面の SIGN IN・SIGN UP から準備画面へ来たとき、アカウントの入力を最初から開く（戻る・再読み込みでは、開かない） */
+  const [authMode, setAuthMode] = useState<AuthMode | undefined>(undefined);
   const rootRef = useRef<HTMLDivElement>(null);
   const screenRef = useRef(screen);
   screenRef.current = screen;
 
   useEffect(() => {
-    const onPop = () => setScreen(screenForPath(location.pathname));
+    const onPop = () => {
+      setScreen(screenForPath(location.pathname));
+      setAuthMode(undefined);
+    };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  const go = useCallback((next: TopScreen) => {
+  // auth：タイトル画面の SIGN IN・SIGN UP から来たとき、準備画面でアカウントの入力を開く（URL には出さない）
+  const go = useCallback((next: TopScreen, auth?: AuthMode) => {
     history.pushState(null, '', pathForScreen(next) + location.search);
+    setAuthMode(auth);
     setScreen(next);
   }, []);
 
@@ -56,10 +64,10 @@ export function TopApp() {
     <div ref={rootRef} tabIndex={-1} className={`top${screen === 'title' ? ' is-title' : ''}`}>
       <Backdrop getScroll={getScroll} />
       {screen === 'title' ? (
-        <TitleScreen onStart={() => go('ready')} />
+        <TitleScreen onStart={() => go('ready')} onAuth={(mode) => go('ready', mode)} />
       ) : (
         <Suspense fallback={null}>
-          <ReadyScreen onBack={() => go('title')} />
+          <ReadyScreen onBack={() => go('title')} initialMode={authMode} />
         </Suspense>
       )}
     </div>

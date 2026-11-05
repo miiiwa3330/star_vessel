@@ -62,6 +62,8 @@
  */
 .top:focus { outline: none; }
 .top.is-title { scroll-snap-type: y mandatory; overscroll-behavior-y: contain; }
+/* 慣性のある動き（section-scroll.ts）の間は、吸い付きを切る。切らないと、1 フレームごとに、近い画面の先頭へ引き戻される */
+.top.is-title.is-gliding { scroll-snap-type: none; }
 .top-title-screen { position: relative; }
 .top-hero {
   position: relative;
@@ -137,8 +139,8 @@
 .top-start::after { content: ''; position: absolute; inset: -14px -20px; }
 .top-start:focus-visible { outline: 1px solid var(--top-accent); outline-offset: -8px; border-radius: 12px; }
 
-/* 右上の X と Miiiwa のアイコン。丸い背景は付けない。ふだんは少し透かし、マウスを乗せると透過を解く（アイコン自体の色の変化だけ） */
-.top-social { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 14px; z-index: 3; display: flex; gap: 4px; }
+/* 右下の X と Miiiwa のアイコン（2026-11-06 に、右上から右下へ移した）。丸い背景は付けない。ふだんは少し透かし、マウスを乗せると透過を解く（アイコン自体の色の変化だけ） */
+.top-social { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); right: 14px; z-index: 3; display: flex; gap: 4px; }
 .top-social-link {
   width: 42px;
   height: 42px;
@@ -154,6 +156,35 @@
 .top-social-link:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 0; opacity: 1; }
 @media (hover: hover) {
   .top-social-link:hover { opacity: 1; }
+}
+
+/*
+ * 右上の SIGN IN・SIGN UP（要件 F55）。「-START-」と同じく、ふだんは薄く、マウスを乗せると白。SIGN UP だけ、細い枠で目立たせる。
+ * 丸い背景は付けない（アイコンと同じ決まり）。ログインしているときは、ユーザー名を出す
+ */
+.top-auth { position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 16px; z-index: 3; display: flex; align-items: center; gap: 6px; }
+.top-auth-button {
+  font-family: 'Josefin Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.22em;
+  color: rgba(232, 236, 244, 0.62);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 8px 14px 8px calc(14px + 0.22em);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease, border-color 0.25s ease;
+  filter: drop-shadow(0 0 3px rgba(2, 4, 10, 0.6));
+}
+.top-auth-outline { border-color: rgba(232, 236, 244, 0.34); }
+.top-auth-user { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0.08em; padding-left: 14px; }
+.top-auth-button:active, .top-auth-button:focus-visible { color: #fff; border-color: #fff; }
+.top-auth-button:focus-visible { outline: none; }
+@media (hover: hover) {
+  .top-auth-button:hover { color: #fff; }
+  .top-auth-outline:hover { border-color: #fff; }
 }
 
 /* 出典の 1 行（要件 F48。地球の画像は CC BY 4.0）。景色をふさがないよう小さく薄く出す */
