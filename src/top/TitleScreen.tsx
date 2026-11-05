@@ -1,42 +1,51 @@
-import { useEffect, useState } from 'react';
-import { fetchOnline } from '../net/presence';
-
-/** 人数を読み直す間隔（ms）。サーバーも 15 秒覚えておくので、それより短くしても意味がない */
-const REFRESH_MS = 30_000;
-
-/** いま遊んでいる人数の 1 行。読めなかったときは null（出さない） */
-export const onlineText = (online: number | null): string | null =>
-  online === null ? null : online > 0 ? `いま ${online.toLocaleString('ja-JP')} 人が旅をしています` : 'いま旅をしている人は、いません';
+import { useCallback, useEffect, useRef } from 'react';
+import { ServiceDetails } from './ServiceDetails';
+import { SocialLinks } from './SocialLinks';
 
 /**
- * タイトル画面（要件 F48）。景色が主役で、文字は最小限：名前・一言・「はじめる」・いま遊んでいる人数だけ。
+ * タイトル画面（要件 F48）。2 つの画面が縦に並ぶ：
+ *   1. 最初の画面：景色が主役で、文字は名前・一言・「-START-」だけ。進むのは「-START-」のまわりをタップ（クリック）したとき
+ *      （2026-11-06 に、画面全体から変更）。枠のあるボタンは置かない
+ *   2. スクロールした先：サービスの詳細（ServiceDetails）。スクロールは、2 つの画面の間で止まらずに、どちらかへ吸い付く（top.css の scroll-snap）
+ * 右上に、X と Miiiwa のアイコン。
  * 宇宙の中に文字を出さない決まり（docs/design/README.md）と同じく、景色をふさがない。
  */
 export function TitleScreen({ onStart }: { onStart: () => void }) {
-  const [online, setOnline] = useState<number | null>(null);
+  // 1 回の操作で 2 回進まないように（ボタンを Enter で押すと、キーとクリックの両方が届くことがある）
+  const started = useRef(false);
+  const start = useCallback(() => {
+    if (started.current) return;
+    started.current = true;
+    onStart();
+  }, [onStart]);
 
+  // どこにも焦点が無いときの Enter は、進む（画面全体のタップはやめたので、キーボードの人のために残す）。
+  // Space は、ページをスクロールするために使うので、奪わない
   useEffect(() => {
-    let alive = true;
-    const load = () => void fetchOnline().then((n) => alive && setOnline(n));
-    load();
-    const id = setInterval(load, REFRESH_MS);
-    return () => {
-      alive = false;
-      clearInterval(id);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+      // 焦点が、ボタンやリンクにあるときは、それぞれの動きに任せる（スクロールの箱 .top にあるのは、何も選んでいないのと同じ）
+      const active = document.activeElement;
+      if (active && active !== document.body && !active.classList.contains('top')) return;
+      e.preventDefault();
+      start();
     };
-  }, []);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [start]);
 
-  const text = onlineText(online);
   return (
     <main className="top-title-screen">
-      <h1 className="top-title">STAR VESSEL</h1>
-      <p className="top-tagline">地球から飛び立ち、世界中のプレイヤーと同じ宇宙を旅する。</p>
-      <button type="button" className="top-button top-button-primary" onClick={onStart}>
-        はじめる
-      </button>
-      <p className="top-online" role="status" aria-live="polite">
-        {text ?? ' '}
-      </p>
+      <SocialLinks />
+      <section className="top-hero">
+        <h1 className="top-title">STAR VESSEL</h1>
+        <p className="top-tagline" lang="en">Travel the same universe as players around the world.</p>
+        {/* 見た目は枠の無い文字。まわり（約 330×110px）をタップできる */}
+        <button type="button" className="top-start" onClick={start}>
+          -START-
+        </button>
+      </section>
+      <ServiceDetails />
     </main>
   );
 }

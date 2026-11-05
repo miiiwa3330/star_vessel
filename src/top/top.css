@@ -37,6 +37,10 @@
     0 -6px 18px 2px rgba(116, 230, 255, 0.45),
     0 -22px 70px 12px rgba(60, 140, 255, 0.28);
 }
+/* 3D の地球（src/top/earth-scene.ts）。CSS の縁は、3D を使わないときと、描けなかったときだけ出る（仮の球体は、読み込み中には出さない） */
+/* 描ける状態になってから、地球が下から上がってくる（earth-scene.ts）のと一緒に、ゆっくり現れる */
+.top-earth-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.8s ease; will-change: transform; }
+.top-backdrop.is-3d .top-earth-canvas { opacity: 1; }
 /* 地平線の向こうの太陽の光 */
 .top-earth::after {
   content: '';
@@ -51,9 +55,18 @@
 }
 
 /* ---- タイトル画面 ---- */
-.top-title-screen {
+/*
+ * 縦に 2 つの画面：最初の画面（.top-hero）と、サービスの詳細（.top-details）。
+ * スクロールは、2 つの画面の間で止まらず、どちらかへ吸い付く（scroll-snap の mandatory・stop: always）。
+ * 詳細が 1 画面より長いときは、その中は、自由にスクロールできる
+ */
+.top:focus { outline: none; }
+.top.is-title { scroll-snap-type: y mandatory; overscroll-behavior-y: contain; }
+.top-title-screen { position: relative; }
+.top-hero {
   position: relative;
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
   box-sizing: border-box;
   padding: 24px 16px 22vh;
   display: flex;
@@ -62,18 +75,136 @@
   justify-content: center;
   text-align: center;
   gap: 18px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
+/*
+ * タイトルの文字：Monoton（OFL）。細い線を重ねたネオンの管のような書体を、オレンジに光らせる（オーナーが指定。2026-11-06）。
+ * 幅が広い書体なので、文字の間は詰め、画面の幅に合わせて大きさを変える。狭いと、「STAR」と「VESSEL」の 2 行になる。
+ * 光のにじみは filter: drop-shadow（文字の線のかたちに沿って光る）
+ */
 .top-title {
   margin: 0;
-  font-size: clamp(28px, 7vw, 64px);
-  font-weight: 300;
-  letter-spacing: 0.32em;
-  /* 文字の幅の分だけ右にずれて見えるのを戻す（letter-spacing は文字の右にも入るため） */
-  padding-left: 0.32em;
-  text-shadow: 0 0 28px rgba(116, 230, 255, 0.35);
+  max-width: 100%;
+  font-family: 'Monoton', system-ui, sans-serif;
+  /* 文字の幅は、大きさの約 8 倍。画面の幅の 11% なら、どの幅でも左右に余白が残る */
+  font-size: clamp(34px, 11vw, 112px);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  word-spacing: 0.18em;
+  text-wrap: balance;
+  color: #ff8a1f;
+  filter: drop-shadow(0 0 6px rgba(255, 138, 31, 0.55)) drop-shadow(0 0 26px rgba(255, 110, 20, 0.4));
 }
-.top-tagline { margin: 0; text-wrap: balance; font-size: clamp(13px, 2.6vw, 17px); line-height: 1.8; opacity: 0.85; max-width: 32em; }
-.top-online { margin: 0; font-size: 12px; opacity: 0.6; min-height: 1.6em; }
+/* 一言：英語の細字（Josefin Sans の 300。「-START-」と同じ書体）。2026-11-06 に、日本語の文から英語に変えた */
+.top-tagline {
+  margin: 0;
+  text-wrap: balance;
+  font-family: 'Josefin Sans', system-ui, sans-serif;
+  font-size: clamp(14px, 2.6vw, 19px);
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  line-height: 1.8;
+  opacity: 0.9;
+  max-width: 32em;
+}
+/*
+ * 枠の無い「-START-」。ふだんは薄い色で、マウスを乗せる（または、キーで選ぶ・押す）と白くなる。
+ * 進むのは、この文字のまわりをタップ（クリック）したとき（約 330×110px）。
+ * 画面全体のタップは、2026-11-06 にやめた（詳細をスクロールで読めるようにするため）
+ */
+.top-start {
+  margin-top: 10px;
+  padding: 26px 64px 26px calc(64px + 0.5em);
+  font-family: 'Josefin Sans', system-ui, sans-serif;
+  font-size: clamp(16px, 3.6vw, 22px);
+  font-weight: 300;
+  letter-spacing: 0.5em;
+  color: rgba(232, 236, 244, 0.42);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease;
+}
+@media (hover: hover) {
+  .top-start:hover { color: #fff; }
+}
+.top-start:active, .top-start:focus-visible { color: #fff; }
+/* タップできる範囲を、見た目の文字より広げる（約 330×110px） */
+.top-start { position: relative; }
+.top-start::after { content: ''; position: absolute; inset: -14px -20px; }
+.top-start:focus-visible { outline: 1px solid var(--top-accent); outline-offset: -8px; border-radius: 12px; }
+
+/* 右上の X と Miiiwa のアイコン。丸い背景は付けない。ふだんは少し透かし、マウスを乗せると透過を解く（アイコン自体の色の変化だけ） */
+.top-social { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 14px; z-index: 3; display: flex; gap: 4px; }
+.top-social-link {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--top-ink);
+  opacity: 0.55;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.2s ease;
+}
+/* 明るい地球の上（詳細の画面）でも見えるよう、背景ではなく、アイコンの形に沿った淡い影を付ける */
+.top-social-link svg { filter: drop-shadow(0 0 3px rgba(2, 4, 10, 0.6)); }
+.top-social-link:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 0; opacity: 1; }
+@media (hover: hover) {
+  .top-social-link:hover { opacity: 1; }
+}
+
+/* 出典の 1 行（要件 F48。地球の画像は CC BY 4.0）。景色をふさがないよう小さく薄く出す */
+.top-credit { margin: 0; text-align: center; font-size: 10px; letter-spacing: 0.04em; opacity: 0.4; }
+.top-credit a { color: inherit; }
+.top-credit a:hover, .top-credit a:focus-visible { opacity: 1; text-decoration: underline; }
+/* 準備画面の下の 1 行（背景の地球の画像の出典）。詳細の「CREDITS」にもある */
+.top-credit-ready { padding: 4px 0 18px; }
+
+/* サービスの詳細。上の余白は、背景の地球の下半分（画面の上の約 4 割）を見せるため */
+.top-details {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  box-sizing: border-box;
+  padding: clamp(230px, 46vh, 480px) 20px 36px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.top-details-inner { max-width: 880px; margin: 0 auto; }
+.top-eyebrow { margin: 64px 0 8px; font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 12px; font-weight: 300; letter-spacing: 0.4em; color: #ff8a1f; }
+.top-details-inner > .top-eyebrow:first-child { margin-top: 0; }
+.top-details-title { margin: 0 0 16px; font-size: clamp(20px, 3.4vw, 30px); font-weight: 300; letter-spacing: 0.06em; line-height: 1.6; text-wrap: balance; }
+.top-details-lead { margin: 0; font-size: 15px; font-weight: 300; line-height: 2.05; opacity: 0.88; }
+.top-details-note { margin: 16px 0 0; font-size: 12px; font-weight: 300; line-height: 1.9; opacity: 0.6; }
+.top-cores { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.top-core { padding: 18px 20px 20px; background: var(--top-panel); border: 1px solid var(--top-line); border-radius: 12px; backdrop-filter: blur(6px); }
+.top-core-no { font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 12px; letter-spacing: 0.3em; color: #ff8a1f; }
+.top-core h3 { margin: 6px 0 8px; font-size: 16px; font-weight: 400; letter-spacing: 0.04em; line-height: 1.6; }
+.top-core p { margin: 0; font-size: 13px; font-weight: 300; line-height: 1.95; opacity: 0.8; }
+.top-data { margin: 20px 0 0; padding: 0; }
+.top-data-row { display: grid; grid-template-columns: minmax(120px, 190px) 1fr; gap: 6px 20px; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--top-line); }
+.top-data-row:last-child { border-bottom: 1px solid var(--top-line); }
+.top-data dt { font-size: 20px; font-weight: 300; letter-spacing: 0.04em; }
+.top-data dd { margin: 0; font-size: 13px; font-weight: 300; line-height: 1.9; opacity: 0.78; }
+.top-play dt { font-size: 15px; font-weight: 400; }
+/* クレジット（詳細のいちばん下） */
+.top-credits { margin-top: 72px; padding-top: 8px; }
+.top-credits-title { margin: 0 0 12px; font-size: 14px; font-weight: 300; letter-spacing: 0.08em; opacity: 0.85; }
+.top-credits-list { margin: 0; padding: 0; font-size: 11px; line-height: 1.8; }
+.top-credits-row { display: grid; grid-template-columns: minmax(120px, 230px) 1fr; gap: 2px 18px; padding: 8px 0; border-top: 1px solid var(--top-line); }
+.top-credits-row:last-child { border-bottom: 1px solid var(--top-line); }
+.top-credits-list dt { font-weight: 300; opacity: 0.6; }
+.top-credits-list dd { margin: 0; font-weight: 300; opacity: 0.8; }
+.top-credits-list a { color: inherit; text-decoration: underline; text-decoration-color: rgba(232, 236, 244, 0.3); text-underline-offset: 3px; }
+.top-credits-list a:hover, .top-credits-list a:focus-visible { text-decoration-color: currentColor; }
+@media (max-width: 640px) {
+  .top-cores { grid-template-columns: 1fr; }
+  .top-data-row { grid-template-columns: 1fr; gap: 2px; }
+  .top-credits-row { grid-template-columns: 1fr; }
+}
 
 /* ---- 部品 ---- */
 .top-button {
@@ -102,7 +233,7 @@
 .top-strong { font-weight: 600; color: var(--top-accent); }
 
 /* ---- 準備画面 ---- */
-.top-ready-screen { position: relative; min-height: 100%; box-sizing: border-box; padding: 24px 16px 32px; display: flex; justify-content: center; align-items: flex-start; }
+.top-ready-screen { position: relative; min-height: 100%; box-sizing: border-box; padding: 24px 16px 14px; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; }
 .top-card {
   width: min(520px, 100%);
   box-sizing: border-box;
