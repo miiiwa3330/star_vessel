@@ -148,13 +148,18 @@ async function horizonsRadius(code) {
 }
 
 const out = [];
-const skipped = { provisional: 0 };
+const skipped = { provisional: 0, duplicate: 0 };
 const sources = {};
 for (const r of elemRows.slice(1)) {
   if (r.length < header.length) continue;
   const code = r[C.code];
   if (!/^[3-9]\d{2}$/.test(code)) {
     skipped.provisional++;
+    continue;
+  }
+  // 表に同じ衛星が 2 回出ることがある（2026-11-05 にパック〈715〉が 2 行あった）。最初の行だけを使う
+  if (out.some((x) => x.code === code)) {
+    skipped.duplicate++;
     continue;
   }
   const p = phys.get(code);

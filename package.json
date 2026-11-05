@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "stars": "node tools/build-stars.mjs",
     "exoplanets": "node tools/build-exoplanets.mjs",
-    "moons": "NODE_USE_ENV_PROXY=1 node tools/build-moons.mjs",
+    "moons": "NODE_USE_ENV_PROXY=1 node tools/build-moons.mjs && NODE_USE_ENV_PROXY=1 node tools/build-moon-names.mjs",
     "asteroids": "NODE_USE_ENV_PROXY=1 node tools/build-asteroids.mjs",
     "satellites": "NODE_USE_ENV_PROXY=1 node tools/build-satellites.mjs",
     "clusters": "NODE_USE_ENV_PROXY=1 node tools/build-clusters.mjs",

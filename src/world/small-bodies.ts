@@ -26,38 +26,6 @@ const PLANET_OF: Record<number, string> = { 3: 'Earth', 4: 'Mars', 5: 'Jupiter',
 /** astronomy-engine で位置を出すので、データからは作らない衛星（月・ガリレオ衛星） */
 const SKIP_CODES = new Set(['301', '501', '502', '503', '504']);
 
-/** 主な衛星の日本語の名前（JPL の英語の名前を、日本で広く使われている読みにした） */
-const MOON_NAMES_JA: Record<string, string> = {
-  '401': 'フォボス',
-  '402': 'ダイモス',
-  '505': 'アマルテア',
-  '506': 'ヒマリア',
-  '514': 'テーベ',
-  '601': 'ミマス',
-  '602': 'エンケラドゥス',
-  '603': 'テティス',
-  '604': 'ディオネ',
-  '605': 'レア',
-  '606': 'タイタン',
-  '607': 'ヒペリオン',
-  '608': 'イアペトゥス',
-  '609': 'フェーベ',
-  '701': 'アリエル',
-  '702': 'ウンブリエル',
-  '703': 'チタニア',
-  '704': 'オベロン',
-  '705': 'ミランダ',
-  '715': 'パック',
-  '801': 'トリトン',
-  '802': 'ネレイド',
-  '808': 'プロテウス',
-  '901': 'カロン',
-  '902': 'ニクス',
-  '903': 'ヒドラ',
-  '904': 'ケルベロス',
-  '905': 'ステュクス',
-};
-
 /** 大気のある衛星（タイタンだけ）。見た目のための値 */
 const MOON_ATMOSPHERES: Record<string, Atmosphere> = {
   '606': { color: [1.0, 0.7, 0.35], thickness: 0.06, strength: 0.9 },
@@ -71,6 +39,8 @@ export interface MoonRecord {
   planet: number;
   number: number;
   name: string;
+  /** 日本語の名前（tools/build-moon-names.mjs が Wikidata から入れる。無ければ英語の名前） */
+  nameJa?: string;
   /** 軌道要素の基準の面。いまは icrf（ICRF の赤道＝EQJ）だけ */
   frame: 'icrf';
   epoch: string;
@@ -132,7 +102,7 @@ export function moonBodies(records: readonly MoonRecord[], facts: PlanetFacts): 
         : r.radius * ANCHOR_RADII_WITHOUT_MASS;
     out.push({
       id: `S${r.planet}.${r.number}`,
-      nameJa: MOON_NAMES_JA[r.code] ?? r.name,
+      nameJa: r.nameJa ?? r.name,
       radiusKm: r.radius,
       kind: 'moon',
       parent,

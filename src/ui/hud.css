@@ -20,16 +20,17 @@
 .hud-bottom {
   position: absolute;
   left: 16px;
-  right: 16px;
   bottom: 16px;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: min(720px, calc(100vw - 32px - 216px));
 }
+.hud-bottom-buttons { display: flex; gap: 6px; pointer-events: auto; }
 .hud-bottom .hud-panel { position: static; }
 .hud-help { font-size: 12px; opacity: 0.85; }
-.hud-credits { font-size: 11px; opacity: 0.6; pointer-events: auto; }
+.hud-credits { font-size: 11px; opacity: 0.85; pointer-events: auto; }
 .hud-credits a { color: inherit; }
 .hud-touch-only { display: none; }
 
@@ -37,17 +38,18 @@
 
 /* スマホ：操作の説明はタッチだけにし、下の 2 つは縦に並べる */
 @media (max-width: 720px), (pointer: coarse) {
-  .hud-bottom { flex-direction: column; align-items: stretch; }
+  .hud-bottom { max-width: calc(100vw - 32px - 64px); }
   .hud-keyboard-only { display: none; }
   .hud-touch-only { display: block; }
-  .hud-speed-buttons.hud-touch-only { display: flex; bottom: 190px; }
+  /* スマホでは右上にレーダーとボタンがあり、右下が空くので、速さのボタンは右下に置く */
+  .hud-speed-buttons.hud-touch-only { display: flex; left: auto; right: 16px; bottom: 16px; }
 }
 
 /* 右の列：レーダーとワープの操作 */
 .hud-dock {
   position: absolute;
   right: 16px;
-  bottom: 84px;
+  bottom: 16px;
   width: 200px;
   display: flex;
   flex-direction: column;
@@ -65,7 +67,7 @@
 .hud-radar-edge { fill: none; stroke: rgba(160, 190, 255, 0.35); stroke-width: 0.012; }
 .hud-radar-ring { fill: none; stroke: rgba(160, 190, 255, 0.15); stroke-width: 0.008; }
 .hud-radar-ring-label { fill: rgba(200, 215, 255, 0.4); font-size: 0.07px; }
-.hud-radar-label { font-size: 0.09px; }
+.hud-radar-label { font-size: 0.09px; paint-order: stroke; stroke: rgba(8, 12, 24, 0.9); stroke-width: 0.025px; }
 .hud-warp-buttons { display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
 .hud-button {
   pointer-events: auto;
@@ -121,7 +123,7 @@
 @media (max-width: 720px), (pointer: coarse) {
   .hud-dock { top: 16px; bottom: auto; width: 130px; }
   .hud-radar { width: 130px; height: 130px; }
-  .hud-notice { top: auto; bottom: 170px; left: 16px; right: 16px; transform: none; max-width: none; }
+  .hud-notice { top: auto; bottom: 64px; left: 16px; right: 16px; transform: none; max-width: none; }
 }
 
 .hud-view-buttons { display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
@@ -165,9 +167,6 @@
 @media (max-width: 720px), (pointer: coarse) {
   .hud-view-buttons { flex-direction: row; flex-wrap: wrap; }
   .hud-view-buttons .hud-button { flex: 1 1 60px; min-width: 0; padding-left: 6px; padding-right: 6px; }
-}
-@media (max-height: 500px) {
-  .hud-help { display: none; }
 }
 
 /* スタンプ（要件 F6）：左の列。履歴の下に、選ぶパネルとボタン */
@@ -307,7 +306,7 @@
 @media (max-width: 720px), (pointer: coarse) {
   /* スマホ：左上の状態の下に重ならないよう、カードは右上に小さく */
   .hud-left .hud-info-card { position: static; transform: none; width: min(230px, calc(100vw - 32px)); font-size: 12px; line-height: 1.5; }
-  .hud-list-panel { width: min(280px, calc(100vw - 32px)); max-height: 36vh; }
+  .hud-list-panel { width: calc(100vw - 32px - 138px); max-height: 36vh; }
 }
 
 /* 選んだ天体の印 */
@@ -325,4 +324,25 @@
   border-top: 9px solid transparent;
   border-bottom: 9px solid transparent;
   border-left: 16px solid #74e6ff;
+}
+
+/* 照準と、照準の先の天体の名前（要件 F36）。画面の真ん中に固定 */
+.hud-aim { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; display: flex; flex-direction: column; align-items: center; }
+.hud-aim-mark { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(200, 220, 255, 0.25); }
+.hud-aim-mark.is-on { border-color: rgba(116, 230, 255, 0.7); }
+.hud-aim-label {
+  position: absolute;
+  top: 22px;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: rgba(8, 12, 24, 0.45);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+/* スマホ：左上の状態を、右上のレーダーとボタン（130px）に重ならない幅にする */
+@media (max-width: 720px), (pointer: coarse) {
+  .hud-left { max-width: calc(100vw - 32px - 138px); }
+  .hud-left .hud-status { font-size: 12px; line-height: 1.5; padding: 8px 10px; }
 }

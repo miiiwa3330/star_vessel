@@ -165,17 +165,16 @@ export class InfoController {
     this.last = now;
     if (this.near && nowMs > this.near.until) this.near = null;
 
-    // カード：選んだ天体 → 近づいた天体 → 照準の先
+    // カード：選んだ天体 → 近づいた天体。照準の先は、照準の下に 1 行だけ
     let card: InfoCardState | null = null;
     if (this.selected) card = this.card(this.selected, 'selected', false);
     else if (this.near) card = this.card(this.near.target, 'near', this.near.firstVisit);
-    else {
-      const aimed = pickAimed(this.targets, abs, forward);
-      if (aimed) card = this.card(aimed, 'aimed', false);
-    }
+    const aimed = blocked ? null : pickAimed(this.targets, abs, forward);
+    const aimLabel = aimed ? { name: aimed.name, distance: formatDistance(length(sub(aimed.positionKm, abs))) } : null;
     const prev = hudStore.get();
     const patch: Partial<typeof prev> = {};
     if (!sameCard(prev.infoCard, card)) patch.infoCard = blocked ? null : card;
+    if (prev.aimLabel?.name !== aimLabel?.name || prev.aimLabel?.distance !== aimLabel?.distance) patch.aimLabel = aimLabel;
     if (prev.leftPanel === 'nearby') patch.nearby = this.sections(abs);
     if (Object.keys(patch).length > 0) hudStore.set(patch);
   }

@@ -14,8 +14,8 @@ import type { Visit } from '../world/visits';
 export interface InfoCardState {
   key: string;
   name: string;
-  /** 照準の先・選んだ天体・近づいた天体 */
-  source: 'aimed' | 'selected' | 'near';
+  /** 選んだ天体・近づいた天体（照準の先は aimLabel の 1 行だけ） */
+  source: 'selected' | 'near';
   /** 自分からの距離（表示用の文字） */
   distance: string;
   details: string[];
@@ -99,6 +99,8 @@ export interface HudState {
   /** 星の見え方（要件 F34） */
   starLimit: StarLimitMode;
   infoCard: InfoCardState | null;
+  /** 照準の先の天体（照準の下に 1 行だけ出す。要件 F36） */
+  aimLabel: { name: string; distance: string } | null;
   /** 選んだ天体（印を付ける） */
   selectedKey: string | null;
   leftPanel: LeftPanel;
@@ -129,6 +131,7 @@ let state: HudState = {
   fromEarthKm: { x: 0, y: 0, z: 0 },
   starLimit: DEFAULT_STAR_LIMIT,
   infoCard: null,
+  aimLabel: null,
   selectedKey: null,
   leftPanel: null,
   nearby: [],

@@ -67,3 +67,19 @@ describe('大きな小惑星・準惑星（JPL SBDB）', () => {
     expect(large.find((b) => b.id === 'A136199')!.radiusKm).toBe(1163);
   });
 });
+
+describe('衛星の名前', () => {
+  it('同じ衛星を 2 回入れない（JPL の表にパックが 2 行あった）', () => {
+    const ids = moons.map((m) => m.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('日本語の名前がある衛星は日本語、仮符号は S/年 惑星 番号 の形', () => {
+    const name = (id: string) => moons.find((m) => m.id === id)!.nameJa;
+    expect(name('S5.16')).toBe('メティス');
+    expect(name('S5.19')).toBe('メガクリテ');
+    expect(name('S7.15')).toBe('パック');
+    expect(name('S5.51')).toBe('S/2010 J 1');
+    expect(moons.every((m) => m.nameJa.length > 0 && !m.nameJa.includes('_'))).toBe(true);
+  });
+});
