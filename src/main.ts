@@ -27,7 +27,7 @@ import { keepOutsideBodies } from './world/collision';
 import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/observer';
 import { radarBlips, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
-import { predictShip, shipPositionKm } from './world/ships';
+import { ShipSmoother } from './world/ship-smoothing';
 import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, unregisterBodies, type BodyInfo, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
 import { decodeExoplanets } from './world/exoplanet-data';
 import { largeAsteroidBodies, moonBodies, smallAsteroidBody, type LargeAsteroid, type MoonRecord } from './world/small-bodies';
@@ -294,6 +294,7 @@ async function main() {
   const shipView = new ShipView();
   solar.scene.add(shipView.group);
   const link = new SpaceLink();
+  const shipSmoother = new ShipSmoother();
 
   // スタンプ（要件 F6）。届いたら、送った人の船の上に吹き出しを出し、画面の隅の履歴にも残す
   const bubbles = new StampBubbles(document.getElementById('ui')!);
@@ -658,8 +659,8 @@ async function main() {
         link.send({ ...observer, velocityKmS, orientation: { x: q.x, y: q.y, z: q.z, w: q.w } }, myDesign);
       }
     }
-    const others = link.ships.map((snap) => ({ id: snap.id, hue: snap.hue, state: predictShip(snap, date.getTime()), design: snap.d }));
-    shipView.update(others, date, abs);
+    const others = shipSmoother.update(link.ships, date, dt);
+    shipView.update(others, abs);
 
     // 視点：宇宙船を作る画面を開いている間は、選んでいる船をゆっくり回して見せる
     const builder = hudStore.get().shipBuilder;
@@ -685,7 +686,7 @@ async function main() {
       } else {
         const o = others.find((x) => x.id === id);
         if (!o) return null;
-        rel = sub(shipPositionKm(o.state, date), abs);
+        rel = sub(o.positionKm, abs);
         size = hullLengthKm((o.design ?? defaultDesignFor(o.id)).hull);
       }
       const up = new THREE.Vector3(0, size * 0.8, 0).applyQuaternion(camera.quaternion);
@@ -715,7 +716,7 @@ async function main() {
           .map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date), r: b.radiusKm, craft: b.kind === 'spacecraft' }))
           .filter((t) => t.craft || t.r >= 200 || length(sub(t.positionKm, abs)) < (t.id.startsWith('N') ? 2_000 : 1e7))
           .map(({ r: _r, craft: _c, ...t }) => t),
-        ...others.map((o) => ({ kind: 'ship' as const, id: o.id, label: '', positionKm: shipPositionKm(o.state, date) })),
+        ...others.map((o) => ({ kind: 'ship' as const, id: o.id, label: '', positionKm: o.positionKm })),
         // レーダーは狭いので、住所の恒星系から後ろだけを出す（例：SOL-3-0-001）
         ...warps.filter((w) => findBody(w.anchor) !== null).map((w) => ({
           kind: 'warp' as const,

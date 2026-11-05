@@ -8,8 +8,6 @@
  */
 import * as THREE from 'three/webgpu';
 import { float, instancedBufferAttribute, sin, time, uv, exp } from 'three/tsl';
-import { shipPositionKm } from '../world/ships';
-import type { ShipState } from '../world/ship-schema';
 import { defaultDesignFor, HULLS, type HullType, type ShipDesign } from '../world/ship-design';
 import type { Quat } from '../world/quat';
 import { createShipModel, type ShipModel } from './ship-models';
@@ -22,7 +20,9 @@ const LIGHT_SIZE_PX = 14;
 export interface ShipToDraw {
   id: string;
   hue: number;
-  state: ShipState;
+  /** 太陽中心の位置（km・EQJ） */
+  positionKm: Vec3;
+  orientation: Quat;
   /** 船の設計（無ければ id から決める） */
   design?: ShipDesign;
 }
@@ -96,7 +96,7 @@ export class ShipView {
   /** 1 ピクセルの大きさを決める値（画面の高さの半分 ÷ tan(視野の半分)） */
   pxPerRadian = 700;
 
-  update(ships: readonly ShipToDraw[], date: Date, observerKm: Vec3): void {
+  update(ships: readonly ShipToDraw[], observerKm: Vec3): void {
     const seen = new Set<string>();
     const n = Math.min(ships.length, MAX_SHIPS);
     for (let i = 0; i < n; i++) {
@@ -105,10 +105,10 @@ export class ShipView {
       const hull = (ship.design ?? defaultDesignFor(ship.id)).hull;
       const d = this.ensure(this.drawn.get(ship.id), hull, ship.hue);
       this.drawn.set(ship.id, d);
-      const rel = sub(shipPositionKm(ship.state, date), observerKm);
+      const rel = sub(ship.positionKm, observerKm);
       const g = d.model.group;
       g.position.set(rel.x, rel.y, rel.z);
-      const q = ship.state.orientation;
+      const q = ship.orientation;
       g.quaternion.copy(this.quat.set(q.x, q.y, q.z, q.w));
       this.color.setHSL(ship.hue / 360, 0.75, 0.6);
       // 船が画面で 3 ピクセルより大きく見えるなら、航行灯の点は消す（船の模型が見える。要件 F33）
