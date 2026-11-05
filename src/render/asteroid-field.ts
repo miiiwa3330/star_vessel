@@ -5,6 +5,9 @@
  * CPU で毎フレーム 90 万個を計算するのは重すぎるため。GPU の 32bit の計算なので位置の誤差は数千 km あるが、
  * 光の点としては見分けられない（近くで見る大きな天体は、球として src/world/small-bodies.ts で倍精度で計算する）。
  * データは public/data/asteroids-*.bin（tools/build-asteroids.mjs）。スマホは明るい約 7.6 万個だけ読む。
+ *
+ * J2000.0 からの日数（約 9,800）は 32bit では 84 秒ごとにしか変わらず、すべての点が 84 秒ごとに約 1,700 km 飛ぶ。
+ * そこで、読み込んだ時点の平均近点角を CPU（倍精度）で先に出し、シェーダーにはそこからの経過日数だけを渡す。
  */
 import * as THREE from 'three/webgpu';
 import {
@@ -12,7 +15,6 @@ import {
   cos,
   exp,
   float,
-  floor,
   instancedBufferAttribute,
   log,
   max,
@@ -23,6 +25,8 @@ import {
   uv,
   vec3,
 } from 'three/tsl';
+import { meanAnomalyAtDays } from '../world/asteroid-search';
+import { worldNow } from '../world/clock';
 import { OBLIQUITY_J2000 } from '../world/small-bodies';
 import { KM_PER_AU } from '../world/units';
 import type { Vec3 } from '../world/vec';
@@ -36,6 +40,8 @@ const HIDE_BEYOND_AU = 2_000;
 /** 見た目の決め方の数（見た目のための値） */
 const LOOK = { refMag: 9, minIntensity: 0.08, fadeStartMag: 22, fadeEndMag: 30, sizePx: 2.2 };
 
+const daysSinceJ2000 = (date: Date): number => (date.getTime() - Date.UTC(2000, 0, 1, 12)) / 86_400_000;
+
 export interface AsteroidFile {
   name: string;
   count: number;
@@ -45,14 +51,14 @@ export interface AsteroidFile {
 class AsteroidChunk {
   readonly sprite: THREE.Sprite;
 
-  constructor(data: Float32Array, days: UniformNode<'float', number>, observerAu: UniformNode<'vec3', THREE.Vector3>) {
+  constructor(data: Float32Array, baseDays: number, sinceBaseDays: UniformNode<'float', number>, observerAu: UniformNode<'vec3', THREE.Vector3>) {
     const n = data.length / STRIDE;
     const elA = new Float32Array(n * 4); // a, e, i, node
-    const elB = new Float32Array(n * 4); // periapsis, M0, epoch（J2000 からの日）, H
+    const elB = new Float32Array(n * 4); // periapsis, 基準の時刻の M, （空き）, H
     for (let k = 0; k < n; k++) {
       const o = k * STRIDE;
       elA.set([data[o + 2], data[o + 3], data[o + 4], data[o + 5]], k * 4);
-      elB.set([data[o + 6], data[o + 7], data[o + 8], data[o + 1]], k * 4);
+      elB.set([data[o + 6], meanAnomalyAtDays(data[o + 7], data[o + 2], data[o + 8], baseDays), 0, data[o + 1]], k * 4);
     }
     const A = instancedBufferAttribute<'vec4'>(new THREE.InstancedBufferAttribute(elA, 4), 'vec4');
     const B = instancedBufferAttribute<'vec4'>(new THREE.InstancedBufferAttribute(elB, 4), 'vec4');
@@ -63,9 +69,7 @@ class AsteroidChunk {
     const peri = B.x;
     const H = B.w;
     const meanMotion = float(GAUSS_K).div(a.mul(sqrt(a)));
-    const M0 = B.y.add(meanMotion.mul(days.sub(B.z)));
-    const twoPi = 2 * Math.PI;
-    const M = M0.sub(floor(M0.div(twoPi)).mul(twoPi));
+    const M = B.y.add(meanMotion.mul(sinceBaseDays));
     // ケプラーの方程式をニュートン法で解く（6 回。離心率 0.9 くらいまで十分に収束する）
     let E = M.add(e.mul(sin(M)));
     for (let k = 0; k < 6; k++) E = E.sub(E.sub(e.mul(sin(E))).sub(M).div(float(1).sub(e.mul(cos(E)))));
@@ -117,7 +121,9 @@ export class AsteroidField {
   readonly group = new THREE.Group();
   /** 読み込んだデータ（近くの小惑星を探すのに使う。src/world/asteroid-search.ts） */
   readonly chunks: Float32Array[] = [];
-  private readonly days = uniform(0) as UniformNode<'float', number>;
+  /** 平均近点角を先に出しておく時刻（J2000.0 からの日） */
+  private readonly baseDays = daysSinceJ2000(worldNow());
+  private readonly sinceBaseDays = uniform(0) as UniformNode<'float', number>;
   private readonly observerAu = uniform(new THREE.Vector3()) as UniformNode<'vec3', THREE.Vector3>;
 
   /** files を順に読み込んで足していく（読み込みは裏で行い、終わったものから描く） */
@@ -128,7 +134,7 @@ export class AsteroidField {
       if (!r.ok) throw new Error(`小惑星のデータが読めない: ${f.name}`);
       const data = new Float32Array(await r.arrayBuffer());
       this.chunks.push(data);
-      const chunk = new AsteroidChunk(data, this.days, this.observerAu);
+      const chunk = new AsteroidChunk(data, this.baseDays, this.sinceBaseDays, this.observerAu);
       this.group.add(chunk.sprite);
       loaded += f.count;
       onProgress?.(loaded);
@@ -136,7 +142,7 @@ export class AsteroidField {
   }
 
   update(date: Date, observerKm: Vec3): void {
-    this.days.value = (date.getTime() - Date.UTC(2000, 0, 1, 12)) / 86_400_000;
+    this.sinceBaseDays.value = daysSinceJ2000(date) - this.baseDays;
     const au = { x: observerKm.x / KM_PER_AU, y: observerKm.y / KM_PER_AU, z: observerKm.z / KM_PER_AU };
     this.observerAu.value.set(au.x, au.y, au.z);
     this.group.visible = Math.hypot(au.x, au.y, au.z) < HIDE_BEYOND_AU;

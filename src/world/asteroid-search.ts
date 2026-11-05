@@ -29,6 +29,16 @@ export interface NearbyAsteroid {
   distanceKm: number;
 }
 
+/**
+ * J2000.0 から days 日のときの平均近点角を −π〜π に丸めたもの。
+ * 光の点の計算（src/render/asteroid-field.ts）は GPU の 32 bit で行うので、0 に近い値にしておくと、細かく動ける
+ */
+export function meanAnomalyAtDays(meanAnomalyRad: number, aAu: number, epochDays: number, days: number): number {
+  const m = meanAnomalyRad + (GAUSS_K / (aAu * Math.sqrt(aAu))) * (days - epochDays);
+  const twoPi = 2 * Math.PI;
+  return m - twoPi * Math.round(m / twoPi);
+}
+
 /** 1 個の小惑星の位置（太陽中心・EQJ・km） */
 export function asteroidPositionKm(d: Float32Array, o: number, date: Date): Vec3 {
   const a = d[o + 2];
