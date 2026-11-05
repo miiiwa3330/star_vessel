@@ -16,6 +16,8 @@
   <body>
     <canvas id="view"></canvas>
     <div id="ui"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <!-- タイトル画面と準備画面（/ と /ready）。世界の画面（/play）では使わない。どちらを出すかは src/entry.ts -->
+    <div id="top"></div>
+    <script type="module" src="/src/entry.ts"></script>
   </body>
 </html>

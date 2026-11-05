@@ -8,6 +8,8 @@ import { warps } from './warps';
 import { ships } from './ships';
 import { satellites } from './satellites';
 import { visits } from './visits';
+import { presence } from './presence';
+import { recovery } from './recovery';
 import { isSystemCode } from '../src/world/address';
 
 export { SpaceRoom } from './space-room';
@@ -35,6 +37,8 @@ app.use('/api/ship', async (c, next) => {
 });
 app.route('/api/ship', ships);
 app.route('/api/satellites', satellites);
+app.route('/api/presence', presence);
+app.route('/api/recovery', recovery);
 
 app.use('/api/visits', async (c, next) => {
   const session = await createAuth(c.env).api.getSession({ headers: c.req.raw.headers });
@@ -55,6 +59,7 @@ app.get('/api/space/:system', async (c) => {
   if (!session) return c.json({ error: 'unauthorized' }, 401);
   const headers = new Headers(c.req.raw.headers);
   headers.set('x-user-id', session.user.id);
+  headers.set('x-room', system);
   const room = c.env.SPACE.get(c.env.SPACE.idFromName(system));
   return room.fetch(new Request(c.req.raw, { headers }));
 });

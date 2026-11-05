@@ -22,6 +22,7 @@ import { nearestIndices, shipPositionKm } from '../src/world/ships';
 import { designOrNone } from '../src/world/ship-schema';
 import type { ShipDesign } from '../src/world/ship-design';
 import { isStampId, STAMP_MIN_INTERVAL_MS } from '../src/world/stamps';
+import { PRESENCE_REFRESH_MS, presenceStatement } from '../src/world/presence';
 
 const BROADCAST_MS = 1000 / SHIP_SEND_HZ;
 const MAX_MESSAGE_BYTES = 2048;
@@ -29,6 +30,8 @@ const MAX_MESSAGE_BYTES = 2048;
 /** 接続ごとに覚えておくこと。休止しても消えないよう、WebSocket に付けて保存する */
 interface Attachment {
   sid: string;
+  /** 部屋の名前（恒星系の記号）。休止すると部屋の名前を忘れるので、接続ごとに覚えておく（人数を書くため。要件 F50） */
+  room: string;
   hue: number;
   state: ShipState | null;
   /** 船の設計（最後に受け取ったもの） */
@@ -53,6 +56,8 @@ function roughPositionKm(s: ShipState, date: Date) {
 
 export class SpaceRoom extends DurableObject<Env> {
   private lastBroadcast = 0;
+  /** 人数を最後に書いた時刻（ms）。休止すると 0 に戻るので、起きたあとに 1 回多く書くことがあるだけ */
+  private lastPresence = 0;
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('expected websocket', { status: 426 });
@@ -61,8 +66,15 @@ export class SpaceRoom extends DurableObject<Env> {
 
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
-    const attachment: Attachment = { sid: crypto.randomUUID().slice(0, 8), hue: hueFromId(userId), state: null, at: 0 };
+    const attachment: Attachment = {
+      sid: crypto.randomUUID().slice(0, 8),
+      room: request.headers.get('x-room') ?? '',
+      hue: hueFromId(userId),
+      state: null,
+      at: 0,
+    };
     server.serializeAttachment(attachment);
+    this.reportPresence(attachment.room, undefined, Date.now());
     const hello: ServerMessage = { t: 'hello', id: attachment.sid, hue: attachment.hue, now: Date.now() };
     server.send(JSON.stringify(hello));
     return new Response(null, { status: 101, webSocket: client });
@@ -78,6 +90,8 @@ export class SpaceRoom extends DurableObject<Env> {
     } catch {
       return;
     }
+    // 人数は、つながったとき・切れたときのほか、前に書いてから 1 分たったら書き直す（切れたと知らせずに消えた部屋の行を、数えなくするため）
+    if (now - this.lastPresence >= PRESENCE_REFRESH_MS) this.reportPresence(a.room, undefined, now);
     const m = parsed as { t?: unknown; s?: unknown; d?: unknown; k?: unknown };
     if (m.t === 'stamp') {
       this.stamp(ws, a, m.k, now);
@@ -97,11 +111,30 @@ export class SpaceRoom extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+    const a = ws.deserializeAttachment() as Attachment | null;
+    if (a) this.reportPresence(a.room, ws, Date.now());
     try {
       ws.close(code, reason);
     } catch {
       // すでに閉じている
     }
+  }
+
+  /**
+   * いまの接続の数を、D1 の presence 表に書く（要件 F50）。失敗しても、宇宙の部屋の動きには影響させない。
+   * exclude：閉じようとしている接続（閉じる処理の中では、まだ一覧に残っていることがあるので数えない）
+   */
+  private reportPresence(room: string, exclude: WebSocket | undefined, now: number): void {
+    if (!room) return;
+    this.lastPresence = now;
+    const count = this.ctx.getWebSockets().filter((s) => s !== exclude).length;
+    const st = presenceStatement(room, count, now);
+    this.ctx.waitUntil(
+      this.env.DB.prepare(st.sql)
+        .bind(...st.params)
+        .run()
+        .catch((e: unknown) => console.error('人数を書けない', e)),
+    );
   }
 
   /**

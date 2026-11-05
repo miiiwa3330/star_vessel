@@ -4,7 +4,7 @@
 
 **サービスの内容そのもの（コンセプト・体験の設計・機能仕様・世界観・技術選定の理由）は本ファイルに書かない。** それらの正本は `docs/` 配下に置く。本ファイルは「どう作業するか」だけを扱う。
 
-> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（187 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。さらに、船を UFO の形にし、スタンプ・人工衛星・星団・星の燃えかす（白色矮星・パルサー・ブラックホール）・小さな小惑星への接近を足した。さらに、もやを消し、遠くは点・近くは実際の大きさにし、星の見え方の切り替え・天体の情報（近くの一覧・照準の先・近づいたときのカード）・訪れた天体のコレクション・地球を原点にした座標を足した。さらに、画面を整理した（操作の説明とクレジットをボタンにしまう、照準の先は 1 行、レーダーの名前が重ならない、衛星の日本語の名前）。さらに、星座の線、実データの星雲・ほかの銀河・彗星・探査機・仮符号の衛星・いて座 A*・木星などの環・地球の夜景と雲・星団の本物のメンバーの星・恒星の動きと時刻合わせを足した。さらに、動くものが飛ばないようにした（時刻・他の船・彗星の点・小惑星の点・2 秒ごとの引っかかり）。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
+> **現在の状態（2026-11-06）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（187 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。さらに、船を UFO の形にし、スタンプ・人工衛星・星団・星の燃えかす（白色矮星・パルサー・ブラックホール）・小さな小惑星への接近を足した。さらに、もやを消し、遠くは点・近くは実際の大きさにし、星の見え方の切り替え・天体の情報（近くの一覧・照準の先・近づいたときのカード）・訪れた天体のコレクション・地球を原点にした座標を足した。さらに、画面を整理した（操作の説明とクレジットをボタンにしまう、照準の先は 1 行、レーダーの名前が重ならない、衛星の日本語の名前）。さらに、星座の線、実データの星雲・ほかの銀河・彗星・探査機・仮符号の衛星・いて座 A*・木星などの環・地球の夜景と雲・星団の本物のメンバーの星・恒星の動きと時刻合わせを足した。さらに、動くものが飛ばないようにした（時刻・他の船・彗星の点・小惑星の点・2 秒ごとの引っかかり）。さらに、サービスの画面づくりを始め、タイトル画面と準備画面（宇宙船を選ぶ・ユーザー名とパスワードで登録・回復コード・いま遊んでいる人数・出発）を足した（世界は `/play` に移した）。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
 
 ---
 
@@ -133,8 +133,8 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 
 | 用途 | コマンド |
 |------|----------|
-| 最初の準備 | `cp .dev.vars.example .dev.vars`（秘密の値を入れる）→ `npm run db:migrate`（手元の D1 にテーブルを作る） |
-| 開発サーバー | `npm run dev`（http://localhost:5173 。Worker の `/api/` も一緒に動く。AI が起動するときはバックグラウンドで `npx vite --port 5173 --strictPort` を実行し、終わったら止める。**人が動かしている開発サーバーは止めない**。ポートが使われていたら、それを使うか、別のポートで起動する） |
+| 最初の準備 | `cp .dev.vars.example .dev.vars`（秘密の値を入れる）→ `npm run db:migrate`（手元の D1 にテーブルを作る。マイグレーションを足したら、もう一度） |
+| 開発サーバー | `npm run dev`（http://localhost:5173 がタイトル画面で、**世界は http://localhost:5173/play**。Worker の `/api/` も一緒に動く。AI が起動するときはバックグラウンドで `npx vite --port 5173 --strictPort` を実行し、終わったら止める。**人が動かしている開発サーバーは止めない**。ポートが使われていたら、それを使うか、別のポートで起動する） |
 | アカウントのテーブルの SQL | `npm run auth:schema`（Better Auth の設定を変えたら作り直し、差分を新しいマイグレーションにする） |
 | テスト | `npm test`（Vitest。天体の位置・向き、星の見た目、自分の位置の計算） |
 | 型チェック | `npm run check`（Cloudflare の型を作り直してから、ブラウザ側と Worker 側の両方を確かめる） |
@@ -148,14 +148,15 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 
 - **「動いた」と書く前に、画面で確かめる。** テストが通っても、描画の向き・明るさ・重なりは画面でしか分からない。WebGPU と WebGL2（WebGPU を消した状態）の両方と、スマホの幅（390px 前後）で見る
 - 開発サーバーでは、ブラウザの開発者ツールから瞬間移動できる：`__sv.teleportGalacto({ x: 0, y: 0, z: 45 })`（銀河中心の座標・kpc。この例は銀河の真上）、`__sv.teleportPc({ x, y, z })`（太陽中心の EQJ・pc）、`__sv.teleportBody('Saturn', 400000, 'pole')`（天体の id、中心からの距離 km、どこから見るか：`'day'` 昼の側〈省略時〉・`'pole'` 北極の上・`'night'` 夜の側）、`__sv.teleportSystem('E1WHADEK', 0.1)`（恒星系の記号と恒星からの距離 AU。この例は TRAPPIST-1）。描いている物は `__sv.debug` から読める（動きの滑らかさを測るときなど）。本番のビルドには入らない
-- 小惑星（約 90 万個）はソフトウェアの描画（GPU の無い環境の自動の確かめ）では重すぎるので、URL に `?asteroids=bright` を付けて明るい約 7.6 万個だけにする。Gaia の星も重いので `?stars=hyg` で読まないようにできる
+- 小惑星（約 90 万個）はソフトウェアの描画（GPU の無い環境の自動の確かめ）では重すぎるので、世界の URL（`/play`）に `?asteroids=bright` を付けて明るい約 7.6 万個だけにする（例：`/play?asteroids=bright&stars=hyg`。2026-11-06 から、世界は `/` ではなく `/play`。`/` はタイトル画面）。Gaia の星も重いので `?stars=hyg` で読まないようにできる
 - 他のプレイヤーの機能を確かめるときは、別々のブラウザ（別のアカウントになる）を 2 つ開く
 
 ## ディレクトリ構成
 
 ```
 src/
-  main.ts                 起動と毎フレームのループ（世界の更新 → 描画 → 画面の表示）
+  entry.ts                ブラウザの入口。URL が /play なら世界（main.ts）、それ以外ならタイトル画面・準備画面（top/）を動的 import で読み込む
+  main.ts                 世界の起動と毎フレームのループ（世界の更新 → 描画 → 画面の表示）。/play で動く
   world/                  世界の計算。three.js も React も使わない純粋な関数（テストはここに集める）
     solar-system.ts       天体の一覧（registry）と、位置と向き。astronomy-engine はこのファイルの中だけで使う
     kepler.ts             ケプラーの軌道（系外惑星などの公転）
@@ -184,6 +185,8 @@ src/
     ship-schema.ts        宇宙船のやりとりの形と確かめ方（サーバーと共有）
     ships.ts              近い船を選ぶ・位置の予測
     address.ts            宇宙の住所（サーバーと共有）
+    account.ts            ユーザー名・パスワードの決まりとエラーの日本語（サーバーと共有）。account-link.ts は匿名の記録を登録したアカウントへ移す SQL（サーバーと共有）。recovery-code.ts は回復コードの形・ハッシュ・SQL（サーバーと共有）
+    presence.ts           いま遊んでいる人数の書き方・数え方（サーバーと共有）
     warp-schema.ts        ワープホールの形と確かめ方（サーバーと共有）
     stars.ts              星のデータの読み方と、見た目（大きさ・明るさ・色）
     clock.ts              世界の時刻（サーバーの時計に、飛ばさずに合わせる）
@@ -198,7 +201,9 @@ src/
   ui/                     画面の表示（React）。hud-store.ts を通して世界から値を受け取り、hudActions で世界へ操作を渡す。
                           stamp-bubbles.ts はスタンプの吹き出し（毎フレーム動かすので DOM を直接動かす）。
                           info-controller.ts は天体の情報とコレクションをつなぐところ、target-marker.ts は選んだ天体の印
-  net/                    サーバーとのやりとり（アカウント・ワープホールの API・宇宙の部屋の WebSocket）
+  top/                    タイトル画面（/）と準備画面（/ready）。世界は読み込まない。routes.ts は URL の決まり、Backdrop.tsx は星空と地球の縁、
+                          ReadyScreen.tsx は宇宙船とアカウントと出発、ShipPreview.tsx は船のプレビュー（three.js なので遅れて読む）、AccountPanel.tsx は登録・ログイン・回復、RecoveryCodeDialog.tsx は回復コードを見せる画面、last-username.ts はこの端末で最後に使ったユーザー名
+  net/                    サーバーとのやりとり（アカウント・回復コード・ワープホールの API・宇宙の部屋の WebSocket・いま遊んでいる人数）
 public/
   data/stars.bin          星のデータ（npm run stars で作る。stars.LICENSE.txt と必ず一緒に置く）
   data/exoplanets.json    系外惑星のデータ（npm run exoplanets で作る。exoplanets.LICENSE.txt と必ず一緒に置く）
@@ -213,8 +218,8 @@ public/
   data/stars-gaia-*.bin   Gaia DR3 の近くの星（npm run gaia。stars-gaia.LICENSE.txt と必ず一緒に置く）
   data/cluster-members/   星団の本物のメンバーの星（npm run cluster-members。目次は cluster-members.json）
   textures/               天体の画像（出どころは docs/tech/credits.md）
-worker/                   サーバー（Cloudflare Workers）。index.ts が入口、warps.ts がワープホールの API、ships.ts が宇宙船の設計の API、visits.ts が訪れた天体の API、satellites.ts が人工衛星の軌道要素の API、space-room.ts が宇宙の部屋（Durable Object）、auth*.ts がアカウント
-migrations/               D1 のテーブル（0001 は npm run auth:schema で作ったもの）
+worker/                   サーバー（Cloudflare Workers）。index.ts が入口、warps.ts がワープホールの API、ships.ts が宇宙船の設計の API、visits.ts が訪れた天体の API、presence.ts がいま遊んでいる人数の API、recovery.ts が回復コードの API、satellites.ts が人工衛星の軌道要素の API、space-room.ts が宇宙の部屋（Durable Object。人数も書く）、auth*.ts がアカウント（ユーザー名の登録・匿名の記録の引き継ぎ）
+migrations/               D1 のテーブル（0001 は npm run auth:schema で作ったもの。0005 はその差分、0006 はいま遊んでいる人数、0007 は回復コード）
 tools/build-stars.mjs     HYG → stars.bin の変換
 tools/build-exoplanets.mjs Open Exoplanet Catalogue → exoplanets.json の変換（stars.bin が先に要る）
 tools/build-moons.mjs     JPL（衛星の表・Horizons）→ moons.json。build-moon-names.mjs が Wikidata から日本語の名前を足す
@@ -232,7 +237,7 @@ docs/                     仕様・判断・経緯の正本（地図は docs/REA
 ```
 
 - 世界の計算は `src/world/` に置き、three.js・React を読み込まない。描画や画面から切り離してテストするため
-- サーバーと共有する `src/world/address.ts`・`warp-schema.ts`・`ship-schema.ts`・`visits.ts`・`galaxy.ts`・`random.ts` は、astronomy-engine・DOM も読み込まない（Worker に余計なものを入れないため）
+- サーバーと共有する `src/world/address.ts`・`warp-schema.ts`・`ship-schema.ts`・`visits.ts`・`account.ts`・`account-link.ts`・`recovery-code.ts`・`presence.ts`・`galaxy.ts`・`random.ts` は、astronomy-engine・DOM も読み込まない（Worker に余計なものを入れないため）
 - **自動で生成するもの（銀河・星）は、誰の端末でも同じ結果にする。** 乱数は `src/world/random.ts` を使い、`Math.random` を使わない。数（星の数など）を決める計算に対数・指数を使わない（ブラウザによって最後の桁が違うことがある）
 - **サーバーは、ブラウザから受け取ったものを必ず確かめてから使う**（`isWarpPlacement` など）。秘密の値（`.dev.vars`）はコミットしない
 - 外部の素材（データ・画像）を足したら、[`docs/tech/credits.md`](docs/tech/credits.md) に書き、表記が要るものは画面のクレジットにも出す
