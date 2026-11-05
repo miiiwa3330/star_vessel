@@ -61,7 +61,19 @@ export function accountErrorMessage(code: string | undefined, status?: number): 
     case 'PASSWORD_TOO_SHORT':
     case 'PASSWORD_TOO_LONG':
       return `パスワードは ${PASSWORD_MIN}〜${PASSWORD_MAX} 文字にしてください`;
+    case 'PREVIOUSLY_REGISTERED':
+    case 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED':
+      return 'この端末のパスキーは、すでに追加してあります';
+    case 'SESSION_NOT_FRESH':
+      return '安全のため、一度ログアウトして、もう一度ログインしてから追加してください';
+    case 'PASSKEY_NOT_FOUND':
+    case 'AUTHENTICATION_FAILED':
+      return 'このパスキーではログインできません。消されたパスキーかもしれません';
     default:
       return status === 429 ? '短い間に何度も試されました。しばらくしてからもう一度お試しください' : 'うまくいきませんでした。しばらくしてからもう一度お試しください';
   }
 }
+
+/** パスキーの操作を、自分でやめたときの記号。エラーとして出さない */
+const PASSKEY_CANCEL_CODES = new Set(['AUTH_CANCELLED', 'REGISTRATION_CANCELLED', 'ERROR_CEREMONY_ABORTED', 'ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY']);
+export const isPasskeyCancel = (code: string | undefined): boolean => code !== undefined && PASSKEY_CANCEL_CODES.has(code);

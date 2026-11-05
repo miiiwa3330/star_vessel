@@ -7,15 +7,24 @@
  */
 import type { BetterAuthOptions } from 'better-auth';
 import { anonymous, username } from 'better-auth/plugins';
+import { passkey } from '@better-auth/passkey';
 import { isUsername, PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, USERNAME_MIN } from '../src/world/account.ts';
 
 type OnLinkAccount = NonNullable<Parameters<typeof anonymous>[0]>['onLinkAccount'];
+type PasskeySite = { rpID: string; origin: string[] };
 
 /** 匿名のアカウントから登録（または既存のアカウントへのログイン）をしたときの引き継ぎは onLinkAccount に渡す（DB が要るので worker/auth.ts が作る） */
-export const authPlugins = (onLinkAccount?: OnLinkAccount) => [
+export const authPlugins = (onLinkAccount?: OnLinkAccount, site?: PasskeySite) => [
   anonymous({ onLinkAccount }),
   // ユーザー名は小文字にそろえて保存する（Better Auth の既定）。表示用に入力のままの名前も残す（displayUsername）
   username({ minUsernameLength: USERNAME_MIN, maxUsernameLength: USERNAME_MAX, usernameValidator: isUsername }),
+  // パスキー（要件 F52）。residentKey を必須にして、ユーザー名を入れなくても端末がアカウントを出せるようにする
+  passkey({
+    rpName: 'STAR VESSEL',
+    rpID: site?.rpID,
+    origin: site?.origin,
+    authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+  }),
 ];
 
 export const authOptions = {

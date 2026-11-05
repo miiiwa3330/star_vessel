@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { AccountError, loginAccount, logoutAccount, registerAccount, type Account } from '../net/auth';
+import { AccountError, loginAccount, loginWithPasskey, logoutAccount, passkeySupported, registerAccount, type Account } from '../net/auth';
 import { recoveryApi, type RecoveryStatus } from '../net/recovery';
 import { credentialProblem, passwordProblem, PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, USERNAME_MIN } from '../world/account';
 import { normalizeRecoveryCode } from '../world/recovery-code';
+import { formatDateJa } from './format-date';
 import { lastUsername, rememberUsername } from './last-username';
+import { PasskeySection } from './PasskeySection';
 import { RecoveryCodeDialog } from './RecoveryCodeDialog';
 
 /** closed：閉じている、register・login：入力、recover：回復コードで戻す、code：登録したあとに回復コードを作る・作り直す */
@@ -11,12 +13,6 @@ type Mode = 'closed' | 'register' | 'login' | 'recover' | 'code';
 
 const GENERIC = 'うまくいきませんでした。しばらくしてからもう一度お試しください';
 const messageOf = (e: unknown): string => (e instanceof AccountError ? e.message : GENERIC);
-
-/** 作った日（画面に出す形） */
-export const formatCodeDate = (iso: string): string => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-};
 
 /**
  * アカウント（要件 F14・F49・F51）。登録しなくても遊べる。登録（ユーザー名とパスワード）すると、
@@ -38,6 +34,11 @@ export function AccountPanel({ account, onChanged }: { account: Account; onChang
   const [status, setStatus] = useState<RecoveryStatus | null>(null);
 
   const userId = account.kind === 'registered' ? account.userId : null;
+  const registeredName = account.kind === 'registered' ? account.name : null;
+  // パスキーでログインしたときも含めて、この端末で最後に使った名前を覚える
+  useEffect(() => {
+    if (registeredName) rememberUsername(registeredName);
+  }, [registeredName]);
   useEffect(() => {
     let alive = true;
     setStatus(null);
@@ -82,12 +83,10 @@ export function AccountPanel({ account, onChanged }: { account: Account; onChang
     void run(async () => {
       if (mode === 'register') {
         await registerAccount(username, password);
-        rememberUsername(username);
         // 登録はできたので、コードが作れなくても続ける（登録したあとの画面から作り直せる）
         await recoveryApi.create(password).then(setShownCode, (err: unknown) => console.error(err));
       } else {
         await loginAccount(username, password);
-        rememberUsername(username);
       }
       switchMode('closed');
       setUsername('');
@@ -132,6 +131,14 @@ export function AccountPanel({ account, onChanged }: { account: Account; onChang
     });
   };
 
+  const passkeyLogin = () =>
+    void run(async () => {
+      if (!(await loginWithPasskey())) return;
+      switchMode('closed');
+      setUsername('');
+      onChanged();
+    });
+
   const logout = () =>
     void run(async () => {
       await logoutAccount();
@@ -154,7 +161,7 @@ export function AccountPanel({ account, onChanged }: { account: Account; onChang
         {status && (
           <p className={status.hasCode ? 'top-hint' : 'top-warn'}>
             {status.hasCode
-              ? `回復コード：作成済み${status.createdAt ? `（${formatCodeDate(status.createdAt)}）` : ''}`
+              ? `回復コード：作成済み${status.createdAt ? `（${formatDateJa(status.createdAt)}）` : ''}`
               : '回復コードがありません。作っておくと、ユーザー名やパスワードを忘れても戻せます'}
           </p>
         )}
@@ -191,6 +198,7 @@ export function AccountPanel({ account, onChanged }: { account: Account; onChang
             {errorLine}
           </>
         )}
+        <PasskeySection username={account.name} />
       </section>
       {dialog}
       </>
@@ -223,6 +231,14 @@ export function AccountPanel({ account, onChanged }: { account: Account; onChang
               ログイン
             </button>
           </div>
+          {mode === 'login' && passkeySupported() && (
+            <div className="top-row">
+              <button type="button" className="top-button top-button-small" onClick={passkeyLogin} disabled={busy}>
+                パスキーでログイン
+              </button>
+              <span className="top-hint top-row-note">ユーザー名もパスワードも要りません</span>
+            </div>
+          )}
           <label className="top-field">
             <span>ユーザー名</span>
             <input

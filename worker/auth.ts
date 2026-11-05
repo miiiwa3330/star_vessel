@@ -8,11 +8,18 @@ async function linkAnonymousData(db: D1Database, anonymousId: string, userId: st
   await db.batch(linkStatements(anonymousId, userId).map((s) => db.prepare(s.sql).bind(...s.params)));
 }
 
+/** パスキーを使えるサイト（ドメイン）とページの場所。手元の開発では、別のポートで確かめるときのページも許す。本番には効かない */
+function passkeySite(baseUrl: string) {
+  const url = new URL(baseUrl);
+  const dev = url.hostname === 'localhost' ? [5173, 5174, 5175, 5176].map((p) => `http://localhost:${p}`) : [];
+  return { rpID: url.hostname, origin: [...new Set([url.origin, ...dev])] };
+}
+
 /** リクエストごとに作る（Workers では環境変数・D1 がリクエストの中でしか手に入らないため） */
 export const createAuth = (env: Env) =>
   betterAuth({
     ...authOptions,
-    plugins: authPlugins(({ anonymousUser, newUser }) => linkAnonymousData(env.DB, anonymousUser.user.id, newUser.user.id)),
+    plugins: authPlugins(({ anonymousUser, newUser }) => linkAnonymousData(env.DB, anonymousUser.user.id, newUser.user.id), passkeySite(env.BETTER_AUTH_URL)),
     database: env.DB,
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,

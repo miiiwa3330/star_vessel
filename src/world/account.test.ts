@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { accountErrorMessage, credentialProblem, internalEmailFor, isInternalEmail, isPassword, isUsername, PASSWORD_MAX, USERNAME_MAX } from './account';
+import { accountErrorMessage, credentialProblem, isPasskeyCancel, internalEmailFor, isInternalEmail, isPassword, isUsername, PASSWORD_MAX, USERNAME_MAX } from './account';
 
 describe('ユーザー名とパスワードの決まり', () => {
   it('ユーザー名は英数字とアンダースコアの 3〜20 文字', () => {
@@ -45,5 +45,14 @@ describe('ユーザー名とパスワードの決まり', () => {
     expect(accountErrorMessage('SOMETHING_ELSE', 500)).toBe(accountErrorMessage(undefined));
     // ユーザー名が存在しないことと、パスワードが違うことを、見分けられるように出さない
     expect(accountErrorMessage('INVALID_USERNAME')).toBe(accountErrorMessage('INVALID_USERNAME_OR_PASSWORD'));
+  });
+
+  it('パスキーのエラーを日本語にする。自分でやめたときはエラーにしない', () => {
+    expect(accountErrorMessage('ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED')).toContain('すでに追加');
+    expect(accountErrorMessage('SESSION_NOT_FRESH')).toContain('もう一度ログイン');
+    expect(accountErrorMessage('PASSKEY_NOT_FOUND')).toContain('ログインできません');
+    expect(isPasskeyCancel('AUTH_CANCELLED')).toBe(true);
+    expect(isPasskeyCancel('PASSKEY_NOT_FOUND')).toBe(false);
+    expect(isPasskeyCancel(undefined)).toBe(false);
   });
 });

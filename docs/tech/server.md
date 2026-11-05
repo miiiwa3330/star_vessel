@@ -12,7 +12,7 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 | Cloudflare Workers | `/api/` を受ける入口。それ以外は Vite が書き出した静的なファイルを配る（Worker を通らないので料金がかからない） | `worker/index.ts`、`wrangler.jsonc` |
 | Hono | `/api/` の中の振り分け | `worker/index.ts` |
 | D1（SQLite） | ワープホール・宇宙船の設計・訪れた天体・アカウント・いま遊んでいる人数の保存 | `migrations/` |
-| Better Auth | アカウント。匿名と、ユーザー名＋パスワード | `worker/auth.ts`、`worker/auth-options.ts` |
+| Better Auth | アカウント。匿名と、ユーザー名＋パスワードと、パスキー | `worker/auth.ts`、`worker/auth-options.ts` |
 | Durable Objects | 他のプレイヤーの宇宙船の位置のやりとり。恒星系ごとに 1 つの部屋 | `worker/space-room.ts` |
 
 - サーバーとブラウザで同じ決まりを使うコード（宇宙の住所・ワープホールの形の確かめ）は `src/world/address.ts` と `src/world/warp-schema.ts` に置き、両方から読み込む。この 2 つは three.js・DOM・astronomy-engine を読み込まない
@@ -25,7 +25,7 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 | `GET /api/warps` | 全員のワープホール（最大 1,000 個）。自分のものには `mine: true` | 不要 |
 | `POST /api/warps` | ワープホールを置く。送るのは置く場所（`WarpPlacement`）。住所の番号はサーバーが振って返す | 必要（匿名でよい） |
 | `DELETE /api/warps/:id` | 消す。置いた本人だけ | 必要 |
-| `/api/auth/*` | Better Auth（匿名のログイン・ユーザー名での登録とログイン・ログアウト・セッション。下の「アカウント」） | — |
+| `/api/auth/*` | Better Auth（匿名のログイン・ユーザー名での登録とログイン・パスキー・ログアウト・セッション。下の「アカウント」「パスキー」） | — |
 | `GET /api/satellites` | 人工衛星の軌道要素（SatNOGS DB から取り、6 時間キャッシュ。取れなければ 503。[`satellites.md`](satellites.md)） | 不要 |
 | `GET /api/ship` ・ `PUT /api/ship` | 自分の宇宙船の設計を読む・保存する（[`ships.md`](ships.md)） | 必要（匿名でよい） |
 | `GET /api/visits` ・ `POST /api/visits` | 訪れた天体のコレクションを読む・記録する（[`../product/info-and-collection.md`](../product/info-and-collection.md)） | 必要（匿名でよい） |
@@ -102,6 +102,20 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 - `/lookup` はコードを使い切らない（ユーザー名を思い出したいだけのときのため）
 - 確かめたこと（2026-11-06）：`src/world/recovery-code.test.ts`（本物のテーブルで、置き換え・その人のログインだけが切れる・同じコードは 2 回効かない）。実際のサーバーで、同時に 2 回送ると片方だけ 200、もう片方は 400。流れの全体は [`../product/top-screen.md`](../product/top-screen.md) の「確かめたこと」
 
+## パスキー
+
+要件 F52。Better Auth の passkey プラグイン（`@better-auth/passkey`）。設定は `worker/auth-options.ts`・`worker/auth.ts`、呼び出しは `src/net/auth.ts`、画面は `src/top/PasskeySection.tsx`、テーブルは `migrations/0008_passkey.sql`。
+
+- **サーバーが持つもの**：公開鍵・鍵の ID・使用回数・種類の印・認証器の機種の記号（AAGUID）・作った日時。秘密鍵と、指紋・顔の情報は端末から出ない
+- **`rpID` は `BETTER_AUTH_URL` のドメイン**。パスキーはドメインに結びつくので、**本番のドメインを変えると、それまでのパスキーは使えなくなる**。公開の前にドメインを決める
+- **手元の開発**：`origin` に `http://localhost:5173`〜`5176` を入れている（別のポートで確かめるため。本番には効かない）
+- `residentKey: 'required'`：端末にアカウントの情報を持たせて、ユーザー名を入れなくても入れるようにする。古いセキュリティキーの一部では足せない
+- 端末に出る名前は、Better Auth の `name`（ユーザー名）。仮のメールアドレスは使われないことを、仮想の認証器の鍵の中身で確かめた
+- **足すときの本人確認**：Better Auth の既定で、ログインから 1 日以内のセッションだけ。回復コードの作り直しと違い、パスワードは求めない（プラグインの作りのまま）
+- **匿名のアカウント**：画面には出さないが、API を直接呼べば足せる（止めていない）。そのパスキーで入っても匿名のアカウントに入るだけなので、ほかの人の記録には触れない
+- パスキーでのログインでも、匿名のときの記録は `onLinkAccount` で移る（Better Auth の anonymous プラグインが `/passkey/verify-authentication` も見ている。確かめた）
+- 回復コードでパスワードを決め直しても、パスキーは消さない
+
 ## いま遊んでいる人数
 
 要件 F50。`GET /api/presence`（`worker/presence.ts`）。数え方は `src/world/presence.ts`、テーブルは `migrations/0006_presence.sql`。
@@ -132,6 +146,7 @@ npm run dev                      # http://localhost:5173 がタイトル画面�
 - `BETTER_AUTH_SECRET` を本番の秘密の値として入れる（`npx wrangler secret put BETTER_AUTH_SECRET`）。`BETTER_AUTH_URL` を本番の URL にする
 - **匿名のアカウントを大量に作られないようにする**：いまは誰でも何度でも匿名のアカウントを作れる。Cloudflare の Rate Limiting か Turnstile を足す
 - **登録・ログインの試行を制限する（パスワードの総当たり対策）**：Better Auth に標準の制限があるが、Workers でどう効くか（接続ごとに別のメモリで動くので、共有されないかもしれない）は確かめていない。本番の前に、Cloudflare の Rate Limiting などで、`/api/auth/sign-in/*` と `/api/auth/sign-up/*` を制限する。回復コードの `/api/recovery/lookup`・`/reset`・`/code` も同じ（コードは推測できない長さだが、D1 の読み込みとパスワードの確認を無駄に使わせないため）
+- **パスキーを本物の端末で確かめる**（iPhone・Android・Mac。端末をまたぐ同期も）。手元では Chrome の仮想の認証器でしか確かめていない。HTTPS とドメインが要るので、本番か、それに近い環境で
 - **パスワードのハッシュの計算時間**：Workers の無料プランは、1 回の CPU 時間の上限が短い。登録・ログイン・決め直しのハッシュ（Better Auth の既定は scrypt）が上限に収まるかは、本番で確かめていない
 - **`/api/presence` の悪用**：認証なしで誰でも読める。D1 の読み込みを避けるため 15 秒だけ Cache-Control で覚えさせているが、Cloudflare 側の制限（Rate Limiting）も足す
 - 公開の方法（Workers Builds で GitHub から出すか、手元から出すか）を決める

@@ -207,3 +207,8 @@
 }
 .top-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
 .top-check input { width: 18px; height: 18px; accent-color: var(--top-accent); }
+
+/* ---- パスキー（要件 F52） ---- */
+.top-passkey { align-items: center; }
+.top-passkey > span { flex: 1 1 auto; }
+.top-row-note { align-self: center; }
