@@ -45,5 +45,9 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | react・react-dom | MIT |
 | vite・vitest・@vitejs/plugin-react | MIT |
 | better-auth・hono・@cloudflare/vite-plugin | MIT |
+| @better-auth/passkey と、それが使う @simplewebauthn/browser・server、@peculiar/*、@hexagon/base64、@levischuck/tiny-cbor、tsyringe、pvtsutils、pvutils | MIT |
+| asn1js（パスキーが使う） | BSD-3-Clause |
+| reflect-metadata（パスキーが使う） | Apache-2.0 |
+| tslib（パスキーが使う） | 0BSD |
 | wrangler | MIT または Apache-2.0 |
 | typescript | Apache-2.0 |
