@@ -90,7 +90,10 @@ class AsteroidChunk {
     const r = max(helio.length(), float(1e-6));
     const delta = max(rel.length(), float(1e-9));
     const mag = H.add(log(r.mul(delta)).mul(5 / Math.LN10));
-    const fade = float(1).sub(smoothstep(LOOK.fadeStartMag, LOOK.fadeEndMag, mag));
+    // 自分のすぐ近く（20 万 km 以内）の点は消す。近くの小惑星は球として倍精度で描くので、
+    // 32bit の計算でずれた点が球の横に見えないように
+    const nearFade = smoothstep(5e4 / KM_PER_AU, 2e5 / KM_PER_AU, delta);
+    const fade = float(1).sub(smoothstep(LOOK.fadeStartMag, LOOK.fadeEndMag, mag)).mul(nearFade);
     const intensity = clamp(exp(mag.sub(LOOK.refMag).mul(-0.4 * Math.LN10)), LOOK.minIntensity, 1).mul(fade);
 
     const material = new THREE.PointsNodeMaterial({
@@ -112,6 +115,8 @@ class AsteroidChunk {
 
 export class AsteroidField {
   readonly group = new THREE.Group();
+  /** 読み込んだデータ（近くの小惑星を探すのに使う。src/world/asteroid-search.ts） */
+  readonly chunks: Float32Array[] = [];
   private readonly days = uniform(0) as UniformNode<'float', number>;
   private readonly observerAu = uniform(new THREE.Vector3()) as UniformNode<'vec3', THREE.Vector3>;
 
@@ -121,7 +126,9 @@ export class AsteroidField {
     for (const f of files) {
       const r = await fetch(`/data/${f.name}`);
       if (!r.ok) throw new Error(`小惑星のデータが読めない: ${f.name}`);
-      const chunk = new AsteroidChunk(new Float32Array(await r.arrayBuffer()), this.days, this.observerAu);
+      const data = new Float32Array(await r.arrayBuffer());
+      this.chunks.push(data);
+      const chunk = new AsteroidChunk(data, this.days, this.observerAu);
       this.group.add(chunk.sprite);
       loaded += f.count;
       onProgress?.(loaded);

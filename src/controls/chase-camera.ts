@@ -24,9 +24,11 @@ export class ChaseCamera {
   /** 上下の角度（ラジアン。正で上から） */
   pitch = 0;
   distanceFactor = DISTANCE.initial;
+  /** 船より下（船の上下の向きで、距離に対する割合）を見る。船を画面の上の方に映したいとき（宇宙船を選ぶ画面）に使う */
+  aimBelow = 0;
   private readonly m = new Matrix4();
   private readonly local = new Vector3();
-  private readonly zero = new Vector3();
+  private readonly target = new Vector3();
   private readonly up = new Vector3();
 
   toggle(): ViewMode {
@@ -67,7 +69,8 @@ export class ChaseCamera {
     this.local.set(Math.sin(this.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(this.yaw) * Math.cos(pitch)).multiplyScalar(d);
     outPosition.copy(this.local).applyQuaternion(ship);
     this.up.set(0, 1, 0).applyQuaternion(ship);
-    this.m.lookAt(outPosition, this.zero, this.up);
+    this.target.copy(this.up).multiplyScalar(-this.aimBelow * d);
+    this.m.lookAt(outPosition, this.target, this.up);
     outQuaternion.setFromRotationMatrix(this.m);
   }
 }

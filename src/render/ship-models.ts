@@ -1,5 +1,5 @@
 /**
- * 宇宙船の形（要件 F27）。3 種類の船体を、three.js の基本の形を組み合わせて作る（外部の 3D モデルは使わない）。
+ * 宇宙船の形（要件 F27）。3 種類の UFO の船体を、three.js の基本の形を組み合わせて作る（外部の 3D モデルは使わない）。
  * 前が −Z（カメラと同じ）、上が +Y、原点が船の中心。単位は km（作るときは m で書いて 1/1000 にする）。
  * 船体の色はプレイヤーの色（色相）、ほかは決まった色。形と色は見た目のための仮のもの（docs/tech/ships.md）。
  */
@@ -33,87 +33,106 @@ function add(group: THREE.Group, geometry: THREE.BufferGeometry, material: THREE
   return mesh;
 }
 
-/** 細長い矢の形（全長 40 m） */
-function arrow(g: THREE.Group, m: Mats) {
-  const body = new THREE.CylinderGeometry(1.2 * M, 2.6 * M, 28 * M, 12);
-  body.rotateX(Math.PI / 2); // 細い方が −Z（前）
-  add(g, body, m.hull, 0, 0, -2);
-  const nose = new THREE.ConeGeometry(1.2 * M, 10 * M, 12);
-  nose.rotateX(-Math.PI / 2);
-  add(g, nose, m.hull, 0, 0, -21);
-  const canopy = new THREE.SphereGeometry(1.4 * M, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  canopy.scale(1, 0.7, 2.2);
-  add(g, canopy, m.glass, 0, 1.6, -10);
-  // 後ろへ反った翼（平たい三角形）
-  const wingShape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(13, 9), new THREE.Vector2(13, 13), new THREE.Vector2(0, 12)]);
-  for (const side of [1, -1]) {
-    const wing = new THREE.ExtrudeGeometry(wingShape, { depth: 0.6, bevelEnabled: false });
-    wing.scale(side * M, M, M);
-    wing.rotateX(Math.PI / 2);
-    wing.translate(side * 1.5 * M, 0.3 * M, -2 * M);
-    add(g, wing, m.trim);
-  }
-  const fin = new THREE.BoxGeometry(0.5 * M, 6 * M, 7 * M);
-  add(g, fin, m.trim, 0, 4, 9);
-  for (const x of [-1.4, 1.4]) {
-    const nozzle = new THREE.CylinderGeometry(1.1 * M, 1.3 * M, 2 * M, 12);
-    nozzle.rotateX(Math.PI / 2);
-    add(g, nozzle, m.trim, x, 0, 12.5);
-    const glow = new THREE.CircleGeometry(0.9 * M, 12);
-    add(g, glow, m.engine, x, 0, 13.6);
+/** まわりに並べる光（緑・黄・赤…と順に。見た目のための色） */
+const RIM_COLORS = [0x7dffb0, 0xffe07a, 0xff7a8a, 0x7ad8ff];
+function rimLights(g: THREE.Group, radiusM: number, count: number, y: number, sizeM: number, owned: THREE.Material[]) {
+  const geo = new THREE.SphereGeometry(sizeM * M, 8, 6);
+  for (let k = 0; k < count; k++) {
+    const a = (k / count) * Math.PI * 2;
+    const mat = new THREE.MeshBasicNodeMaterial({ color: new THREE.Color(RIM_COLORS[k % RIM_COLORS.length]).multiplyScalar(1.4) });
+    owned.push(mat);
+    add(g, geo, mat, Math.cos(a) * radiusM, y, Math.sin(a) * radiusM);
   }
 }
 
-/** 円盤の形（直径 30 m） */
-function disk(g: THREE.Group, m: Mats) {
-  const saucer = new THREE.CylinderGeometry(15 * M, 13 * M, 3 * M, 48);
-  add(g, saucer, m.hull);
-  const rim = new THREE.TorusGeometry(14.5 * M, 0.8 * M, 8, 48);
+/** 前の目印（前が分かるように、前のふちに白い灯り） */
+function frontLight(g: THREE.Group, zM: number, y: number, owned: THREE.Material[]) {
+  const mat = new THREE.MeshBasicNodeMaterial({ color: new THREE.Color(2, 2, 2) });
+  owned.push(mat);
+  add(g, new THREE.SphereGeometry(0.6 * M, 8, 6), mat, 0, y, zM);
+}
+
+/** 平たい円盤に小さなドーム（直径 30 m） */
+function saucer(g: THREE.Group, m: Mats, owned: THREE.Material[]) {
+  // 上下の皿（レンズの形）
+  const top = new THREE.SphereGeometry(15 * M, 48, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+  top.scale(1, 0.16, 1);
+  add(g, top, m.hull);
+  const bottom = new THREE.SphereGeometry(15 * M, 48, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+  bottom.scale(1, 0.12, 1);
+  add(g, bottom, m.trim);
+  const rim = new THREE.TorusGeometry(14.6 * M, 0.5 * M, 8, 64);
   rim.rotateX(Math.PI / 2);
   add(g, rim, m.trim);
-  const dome = new THREE.SphereGeometry(5 * M, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-  dome.scale(1, 0.6, 1);
-  add(g, dome, m.glass, 0, 1.5, -2);
-  const belly = new THREE.SphereGeometry(7 * M, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
-  belly.scale(1, 0.35, 1);
-  add(g, belly, m.trim, 0, -1.5, 0);
-  for (const x of [-6, 0, 6]) {
-    const nozzle = new THREE.BoxGeometry(3 * M, 1.6 * M, 2 * M);
-    add(g, nozzle, m.trim, x, 0, 13.5);
-    const glow = new THREE.PlaneGeometry(2.4 * M, 1 * M);
-    add(g, glow, m.engine, x, 0, 14.6);
-  }
+  const dome = new THREE.SphereGeometry(5 * M, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+  dome.scale(1, 0.8, 1);
+  add(g, dome, m.glass, 0, 2.2, 0);
+  // 下の光る輪（推進の光）
+  const glow = new THREE.RingGeometry(3 * M, 5 * M, 32);
+  glow.rotateX(Math.PI / 2);
+  add(g, glow, m.engine, 0, -1.85, 0);
+  rimLights(g, 15.3, 12, 0, 0.55, owned);
+  frontLight(g, -14.8, 0.2, owned);
 }
 
-/** 箱を連ねた運搬船（全長 80 m） */
-function hauler(g: THREE.Group, m: Mats) {
-  const cockpit = new THREE.BoxGeometry(8 * M, 6 * M, 10 * M);
-  add(g, cockpit, m.hull, 0, 1, -34);
-  const window = new THREE.BoxGeometry(6 * M, 1.6 * M, 0.4 * M);
-  add(g, window, m.glass, 0, 2.5, -39.1);
-  const spine = new THREE.BoxGeometry(2.5 * M, 2.5 * M, 60 * M);
-  add(g, spine, m.trim, 0, 0, 0);
-  for (const z of [-18, -4, 10]) {
-    const cargo = new THREE.BoxGeometry(10 * M, 8 * M, 12 * M);
-    add(g, cargo, m.hull, 0, 0, z);
+/** 背の高いドームに丸窓、下に 3 つの球（直径 24 m） */
+function bell(g: THREE.Group, m: Mats, owned: THREE.Material[]) {
+  const base = new THREE.CylinderGeometry(9 * M, 12 * M, 3 * M, 48);
+  add(g, base, m.hull, 0, -1, 0);
+  const rim = new THREE.TorusGeometry(12 * M, 0.6 * M, 8, 64);
+  rim.rotateX(Math.PI / 2);
+  add(g, rim, m.trim, 0, -2.4, 0);
+  const body = new THREE.CylinderGeometry(6 * M, 8.5 * M, 6 * M, 48);
+  add(g, body, m.hull, 0, 3.5, 0);
+  const dome = new THREE.SphereGeometry(6 * M, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+  add(g, dome, m.glass, 0, 6.5, 0);
+  // 丸窓
+  const port = new THREE.CircleGeometry(1.1 * M, 16);
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    const w = add(g, port, m.engine, Math.sin(a) * 7.35, 3.5, Math.cos(a) * 7.35);
+    w.rotation.y = a;
   }
-  const engineBlock = new THREE.BoxGeometry(12 * M, 9 * M, 8 * M);
-  add(g, engineBlock, m.trim, 0, 0, 26);
-  for (const [x, y] of [[-3.5, -2.5], [3.5, -2.5], [-3.5, 2.5], [3.5, 2.5]]) {
-    const nozzle = new THREE.CylinderGeometry(1.6 * M, 2.2 * M, 4 * M, 12);
-    nozzle.rotateX(Math.PI / 2);
-    add(g, nozzle, m.trim, x, y, 32);
-    const glow = new THREE.CircleGeometry(1.4 * M, 12);
-    add(g, glow, m.engine, x, y, 34.1);
+  // 下の 3 つの球
+  const ball = new THREE.SphereGeometry(2.2 * M, 16, 12);
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + Math.PI / 6;
+    add(g, ball, m.trim, Math.cos(a) * 6, -4, Math.sin(a) * 6);
   }
+  rimLights(g, 12.8, 10, -2.4, 0.5, owned);
+  frontLight(g, -12.6, -2.4, owned);
 }
 
-const BUILDERS: Record<HullType, (g: THREE.Group, m: Mats) => void> = { arrow, disk, hauler };
+/** 光る球のまわりに 2 重の輪（直径 36 m） */
+function ring(g: THREE.Group, m: Mats, owned: THREE.Material[]) {
+  const core = new THREE.SphereGeometry(6 * M, 32, 16);
+  add(g, core, m.glass);
+  const coreGlow = new THREE.SphereGeometry(3.5 * M, 24, 12);
+  add(g, coreGlow, m.engine);
+  const inner = new THREE.TorusGeometry(11 * M, 1.6 * M, 12, 64);
+  inner.rotateX(Math.PI / 2);
+  add(g, inner, m.hull);
+  const outer = new THREE.TorusGeometry(17 * M, 1 * M, 12, 64);
+  outer.rotateX(Math.PI / 2);
+  add(g, outer, m.trim);
+  // 輪をつなぐ 4 本の腕
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * Math.PI * 2 + Math.PI / 4;
+    const arm = new THREE.BoxGeometry(12 * M, 0.8 * M, 1.2 * M);
+    const mesh = add(g, arm, m.trim, Math.cos(a) * 11, 0, Math.sin(a) * 11);
+    mesh.rotation.y = -a;
+  }
+  rimLights(g, 17, 16, 1.1, 0.45, owned);
+  frontLight(g, -18.2, 0, owned);
+}
+
+const BUILDERS: Record<HullType, (g: THREE.Group, m: Mats, owned: THREE.Material[]) => void> = { saucer, bell, ring };
 
 export function createShipModel(hull: HullType, hue: number): ShipModel {
   const group = new THREE.Group();
   const m = materials();
-  BUILDERS[hull](group, m);
+  const owned: THREE.Material[] = [];
+  BUILDERS[hull](group, m, owned);
   group.name = `ship-${hull}`;
   const color = new THREE.Color();
   const model: ShipModel = {
@@ -126,6 +145,7 @@ export function createShipModel(hull: HullType, hue: number): ShipModel {
         if (o instanceof THREE.Mesh) o.geometry.dispose();
       });
       Object.values(m).forEach((x) => x.dispose());
+      owned.forEach((x) => x.dispose());
     },
   };
   model.setHue(hue);

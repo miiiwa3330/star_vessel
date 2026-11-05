@@ -299,7 +299,18 @@ export interface GeneratedStar {
   absMag: number;
   bv: number;
   system: string;
+  /** 白色矮星・中性子星・ブラックホール（ふつうの星は無し） */
+  compact?: 'white-dwarf' | 'neutron-star' | 'black-hole';
 }
+
+/**
+ * 自動で作る、星の燃えかす（白色矮星・中性子星・ブラックホール）の、ふつうの星に対する割合（docs/tech/compact-objects.md）。
+ * 白色矮星：太陽のまわりの数密度 約 4.5×10⁻³ pc⁻³（Hollands ほか 2018）÷ 星全体 約 0.1 pc⁻³ ≒ 5%。
+ * 中性子星：銀河に約 10⁹ 個（Sartore ほか 2010）÷ 星 約 10¹¹ 個 ≒ 1%。ブラックホール：約 10⁸ 個（Olejak ほか 2020）≒ 0.1%
+ */
+export const COMPACT_FRACTIONS = { 'white-dwarf': 0.05, 'neutron-star': 0.01, 'black-hole': 0.001 } as const;
+/** 燃えかすの番号は 1000 から（ふつうの星の番号と重ならないように。マス目の星は 400 個まで） */
+export const COMPACT_INDEX_BASE = 1000;
 
 /**
  * 1 つのマス目の星を作る。同じマス目なら、誰の端末でもいつも同じ星になる。
@@ -321,6 +332,26 @@ export function generateCell(c: Cell): GeneratedStar[] {
     };
     const { absMag, bv } = sampleStarType(rand);
     stars.push({ position: galactoToEqjPc(g), absMag, bv, system: generatedSystemCode(c, i) });
+  }
+  // 星の燃えかす。ふつうの星とは別の乱数の流れで作り、番号を 1000 から振る（ふつうの星の並びと記号を変えないため）
+  const rc = mulberry32(hashInts(c.ix, c.iy, c.iz, GALAXY_SEED, 0x434f4d50));
+  let k = 0;
+  for (let i = 0; i < count; i++) {
+    const u = rc();
+    const compact =
+      u < COMPACT_FRACTIONS['black-hole']
+        ? 'black-hole'
+        : u < COMPACT_FRACTIONS['black-hole'] + COMPACT_FRACTIONS['neutron-star']
+          ? 'neutron-star'
+          : u < COMPACT_FRACTIONS['black-hole'] + COMPACT_FRACTIONS['neutron-star'] + COMPACT_FRACTIONS['white-dwarf']
+            ? 'white-dwarf'
+            : null;
+    const g = { x: ((c.ix + rc()) * CELL_PC) / 1000, y: ((c.iy + rc()) * CELL_PC) / 1000, z: ((c.iz + rc()) * CELL_PC) / 1000 };
+    if (!compact) continue;
+    // 見かけの明るさ：白色矮星は絶対等級 11〜15 等。中性子星・ブラックホールは光では見えないので、描かない明るさにする
+    const absMag = compact === 'white-dwarf' ? 11 + 4 * rc() : 40;
+    stars.push({ position: galactoToEqjPc(g), absMag, bv: compact === 'white-dwarf' ? 0 : 0.65, system: generatedSystemCode(c, COMPACT_INDEX_BASE + k), compact });
+    k++;
   }
   return stars;
 }

@@ -6,4 +6,6 @@ import { cloudflare } from '@cloudflare/vite-plugin';
 export default defineConfig({
   plugins: [react(), cloudflare()],
   build: { target: 'es2023' },
+  // Web Worker を ES モジュールで出す（satellite.js 7 の WebAssembly 版が、Worker の中でトップレベルの await を使うため）
+  worker: { format: 'es' },
 });

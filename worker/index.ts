@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { createAuth } from './auth';
 import { warps } from './warps';
 import { ships } from './ships';
+import { satellites } from './satellites';
 import { isSystemCode } from '../src/world/address';
 
 export { SpaceRoom } from './space-room';
@@ -32,6 +33,7 @@ app.use('/api/ship', async (c, next) => {
   await next();
 });
 app.route('/api/ship', ships);
+app.route('/api/satellites', satellites);
 
 /**
  * 宇宙の部屋への WebSocket。部屋は恒星系ごと（例：/api/space/SOL）。ログインが必要（匿名でよい）。

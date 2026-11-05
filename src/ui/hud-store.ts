@@ -5,7 +5,16 @@
  */
 import type { RadarBlip } from '../world/radar';
 import type { HullType } from '../world/ship-design';
+import type { StampId } from '../world/stamps';
 import type { ViewMode } from '../controls/chase-camera';
+
+/** スタンプの履歴の 1 行 */
+export interface StampLogItem {
+  key: number;
+  hue: number;
+  text: string;
+  mine: boolean;
+}
 
 /** 宇宙船を作る画面の状態（開いていなければ null） */
 export interface ShipBuilderState {
@@ -50,6 +59,11 @@ export interface HudState {
   shipBuilder: ShipBuilderState | null;
   /** 宇宙船の設定がサーバーに保存できるか */
   shipReady: boolean;
+  /** スタンプを送れるか（宇宙の部屋につながっているか） */
+  stampReady: boolean;
+  stampLog: StampLogItem[];
+  /** いる場所の目印（星団の中なら、その名前） */
+  region: string | null;
 }
 
 let state: HudState = {
@@ -68,6 +82,9 @@ let state: HudState = {
   orbitDrag: false,
   shipBuilder: null,
   shipReady: false,
+  stampReady: false,
+  stampLog: [],
+  region: null,
 };
 const listeners = new Set<() => void>();
 
@@ -101,6 +118,8 @@ export const hudActions = {
   previewHull: (_hull: HullType): void => {},
   saveShip: (): void => {},
   closeShipBuilder: (): void => {},
+  /** スタンプを送る（要件 F6） */
+  sendStamp: (_id: StampId): void => {},
 };
 
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;

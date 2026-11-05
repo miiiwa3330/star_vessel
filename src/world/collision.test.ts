@@ -12,6 +12,9 @@ describe('minAltitudeKm', () => {
   it('地球のような小さな天体は 100 km、太陽のような大きな天体は半径の 1%', () => {
     expect(minAltitudeKm(6_371)).toBe(100);
     expect(minAltitudeKm(695_700)).toBeCloseTo(6_957, 6);
+    // 小さな天体には半径の半分まで近づける
+    expect(minAltitudeKm(11)).toBeCloseTo(5.5, 9);
+    expect(minAltitudeKm(1)).toBeCloseTo(0.5, 9);
   });
 });
 

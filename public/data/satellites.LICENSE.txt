@@ -1,0 +1,5 @@
+satellites.json は SatNOGS DB の軌道要素（TLE）を変換したデータです。
+This data is derived from the SatNOGS DB (https://db.satnogs.org/) by the Libre Space Foundation and contributors.
+Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0):
+https://creativecommons.org/licenses/by-sa/4.0/
+Changes: kept only the NORAD catalog number, the name (up to 40 characters) and the two TLE lines; removed modules docked to space stations.

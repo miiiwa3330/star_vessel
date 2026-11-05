@@ -8,6 +8,7 @@ import { KM_PER_LY } from './units';
 import type { Vec3 } from './vec';
 import { isBodyId } from './warp-schema';
 import { isShipDesign, type ShipDesign } from './ship-design';
+import type { StampId } from './stamps';
 
 /** ブラウザが自分の状態を送る回数（1 秒あたり） */
 export const SHIP_SEND_HZ = 4;
@@ -27,6 +28,12 @@ export interface ShipState {
   /** 速度（km/s・EQJ）。受け取った側が、次の状態が届くまでの位置を予測するのに使う */
   velocityKmS: Vec3;
   orientation: Quat;
+}
+
+/** ブラウザ → サーバー：スタンプを送る（要件 F6） */
+export interface StampMessage {
+  t: 'stamp';
+  k: StampId;
 }
 
 /** ブラウザ → サーバー。d は自分の船の設計（形。見た目だけなので、サーバーは形が正しいかだけを確かめる） */
@@ -51,7 +58,9 @@ export interface ShipSnapshot {
 /** サーバー → ブラウザ */
 export type ServerMessage =
   | { t: 'hello'; id: string; hue: number; now: number }
-  | { t: 'ships'; now: number; ships: ShipSnapshot[] };
+  | { t: 'ships'; now: number; ships: ShipSnapshot[] }
+  /** 近くの船（または自分）が送ったスタンプ。from は船の短い ID、hue は送った人の色 */
+  | { t: 'stamp'; now: number; from: string; hue: number; k: StampId };
 
 const finite = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
 const isVec = (v: unknown): v is Vec3 => {

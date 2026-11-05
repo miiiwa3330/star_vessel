@@ -4,6 +4,7 @@ import { hudActions, hudStore } from './hud-store';
 import { Radar } from './Radar';
 import { WarpPanel } from './WarpPanel';
 import { ShipBuilder } from './ShipBuilder';
+import { StampPanel } from './StampPanel';
 import './hud.css';
 
 export function Hud() {
@@ -11,16 +12,20 @@ export function Hud() {
   const utc = s.date.toISOString().replace('T', ' ').slice(0, 19);
   return (
     <>
-      <div className="hud-panel hud-status">
-        <div className="hud-title">STAR VESSEL</div>
-        <div>UTC {utc}</div>
-        <div>
-          {s.anchorName}の表面から {formatDistance(s.altitudeKm)}
+      <div className="hud-left">
+        <div className="hud-panel hud-status">
+          <div className="hud-title">STAR VESSEL</div>
+          <div>UTC {utc}</div>
+          <div>
+            {s.anchorName}の表面から {formatDistance(s.altitudeKm)}
+          </div>
+          <div>{formatSpeed(s.speedKmS)}</div>
+          {s.region && <div>{s.region}</div>}
+          {s.nearbyShips !== null && <div>近くのプレイヤー：{s.nearbyShips} 人</div>}
+          <div className="hud-muted">描画：{s.backend}</div>
+          {s.status && <div className="hud-warn">{s.status}</div>}
         </div>
-        <div>{formatSpeed(s.speedKmS)}</div>
-        {s.nearbyShips !== null && <div>近くのプレイヤー：{s.nearbyShips} 人</div>}
-        <div className="hud-muted">描画：{s.backend}</div>
-        {s.status && <div className="hud-warn">{s.status}</div>}
+        {!s.shipBuilder && <StampPanel ready={s.stampReady} log={s.stampLog} />}
       </div>
       {s.notice && <div className="hud-panel hud-notice">{s.notice}</div>}
       <div className="hud-dock" style={s.shipBuilder ? { display: 'none' } : undefined}>
@@ -51,6 +56,7 @@ export function Hud() {
         </div>
       </div>
       {s.shipBuilder && <ShipBuilder state={s.shipBuilder} />}
+
       <div className="hud-speed-buttons hud-touch-only" style={s.shipBuilder ? { display: 'none' } : undefined}>
         <button type="button" className="hud-button" onClick={() => hudActions.changeSpeed(1)} aria-label="速くする">
           速く
@@ -72,7 +78,10 @@ export function Hud() {
           星：<a href="https://codeberg.org/astronexus/hyg">HYG v4.4</a>（
           <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>） ／ 系外惑星：
           <a href="https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue">Open Exoplanet Catalogue</a>（MIT） ／ 衛星・小惑星：
-          <a href="https://ssd.jpl.nasa.gov/">NASA/JPL</a> ／ 天体の画像：
+          <a href="https://ssd.jpl.nasa.gov/">NASA/JPL</a> ／ 人工衛星：
+          <a href="https://db.satnogs.org/">SatNOGS DB</a>（
+          <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>） ／ 星団・白色矮星・パルサー・ブラックホール：
+          <a href="https://vizier.cfa.harvard.edu/">VizieR</a>（Hunt &amp; Reffert 2023 ほか） ／ 天体の画像：
           <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>（
           <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>）
         </div>

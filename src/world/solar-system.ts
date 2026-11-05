@@ -8,7 +8,7 @@
  * 系外惑星は、いる恒星系が変わるたびに src/world/planets.ts が入れ替える。
  * 一覧に無い天体（遠くの恒星系の惑星など）は、setBodyResolver で渡した関数に聞く。
  */
-import { Body, HelioVector, JupiterMoons, MassProduct, RotationAxis } from 'astronomy-engine';
+import { Body, HelioVector, JupiterMoons, MassProduct, RotationAxis, Rotation_EQD_EQJ } from 'astronomy-engine';
 import {
   CALLISTO_RADIUS_KM,
   EUROPA_RADIUS_KM,
@@ -19,6 +19,7 @@ import { keplerPositionKm, orbitNormal, orbitToEqj, type KeplerElements } from '
 import { DEG, KM_PER_AU } from './units';
 import { add, length, mulMat, normalize, rotX, rotZ, scale, sub, type Mat3, type Vec3 } from './vec';
 import type { RingZone, SurfaceLook } from './surface';
+import type { CompactLook } from './compact-objects';
 
 /**
  * 天体の名前（id）。太陽系の主な天体は英語の名前（Earth など）、ほかは住所の番号を含む記号。
@@ -26,7 +27,7 @@ import type { RingZone, SurfaceLook } from './surface';
  */
 export type BodyId = string;
 
-export type BodyKind = 'star' | 'planet' | 'dwarf' | 'moon' | 'asteroid' | 'exoplanet';
+export type BodyKind = 'star' | 'planet' | 'dwarf' | 'moon' | 'asteroid' | 'exoplanet' | 'satellite' | 'blackhole';
 
 /** 位置の決め方 */
 export type Motion =
@@ -37,7 +38,9 @@ export type Motion =
   /** 親の天体のまわりのケプラーの軌道 */
   | { type: 'kepler'; parent: BodyId; elements: KeplerElements }
   /** 動かない（系外の恒星。太陽中心の位置 km） */
-  | { type: 'fixed'; positionKm: Vec3 };
+  | { type: 'fixed'; positionKm: Vec3 }
+  /** 親の天体からの位置を関数で出す（人工衛星。src/world/satellites.ts） */
+  | { type: 'custom'; parent: BodyId; relativeKm: (date: Date) => Vec3 };
 
 /** 向き（自転）の決め方 */
 export type Spin =
@@ -70,6 +73,8 @@ export interface BodyInfo {
   glow?: readonly [number, number, number];
   /** 大気（ふちに光の輪を描く）。見た目のための値 */
   atmosphere?: Atmosphere;
+  /** 星の燃えかす（白色矮星・中性子星・ブラックホール）の見た目。src/world/compact-objects.ts */
+  compact?: CompactLook;
 }
 
 export interface Atmosphere {
@@ -269,6 +274,8 @@ function computePosition(b: BodyInfo, date: Date): Vec3 {
       return add(heliocentricPositionKm(m.parent, date), keplerPositionKm(m.elements, date, keplerRot(m.elements)));
     case 'fixed':
       return m.positionKm;
+    case 'custom':
+      return add(heliocentricPositionKm(m.parent, date), m.relativeKm(date));
   }
 }
 
@@ -334,4 +341,14 @@ export function bodyFixedToEqj(id: BodyId, date: Date): Mat3 {
 /** 太陽系の主な天体の GM（km³/s²）。astronomy-engine の値（AU³/日² を換算） */
 export function majorGmKm3s2(id: BodyId): number {
   return (MassProduct(Body[id as keyof typeof Body]) * KM_PER_AU ** 3) / 86_400 ** 2;
+}
+
+/**
+ * その時刻の真の赤道・真の春分点の座標（EQD）→ EQJ の回転。人工衛星の軌道計算（SGP4）の座標（TEME）を EQJ に移すのに使う。
+ * TEME と EQD の違い（分点差。1 秒角ほど）は無視する
+ */
+export function eqdToEqj(date: Date): Mat3 {
+  const r = Rotation_EQD_EQJ(date).rot;
+  // astronomy-engine の rot[i][j] は「i 番目の入力の軸が、出力の j 成分にどう写るか」（列ベクトルの並び）
+  return [r[0][0], r[1][0], r[2][0], r[0][1], r[1][1], r[2][1], r[0][2], r[1][2], r[2][2]];
 }

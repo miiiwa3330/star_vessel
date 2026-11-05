@@ -24,6 +24,8 @@ import {
   createBodyUniforms,
   createRingMaterial,
   createStarGlow,
+  createBlackHole,
+  createPulsarBeams,
   createStarMaterial,
   ringShadowedColor,
   STAR_GLOW_RADII,
@@ -51,6 +53,8 @@ interface Drawn {
   info: BodyInfo;
   uniforms: BodyUniforms;
   glow: THREE.Sprite | null;
+  /** パルサーのビーム（自転軸のまわりを回す） */
+  beams: THREE.Group | null;
   /** この天体のために作った物（作り直すときに捨てる） */
   owned: { dispose(): void }[];
   removed: boolean;
@@ -63,6 +67,12 @@ export class SolarSystemView {
   private readonly starLight = new THREE.PointLight(0xffffff, 3, 0, 0);
   private readonly tmp = new THREE.Matrix4();
   private readonly painter = new SurfacePainter();
+  private readonly axis = new THREE.Vector3();
+  private readonly yAxis = new THREE.Vector3(0, 1, 0);
+  private readonly xAxis = new THREE.Vector3(1, 0, 0);
+  private readonly q1 = new THREE.Quaternion();
+  private readonly q2 = new THREE.Quaternion();
+  private readonly q3 = new THREE.Quaternion();
   private version = -1;
 
   constructor(private readonly textures: BodyTextures) {
@@ -75,10 +85,37 @@ export class SolarSystemView {
     const big = info.radiusKm > 1_000;
     const geometry = new THREE.SphereGeometry(info.radiusKm, big ? 96 : 32, big ? 48 : 16);
     owned.push(geometry);
-    const d: Drawn = { mesh: null as unknown as THREE.Mesh, info, uniforms, glow: null, owned, removed: false };
+    const d: Drawn = { mesh: null as unknown as THREE.Mesh, info, uniforms, glow: null, beams: null, owned, removed: false };
 
     let material: THREE.Material;
-    if (info.glow) {
+    if (info.compact?.kind === 'black-hole') {
+      const bh = createBlackHole(info.radiusKm, !!info.compact.disk);
+      owned.push(...bh.owned);
+      d.mesh = bh.mesh;
+      material = bh.mesh.material as THREE.Material;
+      if (info.compact.disk) {
+        // 遠くからも見えるよう、降着円盤の光の広がり
+        d.glow = createStarGlow([1, 0.7, 0.4]);
+        d.glow.scale.setScalar(info.radiusKm * 400);
+        owned.push(d.glow.material);
+        this.scene.add(d.glow);
+      }
+    } else if (info.kind === 'satellite') {
+      // 人工衛星：箱の本体と、左右の太陽電池の板（見た目のための簡単な模型）
+      const s = info.radiusKm * 2;
+      const bodyGeo = new THREE.BoxGeometry(s * 0.25, s * 0.25, s * 0.4);
+      const panelGeo = new THREE.BoxGeometry(s * 0.35, s * 0.02, s * 0.25);
+      const bodyMat = new THREE.MeshStandardNodeMaterial({ color: 0xd8d4c8, roughness: 0.5, metalness: 0.6 });
+      const panelMat = new THREE.MeshStandardNodeMaterial({ color: 0x1c2a5a, roughness: 0.3, metalness: 0.4, side: THREE.DoubleSide });
+      owned.push(bodyGeo, panelGeo, bodyMat, panelMat);
+      d.mesh = new THREE.Mesh(bodyGeo, bodyMat);
+      for (const x of [-1, 1]) {
+        const panel = new THREE.Mesh(panelGeo, panelMat);
+        panel.position.set(x * s * 0.32, 0, 0);
+        d.mesh.add(panel);
+      }
+      material = bodyMat;
+    } else if (info.glow) {
       material = createStarMaterial(info.glow);
       d.glow = createStarGlow(info.glow);
       d.glow.scale.setScalar(info.radiusKm * STAR_GLOW_RADII * 2);
@@ -124,6 +161,13 @@ export class SolarSystemView {
     const mesh = d.mesh;
     mesh.name = info.id;
     mesh.matrixAutoUpdate = false;
+    if (info.compact?.kind === 'neutron-star') {
+      d.beams = createPulsarBeams(info.radiusKm);
+      d.beams.traverse((o) => {
+        if (o instanceof THREE.Mesh) owned.push(o.geometry, o.material as THREE.Material);
+      });
+      this.scene.add(d.beams);
+    }
     if (info.atmosphere) {
       const atm = createAtmosphereMesh(info.radiusKm, info.atmosphere, uniforms);
       owned.push(atm.geometry, atm.material as THREE.Material);
@@ -142,6 +186,7 @@ export class SolarSystemView {
       if (now.get(id) === d.info) continue;
       this.scene.remove(d.mesh);
       if (d.glow) this.scene.remove(d.glow);
+      if (d.beams) this.scene.remove(d.beams);
       d.removed = true;
       d.owned.forEach((o) => o.dispose());
       this.drawn.delete(id);
@@ -167,6 +212,18 @@ export class SolarSystemView {
       d.mesh.matrix.copy(this.tmp);
       d.mesh.matrixWorldNeedsUpdate = true;
       d.glow?.position.set(rel.x, rel.y, rel.z);
+      if (d.beams && d.info.compact?.beamPeriodS) {
+        // ビームは自転軸から 30 度傾いた磁極の向きに出て、自転軸のまわりを回る（見た目では 1 秒より速くしない）
+        const s = d.info.spin;
+        const pole = s.type === 'steady' ? s.pole : { x: 0, y: 0, z: 1 };
+        this.axis.set(pole.x, pole.y, pole.z).normalize();
+        this.q1.setFromUnitVectors(this.yAxis, this.axis);
+        const angle = ((date.getTime() / 1000) % d.info.compact.beamPeriodS) / d.info.compact.beamPeriodS * Math.PI * 2;
+        this.q2.setFromAxisAngle(this.axis, angle);
+        this.q3.setFromAxisAngle(this.xAxis, Math.PI / 6);
+        d.beams.quaternion.copy(this.q2).multiply(this.q1).multiply(this.q3);
+        d.beams.position.set(rel.x, rel.y, rel.z);
+      }
       d.uniforms.center.value.set(rel.x, rel.y, rel.z);
       const pole = mulVec(orient, { x: 0, y: 0, z: 1 });
       d.uniforms.pole.value.set(pole.x, pole.y, pole.z);
