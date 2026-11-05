@@ -64,3 +64,44 @@ export function radarBlips(
     };
   });
 }
+
+/** 名前を出せる点（レーダーの座標。上が +y）と、優先の順（小さいほど先） */
+export interface RadarLabelCandidate {
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+  priority: number;
+}
+
+/**
+ * レーダーに名前を出す点を選ぶ。優先の高い順に、ほかの名前・点の印と重ならないものだけ、最大 max 個。
+ * 名前は点の右に置き、幅は 1 文字 charW（全角の文字の幅。半角は半分）、高さ lineH とみなす（レーダーの座標の単位）。
+ * dots はレーダーのすべての点の印（名前が印を隠さないように、その点以外の印にかかる名前は出さない）
+ */
+export function chooseRadarLabels(
+  candidates: readonly RadarLabelCandidate[],
+  max: number,
+  dots: readonly { x: number; y: number }[] = [],
+  charW = 0.09,
+  lineH = 0.1,
+  dotR = 0.035,
+): Set<string> {
+  const chosen = new Set<string>();
+  const boxes: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  const width = (s: string) => [...s].reduce((w, c) => w + (c.charCodeAt(0) < 0x100 ? charW * 0.55 : charW), 0);
+  for (const c of [...candidates].sort((a, b) => a.priority - b.priority)) {
+    if (chosen.size >= max) break;
+    const box = { x0: c.x + 0.05, x1: c.x + 0.06 + width(c.label), y0: c.y - lineH / 2, y1: c.y + lineH / 2 };
+    // レーダーの円の外にはみ出す名前は出さない
+    if (Math.hypot(box.x1, c.y) > 1.1) continue;
+    if (boxes.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1)) continue;
+    const hitsDot = dots.some(
+      (d) => (d.x !== c.x || d.y !== c.y) && d.x + dotR > box.x0 && d.x - dotR < box.x1 && d.y + dotR > box.y0 && d.y - dotR < box.y1,
+    );
+    if (hitsDot) continue;
+    boxes.push(box);
+    chosen.add(c.id);
+  }
+  return chosen;
+}

@@ -12,6 +12,7 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | HYG Database v4.4（恒星） | `public/data/stars.bin`（変換したもの） | https://codeberg.org/astronexus/hyg（David Nash / astronexus） | CC BY-SA 4.0 | 画面に「星：HYG v4.4（CC BY-SA 4.0）」とリンク。変換したデータも CC BY-SA 4.0 で、変更点を `public/data/stars.LICENSE.txt` に書いている |
 | Open Exoplanet Catalogue（系外惑星） | `public/data/exoplanets.json`（変換したもの） | https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue（Hanno Rein ほか） | MIT | 画面に「系外惑星：Open Exoplanet Catalogue（MIT）」とリンク。著作権の表示と許諾の文を `public/data/exoplanets.LICENSE.txt` に置く（必ず json と一緒に置く） |
 | JPL の衛星のデータ（平均軌道要素・物理量・Horizons） | `public/data/moons.json`（変換したもの） | https://ssd.jpl.nasa.gov/（NASA/JPL Solar System Dynamics） | NASA/JPL のデータ（著作権の制限なし。出典を書く） | 画面に「衛星・小惑星：NASA/JPL」とリンク |
+| Wikidata（衛星の日本語の名前） | `public/data/moons.json` の `nameJa` | https://www.wikidata.org/ （SPARQL で取得） | CC0 | 表記は要らないが、画面のクレジットに「衛星の名前：Wikidata（CC0）」と出している |
 | JPL Small-Body Database（小惑星） | `public/data/asteroids-*.bin`・`asteroids-large.json`（変換したもの） | https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html | 同上 | 同上 |
 | SatNOGS DB（人工衛星の軌道要素） | `public/data/satellites.json`（写し）と、サーバーの `/api/satellites` | https://db.satnogs.org/（Libre Space Foundation ほか） | CC BY-SA 4.0 | 画面に「人工衛星：SatNOGS DB（CC BY-SA 4.0）」とリンク。写しは同じライセンスで、変更点を `public/data/satellites.LICENSE.txt` に書く（必ず json と一緒に置く） |
 | Hunt & Reffert (2023) の星団の表 | `public/data/clusters.json`（変換したもの） | VizieR J/A+A/673/A114（ハーバード大学のミラー） | 論文のデータ。出典を書けば使える（CDS の利用の条件） | 画面に「星団・白色矮星・パルサー・ブラックホール：VizieR（Hunt & Reffert 2023 ほか）」とリンク |

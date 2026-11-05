@@ -17,3 +17,4 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-05 | [宇宙船と視点、太陽系の衛星と小惑星](entries/2026-11-05-ships-and-small-bodies.md) |
 | 2026-11-05 | [UFO・スタンプと、人工衛星・星団・星の燃えかす](entries/2026-11-05-stamps-ufo-and-data.md) |
 | 2026-11-05 | [ユーザー目線の調整：もや・大きさ・天体の情報](entries/2026-11-05-user-view-tuning.md) |
+| 2026-11-05 | [画面の整理と衛星の日本語の名前](entries/2026-11-05-ui-declutter.md) |

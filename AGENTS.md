@@ -4,7 +4,7 @@
 
 **サービスの内容そのもの（コンセプト・体験の設計・機能仕様・世界観・技術選定の理由）は本ファイルに書かない。** それらの正本は `docs/` 配下に置く。本ファイルは「どう作業するか」だけを扱う。
 
-> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（188 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。さらに、船を UFO の形にし、スタンプ・人工衛星・星団・星の燃えかす（白色矮星・パルサー・ブラックホール）・小さな小惑星への接近を足した。さらに、もやを消し、遠くは点・近くは実際の大きさにし、星の見え方の切り替え・天体の情報（近くの一覧・照準の先・近づいたときのカード）・訪れた天体のコレクション・地球を原点にした座標を足した。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
+> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（187 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。さらに、船を UFO の形にし、スタンプ・人工衛星・星団・星の燃えかす（白色矮星・パルサー・ブラックホール）・小さな小惑星への接近を足した。さらに、もやを消し、遠くは点・近くは実際の大きさにし、星の見え方の切り替え・天体の情報（近くの一覧・照準の先・近づいたときのカード）・訪れた天体のコレクション・地球を原点にした座標を足した。さらに、画面を整理した（操作の説明とクレジットをボタンにしまう、照準の先は 1 行、レーダーの名前が重ならない、衛星の日本語の名前）。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
 
 ---
 
@@ -140,7 +140,7 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 | ビルド | `npm run build`（型チェック → `dist/`） |
 | 星のデータの作り直し | `npm run stars`（HYG を取得して `public/data/stars.bin` を書き出す。取得した元データは `tools/.cache/` に置き、コミットしない） |
 | 系外惑星のデータの作り直し | `npm run exoplanets`（Open Exoplanet Catalogue を git で取得して `public/data/exoplanets.json` を書き出す。星のデータを作り直したら、これも作り直す） |
-| 衛星・小惑星のデータの作り直し | `npm run moons`・`npm run asteroids`（JPL から取得。衛星は元期から離れるほどずれるので年に一度くらい。Node の fetch をプロキシ越しに使うため `NODE_USE_ENV_PROXY=1` を付けている） |
+| 衛星・小惑星のデータの作り直し | `npm run moons`・`npm run asteroids`（JPL から取得。衛星の日本語の名前は Wikidata から。衛星は元期から離れるほどずれるので年に一度くらい。Node の fetch をプロキシ越しに使うため `NODE_USE_ENV_PROXY=1` を付けている） |
 | 人工衛星・星団・燃えかすのデータの作り直し | `npm run satellites`・`npm run clusters`・`npm run compact`（星団と燃えかすは VizieR のハーバード大学のミラーから取る。CDS の本家は開発の環境から応答が無い） |
 
 - **「動いた」と書く前に、画面で確かめる。** テストが通っても、描画の向き・明るさ・重なりは画面でしか分からない。WebGPU と WebGL2（WebGPU を消した状態）の両方と、スマホの幅（390px 前後）で見る
@@ -202,7 +202,7 @@ worker/                   サーバー（Cloudflare Workers）。index.ts が入
 migrations/               D1 のテーブル（0001 は npm run auth:schema で作ったもの）
 tools/build-stars.mjs     HYG → stars.bin の変換
 tools/build-exoplanets.mjs Open Exoplanet Catalogue → exoplanets.json の変換（stars.bin が先に要る）
-tools/build-moons.mjs     JPL（衛星の表・Horizons）→ moons.json
+tools/build-moons.mjs     JPL（衛星の表・Horizons）→ moons.json。build-moon-names.mjs が Wikidata から日本語の名前を足す
 tools/build-asteroids.mjs JPL Small-Body Database → asteroids-*.bin・asteroids-large.json
 tools/build-satellites.mjs SatNOGS DB → satellites.json
 tools/build-clusters.mjs  Hunt & Reffert 2023（VizieR のミラー）→ clusters.json

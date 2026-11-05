@@ -9,6 +9,8 @@ import { StampPanel } from './StampPanel';
 import { InfoCard } from './InfoCard';
 import { NearbyPanel } from './NearbyPanel';
 import { CollectionPanel } from './CollectionPanel';
+import { AimLabel } from './AimLabel';
+import { BottomPanels } from './BottomPanels';
 import './hud.css';
 
 export function Hud() {
@@ -102,26 +104,8 @@ export function Hud() {
         </button>
       </div>
       {/* 宇宙船を作る画面を開いている間は、下の説明と右のボタンを隠す（重なるため） */}
-      <div className="hud-bottom" style={s.shipBuilder ? { display: 'none' } : undefined}>
-        <div className="hud-panel hud-help">
-          <div className="hud-keyboard-only">
-            ドラッグ：向きを変える ／ W・S：前後 ／ A・D：左右 ／ R・F：上下 ／ Q・E：傾き ／ ホイール・＋−：速さ（Shift で 10 倍ずつ） ／ V：視点（三人称では右ドラッグで回り込み、Alt＋ホイールで距離）
-          </div>
-          <div className="hud-touch-only">1 本指：向きを変える ／ 2 本指で触れている間：前へ</div>
-          <div className="hud-muted">レーダー：上が進む方向 ／ ●自分より上 ○下 ／ ◆ワープホール ／ ▲ほかのプレイヤー</div>
-        </div>
-        <div className="hud-panel hud-credits">
-          星：<a href="https://codeberg.org/astronexus/hyg">HYG v4.4</a>（
-          <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>） ／ 系外惑星：
-          <a href="https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue">Open Exoplanet Catalogue</a>（MIT） ／ 衛星・小惑星：
-          <a href="https://ssd.jpl.nasa.gov/">NASA/JPL</a> ／ 人工衛星：
-          <a href="https://db.satnogs.org/">SatNOGS DB</a>（
-          <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>） ／ 星団・白色矮星・パルサー・ブラックホール：
-          <a href="https://vizier.cfa.harvard.edu/">VizieR</a>（Hunt &amp; Reffert 2023 ほか） ／ 天体の画像：
-          <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>（
-          <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>）
-        </div>
-      </div>
+      {!s.shipBuilder && <AimLabel aim={s.aimLabel} />}
+      <BottomPanels hidden={s.shipBuilder !== null} />
     </>
   );
 }
