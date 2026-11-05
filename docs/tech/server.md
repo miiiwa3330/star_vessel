@@ -11,7 +11,7 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 |------|------|------|
 | Cloudflare Workers | `/api/` を受ける入口。それ以外は Vite が書き出した静的なファイルを配る（Worker を通らないので料金がかからない） | `worker/index.ts`、`wrangler.jsonc` |
 | Hono | `/api/` の中の振り分け | `worker/index.ts` |
-| D1（SQLite） | ワープホールとアカウントの保存 | `migrations/` |
+| D1（SQLite） | ワープホール・宇宙船の設計・訪れた天体・アカウントの保存 | `migrations/` |
 | Better Auth | アカウント。いまは匿名だけ | `worker/auth.ts`、`worker/auth-options.ts` |
 | Durable Objects | 他のプレイヤーの宇宙船の位置のやりとり。恒星系ごとに 1 つの部屋 | `worker/space-room.ts` |
 
@@ -28,6 +28,7 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 | `/api/auth/*` | Better Auth（匿名のログイン・セッション） | — |
 | `GET /api/satellites` | 人工衛星の軌道要素（SatNOGS DB から取り、6 時間キャッシュ。取れなければ 503。[`satellites.md`](satellites.md)） | 不要 |
 | `GET /api/ship` ・ `PUT /api/ship` | 自分の宇宙船の設計を読む・保存する（[`ships.md`](ships.md)） | 必要（匿名でよい） |
+| `GET /api/visits` ・ `POST /api/visits` | 訪れた天体のコレクションを読む・記録する（[`../product/info-and-collection.md`](../product/info-and-collection.md)） | 必要（匿名でよい） |
 | `GET /api/space/:system`（WebSocket） | 宇宙の部屋（恒星系ごと。例 `/api/space/SOL`）。下の「宇宙船の位置のやりとり」 | 必要（匿名でよい） |
 
 エラーは `{ "error": "..." }`：`unauthorized`（401）、`invalid`（400・形が正しくない）、`limit`（409・3 個まで）、`not_found`（404・無い、または自分のものではない）。

@@ -7,7 +7,7 @@
  * 大気・恒星の光・環の影は src/render/body-effects.ts（要件 F25）。
  */
 import * as THREE from 'three/webgpu';
-import { texture } from 'three/tsl';
+import { exp, float, instancedBufferAttribute, texture, uv } from 'three/tsl';
 import {
   allBodies,
   bodiesVersion,
@@ -36,6 +36,14 @@ import { SurfacePainter } from './surface-painter';
 import { createRingMesh, ringTexture } from './surface-texture';
 
 export type BodyTextures = Partial<Record<BodyId, THREE.Texture>>;
+
+/** 天体の光の点の数の上限・大きさ（ピクセル） */
+const MAX_POINTS = 1024;
+const POINT_SIZE_PX = 4;
+/** 本物の大きさ（半径）が画面でこれ（ピクセル）より大きくなったら、点を消す */
+const POINT_MAX_PX = 1.5;
+/** 本物の大きさがこれ（ピクセル）より小さいときは、点も描かない（とても遠く・とても小さい） */
+const POINT_MIN_PX = 1e-5;
 
 /** 天体の名前から、模様の種を決める（同じ天体はいつも同じ模様） */
 const seedOf = (id: string) => hashInts(...Array.from(id, (c) => c.charCodeAt(0)));
@@ -74,9 +82,41 @@ export class SolarSystemView {
   private readonly q2 = new THREE.Quaternion();
   private readonly q3 = new THREE.Quaternion();
   private version = -1;
+  /** 1 ピクセルの大きさを決める値（画面の高さの半分 ÷ tan(視野の半分)） */
+  private pxPerRadian = 700;
+  /**
+   * 天体の光の点（要件 F33）。本物の大きさが画面で POINT_MAX_PX より小さいときだけ、天体の位置に点を描く。
+   * 近づいて大きくなると点は消え、本物の大きさの球（模型）だけになる
+   */
+  private readonly pointPos = new Float32Array(MAX_POINTS * 3);
+  private readonly pointColor = new Float32Array(MAX_POINTS * 3);
+  private readonly pointPosAttr = new THREE.InstancedBufferAttribute(this.pointPos, 3);
+  private readonly pointColorAttr = new THREE.InstancedBufferAttribute(this.pointColor, 3);
+  private readonly points: THREE.Sprite;
 
   constructor(private readonly textures: BodyTextures) {
     this.scene.add(this.starLight, new THREE.AmbientLight(0xffffff, 0.03));
+    this.pointPosAttr.setUsage(THREE.DynamicDrawUsage);
+    this.pointColorAttr.setUsage(THREE.DynamicDrawUsage);
+    const m = new THREE.PointsNodeMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: false,
+    });
+    m.positionNode = instancedBufferAttribute(this.pointPosAttr, 'vec3');
+    m.colorNode = instancedBufferAttribute<'vec3'>(this.pointColorAttr, 'vec3');
+    m.sizeNode = float(POINT_SIZE_PX);
+    const d = uv().sub(0.5).length().mul(2);
+    m.opacityNode = exp(d.mul(d).mul(-12));
+    this.points = new THREE.Sprite(m);
+    this.points.count = 0;
+    this.points.frustumCulled = false;
+    this.scene.add(this.points);
+  }
+
+  setViewport(heightPx: number, fovDeg: number): void {
+    this.pxPerRadian = heightPx / 2 / Math.tan((fovDeg * Math.PI) / 360);
   }
 
   private create(info: BodyInfo): Drawn {
@@ -196,6 +236,31 @@ export class SolarSystemView {
     }
   }
 
+  /** 天体の光の点を置く。恒星・ブラックホール（自分の光の広がりがある）と人工衛星（別に点で描く）は除く */
+  private updatePoints(rels: Map<BodyId, Vec3>): void {
+    let n = 0;
+    for (const [id, d] of this.drawn) {
+      if (n >= MAX_POINTS) break;
+      const k = d.info.kind;
+      if (k === 'star' || k === 'blackhole' || k === 'satellite') continue;
+      const rel = rels.get(id)!;
+      const dist = Math.hypot(rel.x, rel.y, rel.z);
+      const px = (d.info.radiusKm / Math.max(dist, 1e-9)) * this.pxPerRadian;
+      if (px > POINT_MAX_PX || px < POINT_MIN_PX) continue;
+      // 小さく遠いほど暗く（1/1000 ピクセルで 0.25、1 ピクセルで 1）。近づいて球が見え始めるところで消えていく
+      const b = Math.min(1, 0.25 + 0.25 * Math.max(0, Math.log10(px * 1000))) * Math.min(1, (POINT_MAX_PX - px) / 0.5);
+      this.pointPos.set([rel.x, rel.y, rel.z], n * 3);
+      this.pointColor.set([0.95 * b, 0.92 * b, 0.85 * b], n * 3);
+      n++;
+    }
+    this.points.count = n;
+    for (const a of [this.pointPosAttr, this.pointColorAttr]) {
+      a.clearUpdateRanges();
+      a.addUpdateRange(0, n * 3);
+      a.needsUpdate = true;
+    }
+  }
+
   /** date の時刻の天体を、observerKm（太陽中心・EQJ）から見た位置に置く */
   update(date: Date, observerKm: Vec3): void {
     this.sync();
@@ -236,6 +301,7 @@ export class SolarSystemView {
         }
       }
     }
+    this.updatePoints(rels);
     if (nearestStar) {
       this.starLight.position.set(nearestStar.x, nearestStar.y, nearestStar.z);
       // 光の色は恒星の色（太陽は白に近い）。いちばん明るい成分を 1 にそろえる

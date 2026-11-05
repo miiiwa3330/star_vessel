@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apparentMagnitude, bvToRgb, decodeStars, starAppearance, STAR_STRIDE } from './stars';
+import { apparentMagnitude, bvToRgb, decodeStars, starAppearance, STAR_STRIDE, STAR_LIMITS, DEFAULT_STAR_LIMIT } from './stars';
 
 describe('starAppearance', () => {
   it('明るい星（等級が小さい）ほど大きく明るい', () => {
@@ -15,14 +15,21 @@ describe('starAppearance', () => {
     expect(starAppearance(6.5).intensity).toBeGreaterThan(starAppearance(9).intensity);
   });
 
-  it('10 等までは消えず、大きさも 1 ピクセルより小さくならない', () => {
-    expect(starAppearance(10).intensity).toBeGreaterThan(0);
-    expect(starAppearance(12).sizePx).toBeGreaterThanOrEqual(1);
+  it('写真（14 等まで）では 12 等までは消えず、大きさも 1 ピクセルより小さくならない', () => {
+    expect(starAppearance(12, STAR_LIMITS.photo).intensity).toBeGreaterThan(0);
+    expect(starAppearance(12, STAR_LIMITS.photo).sizePx).toBeGreaterThanOrEqual(1);
   });
 
-  it('14 等より暗い星は消える（銀河の外から見て、遠くの星が重なって光らないように）', () => {
-    expect(starAppearance(14).intensity).toBe(0);
-    expect(starAppearance(12).intensity).toBeLessThan(starAppearance(10).intensity);
+  it('見える限界より暗い星は消える（肉眼 6.5 等・双眼鏡 9 等・写真 14 等）', () => {
+    expect(starAppearance(14, STAR_LIMITS.photo).intensity).toBe(0);
+    expect(starAppearance(9, STAR_LIMITS.binoculars).intensity).toBe(0);
+    expect(starAppearance(6.5, STAR_LIMITS.naked).intensity).toBe(0);
+    expect(starAppearance(4.5, STAR_LIMITS.naked).intensity).toBeGreaterThan(0);
+    expect(starAppearance(13.5, STAR_LIMITS.photo).intensity).toBeLessThan(starAppearance(10, STAR_LIMITS.photo).intensity);
+  });
+
+  it('最初の見え方は双眼鏡', () => {
+    expect(DEFAULT_STAR_LIMIT).toBe('binoculars');
   });
 });
 

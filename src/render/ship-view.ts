@@ -10,7 +10,7 @@ import * as THREE from 'three/webgpu';
 import { float, instancedBufferAttribute, sin, time, uv, exp } from 'three/tsl';
 import { shipPositionKm } from '../world/ships';
 import type { ShipState } from '../world/ship-schema';
-import { defaultDesignFor, type HullType, type ShipDesign } from '../world/ship-design';
+import { defaultDesignFor, HULLS, type HullType, type ShipDesign } from '../world/ship-design';
 import type { Quat } from '../world/quat';
 import { createShipModel, type ShipModel } from './ship-models';
 import { sub, type Vec3 } from '../world/vec';
@@ -93,6 +93,9 @@ export class ShipView {
     g.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
   }
 
+  /** 1 ピクセルの大きさを決める値（画面の高さの半分 ÷ tan(視野の半分)） */
+  pxPerRadian = 700;
+
   update(ships: readonly ShipToDraw[], date: Date, observerKm: Vec3): void {
     const seen = new Set<string>();
     const n = Math.min(ships.length, MAX_SHIPS);
@@ -108,8 +111,11 @@ export class ShipView {
       const q = ship.state.orientation;
       g.quaternion.copy(this.quat.set(q.x, q.y, q.z, q.w));
       this.color.setHSL(ship.hue / 360, 0.75, 0.6);
+      // 船が画面で 3 ピクセルより大きく見えるなら、航行灯の点は消す（船の模型が見える。要件 F33）
+      const px = (HULLS[hull].lengthKm / 2 / Math.max(Math.hypot(rel.x, rel.y, rel.z), 1e-9)) * this.pxPerRadian;
+      const k = Math.max(0, Math.min(1, (3 - px) / 1.5));
       this.lightPos.set([rel.x, rel.y, rel.z], i * 3);
-      this.lightColor.set([this.color.r, this.color.g, this.color.b], i * 3);
+      this.lightColor.set([this.color.r * k, this.color.g * k, this.color.b * k], i * 3);
     }
     for (const [id, d] of this.drawn) {
       if (seen.has(id)) continue;

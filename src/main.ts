@@ -20,6 +20,7 @@ import { ShipView } from './render/ship-view';
 import { GalaxyView } from './render/galaxy-view';
 import { galactoToEqjPc } from './world/galaxy';
 import { Hud } from './ui/Hud';
+import { InfoController } from './ui/info-controller';
 import { hudActions, hudStore, showNotice } from './ui/hud-store';
 import { worldNow } from './world/clock';
 import { keepOutsideBodies } from './world/collision';
@@ -39,13 +40,16 @@ import { clusterAt, clusterLabel, decodeClusters, type Cluster } from './world/c
 import { StarSystems } from './world/star-systems';
 import { starBodyId } from './world/planets';
 import { createExtraStarfield } from './render/starfield';
-import { decodeStars, STAR_STRIDE } from './world/stars';
+import { decodeStars, DEFAULT_STAR_LIMIT, STAR_LIMIT_NAMES_JA, STAR_LIMITS, STAR_STRIDE, type StarLimitMode } from './world/stars';
+import { starLimitMag } from './render/star-sprites';
 import { nearestSystem, readAddress, setAddressNameLookup, SYSTEM_SOL } from './world/address';
 import { KM_PER_AU, KM_PER_PC } from './world/units';
 import { add, length, mulVec, normalize, scale, sub } from './world/vec';
 import { arriveAt, planWarpHere, warpPositionKm } from './world/warp';
 import { MAX_WARPS_PER_PLAYER, type WarpHole } from './world/warp-schema';
 
+/** 星の見え方を覚えておく場所（localStorage） */
+const STAR_LIMIT_KEY = 'star_vessel.starLimit';
 /** 自分の船の吹き出しの id */
 const SELF_BUBBLE = 'self';
 
@@ -248,6 +252,19 @@ async function main() {
   let observer = startObserver(worldNow());
   const controls = new FlightControls(canvas);
 
+  // 天体の情報とコレクション（要件 F35〜F38）
+  const info = new InfoController({
+    ui: document.getElementById('ui')!,
+    camera,
+    systems,
+    stars: stars.data,
+    extraStars: [...galaxy.localStars, ...extraStars],
+    clusters,
+    face: (rel) => controls.lookAt(rel, controls.up()),
+  });
+  controls.onTap = (x, y) => info.tap(x, y, window.innerWidth, window.innerHeight);
+  if (online) void info.connect();
+
   // 視点（要件 F28）と自分の宇宙船（要件 F27）
   const chase = new ChaseCamera();
   /** 宇宙船を作る画面を開いている間に、船を見せるためのカメラ（ゆっくり回る） */
@@ -263,6 +280,31 @@ async function main() {
     if (chase.mode === 'third') chase.zoom(steps);
   };
   controls.onToggleView = () => hudActions.toggleView();
+  // 星の見え方（要件 F34）。選んだものは、この端末に覚えておく
+  const setStarLimit = (mode: StarLimitMode) => {
+    starLimitMag.value = STAR_LIMITS[mode];
+    hudStore.set({ starLimit: mode });
+    try {
+      localStorage.setItem(STAR_LIMIT_KEY, mode);
+    } catch {
+      // 覚えられなくても動く
+    }
+  };
+  {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(STAR_LIMIT_KEY);
+    } catch {
+      saved = null;
+    }
+    setStarLimit(saved && saved in STAR_LIMITS ? (saved as StarLimitMode) : DEFAULT_STAR_LIMIT);
+  }
+  hudActions.cycleStarLimit = () => {
+    const modes = Object.keys(STAR_LIMITS) as StarLimitMode[];
+    const next = modes[(modes.indexOf(hudStore.get().starLimit) + 1) % modes.length];
+    setStarLimit(next);
+    showNotice(`星の見え方：${STAR_LIMIT_NAMES_JA[next]}（${STAR_LIMITS[next]} 等まで）`);
+  };
   hudActions.toggleView = () => {
     const mode = chase.toggle();
     if (mode === 'first') {
@@ -319,6 +361,12 @@ async function main() {
     camera.aspect = starCamera.aspect = w / h;
     galaxy.setViewport(h, FOV);
     clusterView.setViewport(h, FOV);
+    {
+      const ppr = h / 2 / Math.tan((FOV * Math.PI) / 360);
+      solar.setViewport(h, FOV);
+      satelliteField.pxPerRadian = ppr;
+      shipView.pxPerRadian = ppr;
+    }
     camera.updateProjectionMatrix();
     starCamera.updateProjectionMatrix();
   };
@@ -510,6 +558,8 @@ async function main() {
     galaxy.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
     clusterView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, nowMs);
 
+    info.updateMarker(w, h, builder !== null);
+
     renderer.clear();
     renderer.render(starScene, starCamera);
     renderer.clearDepth();
@@ -532,6 +582,12 @@ async function main() {
           positionKm: warpPositionKm(w, date),
         })),
       ];
+      const inCluster = clusterAt(clusters, { x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
+      {
+        const f = new THREE.Vector3();
+        camera.getWorldDirection(f);
+        info.updateHud(nowMs, abs, date, observer.anchor, inCluster, { x: f.x, y: f.y, z: f.z }, builder !== null);
+      }
       hudStore.set({
         date,
         // 太陽系の外では、太陽ではなく、いる恒星系の恒星からの高さを出す
@@ -547,10 +603,8 @@ async function main() {
         speedKmS: controls.speedKmS,
         nearbyShips: online ? (link.connected ? others.length : null) : null,
         stampReady: online && link.connected,
-        region: (() => {
-          const c = clusterAt(clusters, { x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
-          return c ? `${c.kind === 'globular' ? '球状星団' : '散開星団'}：${clusterLabel(c)}` : null;
-        })(),
+        fromEarthKm: sub(abs, heliocentricPositionKm('Earth', date)),
+        region: inCluster ? `${inCluster.kind === 'globular' ? '球状星団' : '散開星団'}：${clusterLabel(inCluster)}` : null,
         radar: radarBlips(abs, controls.orientation, targets),
         warps: warps.map((w) => ({
           id: w.id,

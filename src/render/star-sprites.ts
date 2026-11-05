@@ -7,8 +7,12 @@
  * - WebGPU は点を 1 ピクセルでしか描けないので、小さな板（Sprite）を星の数だけまとめて描く
  */
 import * as THREE from 'three/webgpu';
-import { cameraPosition, clamp, exp, float, instancedBufferAttribute, log, max, smoothstep, uv } from 'three/tsl';
-import { bvToRgb, STAR_LOOK } from '../world/stars';
+import { cameraPosition, clamp, exp, float, instancedBufferAttribute, log, max, smoothstep, uniform, uv } from 'three/tsl';
+import { bvToRgb, DEFAULT_STAR_LIMIT, STAR_LIMITS, STAR_LOOK } from '../world/stars';
+import type UniformNode from 'three/src/nodes/core/UniformNode.js';
+
+/** 星の見える限界の等級（要件 F34）。すべての星の描画で共有する。setStarLimit で変える */
+export const starLimitMag = uniform(STAR_LIMITS[DEFAULT_STAR_LIMIT]) as UniformNode<'float', number>;
 
 /** 板の大きさは、見せたい大きさの何倍か。ふちに向かってぼかすので、その分大きく取る */
 const GLOW_SCALE = 3;
@@ -36,7 +40,9 @@ export class StarSprites {
     const distancePc = max(pos.sub(cameraPosition).length(), float(1e-7));
     // m = M + 5·log10(d / 10)
     const mag = instancedBufferAttribute<'float'>(magAttr, 'float').add(log(distancePc.div(10)).mul(5 / LN10));
-    const fade = float(1).sub(smoothstep(L.fadeStartMag, L.fadeEndMag, mag));
+    const fade = float(1).sub(smoothstep(starLimitMag.sub(L.fadeWidthMag), starLimitMag, mag));
+    // 恒星系に入ってその星のそば（5 AU より近く）では、点を消す。本物の大きさの球と光の広がりで描くので（要件 F33）
+    const nearFade = smoothstep(1e-5, 2.5e-5, distancePc);
     const intensity = clamp(exp(mag.sub(L.refMag).mul(-0.4 * L.contrast * LN10)), L.minIntensity, 1).mul(fade);
     const size = clamp(exp(mag.add(L.sizeOffsetMag).mul(-L.sizeSlope * LN10)).mul(L.sizeBasePx), L.minSizePx, L.maxSizePx);
 
@@ -49,9 +55,11 @@ export class StarSprites {
     });
     material.positionNode = pos;
     material.sizeNode = size.mul(GLOW_SCALE);
-    material.colorNode = instancedBufferAttribute<'vec3'>(colorAttr, 'vec3').mul(intensity);
+    material.colorNode = instancedBufferAttribute<'vec3'>(colorAttr, 'vec3').mul(intensity).mul(nearFade);
     const d = uv().sub(0.5).length().mul(2);
-    material.opacityNode = exp(d.mul(d).mul(-8));
+    // くっきりした芯と、明るい星（2 等より明るい）にだけ薄い光の広がり（要件 F32。にじんだ玉に見えないように）
+    const halo = exp(d.mul(-5)).mul(0.12).mul(smoothstep(2, -1, mag));
+    material.opacityNode = exp(d.mul(d).mul(-22)).add(halo);
 
     this.sprite = new THREE.Sprite(material);
     this.sprite.count = 0;

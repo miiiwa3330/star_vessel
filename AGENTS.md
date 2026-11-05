@@ -4,7 +4,7 @@
 
 **サービスの内容そのもの（コンセプト・体験の設計・機能仕様・世界観・技術選定の理由）は本ファイルに書かない。** それらの正本は `docs/` 配下に置く。本ファイルは「どう作業するか」だけを扱う。
 
-> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（188 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。さらに、船を UFO の形にし、スタンプ・人工衛星・星団・星の燃えかす（白色矮星・パルサー・ブラックホール）・小さな小惑星への接近を足した。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
+> **現在の状態（2026-11-05）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（188 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。さらに、船を UFO の形にし、スタンプ・人工衛星・星団・星の燃えかす（白色矮星・パルサー・ブラックホール）・小さな小惑星への接近を足した。さらに、もやを消し、遠くは点・近くは実際の大きさにし、星の見え方の切り替え・天体の情報（近くの一覧・照準の先・近づいたときのカード）・訪れた天体のコレクション・地球を原点にした座標を足した。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
 
 ---
 
@@ -162,6 +162,8 @@ src/
     small-bodies.ts       太陽系の衛星と大きな小惑星・準惑星（データから天体の一覧を作る）
     ship-design.ts        宇宙船の設計の形と確かめ方（サーバーと共有）
     stamps.ts             スタンプ（サーバーと共有）
+    info.ts               天体の情報（種類・カードの説明・照準の先・近くの恒星）
+    visits.ts             訪れた天体のコレクションの記録の形と確かめ方（サーバーと共有）
     asteroid-search.ts    近くの小惑星を探す
     satellites.ts         人工衛星（SGP4。satellite.js はこのファイルの中だけで使う）。satellite-data.ts は取り込み（サーバーと共有）
     clusters.ts           星団
@@ -184,7 +186,8 @@ src/
                           satellite-field.ts は人工衛星の光の点、cluster-view.ts は星団
   controls/flight.ts      操縦（仮）。chase-camera.ts は一人称・三人称の視点
   ui/                     画面の表示（React）。hud-store.ts を通して世界から値を受け取り、hudActions で世界へ操作を渡す。
-                          stamp-bubbles.ts はスタンプの吹き出し（毎フレーム動かすので DOM を直接動かす）
+                          stamp-bubbles.ts はスタンプの吹き出し（毎フレーム動かすので DOM を直接動かす）。
+                          info-controller.ts は天体の情報とコレクションをつなぐところ、target-marker.ts は選んだ天体の印
   net/                    サーバーとのやりとり（アカウント・ワープホールの API・宇宙の部屋の WebSocket）
 public/
   data/stars.bin          星のデータ（npm run stars で作る。stars.LICENSE.txt と必ず一緒に置く）
@@ -195,7 +198,7 @@ public/
   data/clusters.json      星団（npm run clusters）
   data/compact.json       白色矮星・パルサー・ブラックホール（npm run compact）
   textures/               天体の画像（出どころは docs/tech/credits.md）
-worker/                   サーバー（Cloudflare Workers）。index.ts が入口、warps.ts がワープホールの API、ships.ts が宇宙船の設計の API、satellites.ts が人工衛星の軌道要素の API、space-room.ts が宇宙の部屋（Durable Object）、auth*.ts がアカウント
+worker/                   サーバー（Cloudflare Workers）。index.ts が入口、warps.ts がワープホールの API、ships.ts が宇宙船の設計の API、visits.ts が訪れた天体の API、satellites.ts が人工衛星の軌道要素の API、space-room.ts が宇宙の部屋（Durable Object）、auth*.ts がアカウント
 migrations/               D1 のテーブル（0001 は npm run auth:schema で作ったもの）
 tools/build-stars.mjs     HYG → stars.bin の変換
 tools/build-exoplanets.mjs Open Exoplanet Catalogue → exoplanets.json の変換（stars.bin が先に要る）
@@ -209,7 +212,7 @@ docs/                     仕様・判断・経緯の正本（地図は docs/REA
 ```
 
 - 世界の計算は `src/world/` に置き、three.js・React を読み込まない。描画や画面から切り離してテストするため
-- サーバーと共有する `src/world/address.ts`・`warp-schema.ts`・`ship-schema.ts`・`galaxy.ts`・`random.ts` は、astronomy-engine・DOM も読み込まない（Worker に余計なものを入れないため）
+- サーバーと共有する `src/world/address.ts`・`warp-schema.ts`・`ship-schema.ts`・`visits.ts`・`galaxy.ts`・`random.ts` は、astronomy-engine・DOM も読み込まない（Worker に余計なものを入れないため）
 - **自動で生成するもの（銀河・星）は、誰の端末でも同じ結果にする。** 乱数は `src/world/random.ts` を使い、`Math.random` を使わない。数（星の数など）を決める計算に対数・指数を使わない（ブラウザによって最後の桁が違うことがある）
 - **サーバーは、ブラウザから受け取ったものを必ず確かめてから使う**（`isWarpPlacement` など）。秘密の値（`.dev.vars`）はコミットしない
 - 外部の素材（データ・画像）を足したら、[`docs/tech/credits.md`](docs/tech/credits.md) に書き、表記が要るものは画面のクレジットにも出す

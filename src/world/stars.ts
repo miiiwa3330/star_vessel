@@ -33,13 +33,14 @@ export function decodeStars(buffer: ArrayBuffer): StarCatalog {
  * 明るい星が目立たなかったので、いまの値にした。
  * 2026-11-05：fadeStartMag〜fadeEndMag で、とても暗い星を消すようにした。銀河の外から見たとき、
  * 本物の星（約 11 万個）が最小の明るさのまま太陽のまわりに重なり、明るい玉に見えたため。
+ * 2026-11-05：見える限界（肉眼・双眼鏡・写真）を切り替えられるようにした（STAR_LIMITS。要件 F34）。限界の 1.5 等手前から消す
  */
 export const STAR_LOOK = {
   refMag: 1,
   contrast: 0.7,
   minIntensity: 0.01,
-  fadeStartMag: 10,
-  fadeEndMag: 14,
+  /** 見える限界（limitMag）の何等手前から消し始めるか */
+  fadeWidthMag: 1.5,
   sizeBasePx: 6,
   sizeSlope: 0.12,
   sizeOffsetMag: 1.5,
@@ -51,10 +52,19 @@ export const STAR_LOOK = {
 export const apparentMagnitude = (absMag: number, distancePc: number): number =>
   absMag + 5 * Math.log10(Math.max(distancePc, 1e-7) / 10);
 
-/** 見かけの等級から、画面での大きさ（CSS ピクセル）と明るさ（0〜1） */
-export function starAppearance(mag: number): { sizePx: number; intensity: number } {
+/**
+ * 星の見え方（要件 F34）。見える限界の等級。肉眼・双眼鏡・写真（長時間露出）の 3 つから選べる。
+ * 肉眼の限界 6.5 等はよく使われる値（暗い空で）、双眼鏡は口径 50 mm でおおよそ 9〜10 等、写真の 14 等はこれまでの値
+ */
+export const STAR_LIMITS = { naked: 6.5, binoculars: 9, photo: 14 } as const;
+export type StarLimitMode = keyof typeof STAR_LIMITS;
+export const DEFAULT_STAR_LIMIT: StarLimitMode = 'binoculars';
+export const STAR_LIMIT_NAMES_JA: Record<StarLimitMode, string> = { naked: '肉眼', binoculars: '双眼鏡', photo: '写真' };
+
+/** 見かけの等級から、画面での大きさ（CSS ピクセル）と明るさ（0〜1）。limitMag は見える限界の等級 */
+export function starAppearance(mag: number, limitMag: number = STAR_LIMITS[DEFAULT_STAR_LIMIT]): { sizePx: number; intensity: number } {
   const L = STAR_LOOK;
-  const fade = 1 - smoothstep(L.fadeStartMag, L.fadeEndMag, mag);
+  const fade = 1 - smoothstep(limitMag - L.fadeWidthMag, limitMag, mag);
   const intensity = clamp(10 ** (-0.4 * (mag - L.refMag) * L.contrast), L.minIntensity, 1) * fade;
   const sizePx = clamp(L.sizeBasePx * 10 ** (-L.sizeSlope * (mag + L.sizeOffsetMag)), L.minSizePx, L.maxSizePx);
   return { sizePx, intensity };
