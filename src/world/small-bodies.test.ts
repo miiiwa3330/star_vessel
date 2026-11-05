@@ -69,6 +69,15 @@ describe('大きな小惑星・準惑星（JPL SBDB）', () => {
 });
 
 describe('衛星の名前', () => {
+  it('どの衛星も軌道が楕円で、位置が数になる（仮符号の衛星も）', () => {
+    for (const r of (JSON.parse(readFileSync('public/data/moons.json', 'utf8')) as { moons: MoonRecord[] }).moons) {
+      expect(r.e, r.name).toBeLessThan(1);
+      expect(r.a, r.name).toBeGreaterThan(0);
+      expect(r.P, r.name).toBeGreaterThan(0);
+      expect(r.radius, r.name).toBeGreaterThan(0);
+    }
+  });
+
   it('同じ衛星を 2 回入れない（JPL の表にパックが 2 行あった）', () => {
     const ids = moons.map((m) => m.id);
     expect(new Set(ids).size).toBe(ids.length);

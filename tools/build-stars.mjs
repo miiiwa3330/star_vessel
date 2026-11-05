@@ -1,5 +1,6 @@
 // HYG v4.4（CC BY-SA 4.0）から、ブラウザで読む星のデータ public/data/stars.bin を作る。
 // 形式は docs/tech/world-model.md の「恒星のデータ形式」。使い方：npm run stars
+// 星の動き（public/data/stars-motion.bin）も一緒に作る
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { dirname, join } from 'node:path';
@@ -48,7 +49,7 @@ const col = (name) => {
   if (i < 0) throw new Error(`列が無い: ${name}`);
   return i;
 };
-const [iId, iX, iY, iZ, iAbsMag, iCi, iDist] = ['id', 'x', 'y', 'z', 'absmag', 'ci', 'dist'].map(col);
+const [iId, iX, iY, iZ, iAbsMag, iCi, iDist, iVx, iVy, iVz] = ['id', 'x', 'y', 'z', 'absmag', 'ci', 'dist', 'vx', 'vy', 'vz'].map(col);
 
 const stars = [];
 for (const line of lines.slice(1)) {
@@ -57,15 +58,21 @@ for (const line of lines.slice(1)) {
   // 距離の分からない星（HYG では距離が 100,000 pc の仮の値）は、3 次元の場所に置けないので外す
   if (Number(f[iDist]) >= 100_000) continue;
   const ci = f[iCi] === '' ? Number.NaN : Number(f[iCi]);
-  stars.push([Number(f[iX]), Number(f[iY]), Number(f[iZ]), Number(f[iAbsMag]), ci, Number(f[iId])]);
+  stars.push([Number(f[iX]), Number(f[iY]), Number(f[iZ]), Number(f[iAbsMag]), ci, Number(f[iId]), Number(f[iVx]) || 0, Number(f[iVy]) || 0, Number(f[iVz]) || 0]);
 }
 // 本来の明るさ（絶対等級）の明るい順に並べる。性能の低い端末では先頭から一部だけを描けばよい
 stars.sort((a, b) => a[3] - b[3]);
 
 const data = new Float32Array(stars.length * STRIDE);
-stars.forEach((s, i) => data.set(s, i * STRIDE));
+// 星の動き（pc/年）は別のファイルに置く。stars.bin の形を変えると、stars.bin を読むツールも直すことになるため
+const motion = new Float32Array(stars.length * 3);
+stars.forEach((s, i) => {
+  data.set(s.slice(0, STRIDE), i * STRIDE);
+  motion.set(s.slice(STRIDE), i * 3);
+});
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'stars.bin'), Buffer.from(data.buffer));
+writeFileSync(join(outDir, 'stars-motion.bin'), Buffer.from(motion.buffer));
 writeFileSync(
   join(outDir, 'stars.LICENSE.txt'),
   [
@@ -73,7 +80,7 @@ writeFileSync(
     'This data is derived from the HYG Database v4.4 by David Nash (astronexus), https://codeberg.org/astronexus/hyg',
     'Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0):',
     'https://creativecommons.org/licenses/by-sa/4.0/',
-    'Changes: kept only x, y, z (parsec, J2000 equatorial), absolute magnitude, B-V color index and the HYG id; removed the Sun and stars without a known distance; sorted by absolute magnitude; stored as little-endian float32.',
+    'Changes: kept only x, y, z (parsec, J2000 equatorial), absolute magnitude, B-V color index and the HYG id (stars.bin) and vx, vy, vz (parsec per year, stars-motion.bin, same order); removed the Sun and stars without a known distance; sorted by absolute magnitude; stored as little-endian float32.',
     '',
   ].join('\n'),
 );

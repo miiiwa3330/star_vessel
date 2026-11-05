@@ -23,6 +23,28 @@ export function decodeStars(buffer: ArrayBuffer): StarCatalog {
   return { count: data.length / STAR_STRIDE, data };
 }
 
+/** 星のデータの位置の元期（J2000.0。HYG の x・y・z）。UNIX ミリ秒 */
+const J2000_MS = Date.UTC(2000, 0, 1, 12);
+const JULIAN_YEAR_MS = 365.25 * 86_400_000;
+
+/** date が J2000.0 から何年か */
+export const yearsSinceJ2000 = (date: Date): number => (date.getTime() - J2000_MS) / JULIAN_YEAR_MS;
+
+/**
+ * 星を今の位置へ動かす（要件 F5）。motion は星ごとに vx・vy・vz（pc/年。public/data/stars-motion.bin。星のデータと同じ順）。
+ * 1 回の起動の間に星が動く量はとても小さいので、起動したときに 1 回だけ動かす。data を書き換える
+ */
+export function applyStarMotion(data: Float32Array, motion: Float32Array, years: number): void {
+  const n = data.length / STAR_STRIDE;
+  if (motion.length !== n * 3) throw new Error('stars-motion.bin の長さが星のデータと合わない');
+  for (let i = 0; i < n; i++) {
+    const o = i * STAR_STRIDE;
+    data[o] += motion[i * 3] * years;
+    data[o + 1] += motion[i * 3 + 1] * years;
+    data[o + 2] += motion[i * 3 + 2] * years;
+  }
+}
+
 /**
  * 星の見た目の決め方の数。starAppearance（テスト・CPU）と、星を描くシェーダー（src/render/star-sprites.ts）の両方が使う。
  *

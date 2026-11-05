@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addressCode, addressPrefix, bodyAddress, isSystemCode, knownSystemArm, nearestSystem, readAddress, toRoman } from './address';
+import { addressCode, addressPrefix, bodyAddress, hygSystemCode, isSystemCode, knownSystemArm, nearestSystem, readAddress, toRoman } from './address';
 import { cellOf, galactoToEqjPc, generateCell } from './galaxy';
 import { KM_PER_PC } from './units';
 
@@ -111,5 +111,19 @@ describe('系外惑星の衛星', () => {
     expect(bodyAddress('H70666.2.0')).toBeNull();
     expect(addressPrefix('H70666.2.1', 'H70666', 'ORI')).toBe('MW-ORI-H70666-2-1');
     expect(readAddress('MW-ORI-H70666-2-3-001')).toBe('天の川銀河 オリオン腕 恒星 H70666 第2惑星 第3衛星 1番');
+  });
+});
+
+describe('2026-11-05 に足した天体の住所', () => {
+  it('彗星・仮符号の衛星・探査機・Gaia の星の恒星系', () => {
+    expect(bodyAddress('C1P')).toEqual({ planet: 'C1P', moon: 0, system: 'SOL' });
+    expect(bodyAddress('CC1995O1')).toEqual({ planet: 'CC1995O1', moon: 0, system: 'SOL' });
+    expect(bodyAddress('S5p55501')).toEqual({ planet: '5', moon: 0, system: 'SOL' });
+    expect(bodyAddress('V31')).toEqual({ planet: '0', moon: 0, system: 'SOL' });
+    expect(isSystemCode('D123')).toBe(true);
+    expect(hygSystemCode(1_000_123)).toBe('D123');
+    expect(hygSystemCode(32263)).toBe('H32263');
+    expect(bodyAddress('D123.2')).toEqual({ planet: '2', moon: 0, system: 'D123' });
+    expect(addressPrefix('C1P', 'SOL', 'ORI')).toBe('MW-ORI-SOL-C1P-0');
   });
 });

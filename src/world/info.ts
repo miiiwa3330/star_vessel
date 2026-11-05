@@ -2,8 +2,11 @@
  * 天体の情報（要件 F35〜F37）：種類の名前、情報のカードに出す説明、照準の先の天体を選ぶ計算。
  * 決まりは docs/product/info-and-collection.md。three.js・React を読み込まない。
  */
+import { hygSystemCode } from './address';
 import type { BodyInfo, BodyKind } from './solar-system';
 import type { Cluster } from './clusters';
+import type { Galaxy } from './galaxies';
+import { NEBULA_TYPE_NAMES_JA, type Nebula } from './nebulae';
 import type { HostStar } from './planets';
 import { KM_PER_PC } from './units';
 import type { Vec3 } from './vec';
@@ -18,9 +21,13 @@ export type InfoKind =
   | 'dwarf'
   | 'moon'
   | 'asteroid'
+  | 'comet'
   | 'exoplanet'
   | 'satellite'
-  | 'cluster';
+  | 'spacecraft'
+  | 'cluster'
+  | 'nebula'
+  | 'galaxy';
 
 export const INFO_KIND_NAMES_JA: Record<InfoKind, string> = {
   star: '恒星',
@@ -31,9 +38,13 @@ export const INFO_KIND_NAMES_JA: Record<InfoKind, string> = {
   dwarf: '準惑星',
   moon: '衛星',
   asteroid: '小惑星',
+  comet: '彗星',
   exoplanet: '系外惑星',
   satellite: '人工衛星',
+  spacecraft: '探査機',
   cluster: '星団',
+  nebula: '星雲',
+  galaxy: '銀河',
 };
 
 /** 情報を出す相手 */
@@ -64,8 +75,10 @@ export function bodyKind(b: BodyInfo): InfoKind {
     dwarf: 'dwarf',
     moon: 'moon',
     asteroid: 'asteroid',
+    comet: 'comet',
     exoplanet: 'exoplanet',
     satellite: 'satellite',
+    spacecraft: 'spacecraft',
     blackhole: 'black-hole',
   };
   return map[b.kind];
@@ -84,7 +97,7 @@ export function describeBody(b: BodyInfo, parentName: string | null): string[] {
   const exo = kind === 'exoplanet' || (kind === 'moon' && b.id !== 'Moon' && !b.id.startsWith('S'));
   const generated = exo && isGenerated(b);
   out.push(`${INFO_KIND_NAMES_JA[kind]}${generated ? '（自動で作った天体）' : ''}${parentName ? ` ・ ${parentName}のまわりを回る` : ''}`);
-  if (kind === 'satellite') out.push(`大きさ 約 ${fmtKm(b.radiusKm * 2)}`);
+  if (kind === 'satellite' || kind === 'spacecraft') out.push(`大きさ 約 ${fmtKm(b.radiusKm * 2)}`);
   else if (kind === 'black-hole') out.push(`事象の地平面の半径 約 ${fmtKm(b.radiusKm)}`);
   else out.push(`半径 ${fmtKm(b.radiusKm)}`);
   if (b.motion.type === 'kepler') out.push(`公転周期 ${fmtPeriod(b.motion.elements.periodDays)}`);
@@ -118,6 +131,34 @@ export function describeCluster(c: Cluster): string[] {
     `太陽から ${Math.round(distLy).toLocaleString('ja-JP')} 光年`,
     `半数の星が入る半径 ${((c.r50Pc * 3.2616) | 0).toLocaleString('ja-JP')} 光年`,
     `見つかっているメンバー ${c.members.toLocaleString('ja-JP')} 個`,
+  ];
+}
+
+const fmtLy = (pc: number) => {
+  const ly = pc * 3.2616;
+  return ly < 100 ? `${ly.toPrecision(3)} 光年` : ly < 1e6 ? `${Math.round(ly).toLocaleString('ja-JP')} 光年` : `${(ly / 1e6).toPrecision(3)} 百万光年`;
+};
+
+/** 星雲の、情報のカードの説明 */
+export function describeNebula(n: Nebula): string[] {
+  return [
+    `${NEBULA_TYPE_NAMES_JA[n.type]}${n.nameJa ? ` ・ ${n.name}` : ''}`,
+    `太陽から ${fmtLy(Math.hypot(n.positionPc.x, n.positionPc.y, n.positionPc.z))}`,
+    n.measured ? `半径 ${fmtLy(n.radiusPc)}` : `半径 約 ${fmtLy(n.radiusPc)}（典型的な値）`,
+    '形は種類に合わせて作ったもの（位置と大きさは観測の値）',
+  ];
+}
+
+/** 銀河の、情報のカードの説明 */
+export function describeGalaxy(g: Galaxy): string[] {
+  const t = g.tType;
+  const type = t === null ? '銀河' : t <= -1 ? '楕円銀河・矮小楕円銀河' : t === 0 ? 'レンズ状銀河' : t <= 8 ? '渦巻銀河' : '不規則銀河';
+  return [
+    `${type}${g.nameJa ? ` ・ ${g.name}` : ''}`,
+    `太陽から ${fmtLy(Math.hypot(g.positionPc.x, g.positionPc.y, g.positionPc.z))}`,
+    `半径 ${fmtLy(g.radiusPc)}`,
+    `絶対等級 ${g.absB.toFixed(1)}（B バンド）`,
+    '星の並びは種類に合わせて作ったもの（位置・大きさ・明るさは観測の値）',
   ];
 }
 
@@ -160,6 +201,10 @@ export function pickAimed(
 export const starKey = (system: string): string => (system === 'SOL' ? 'Sun' : `${system}.0`);
 /** 星団の記号 */
 export const clusterKey = (c: Cluster): string => `C:${c.name}`;
+/** コレクションの記号に使える文字だけにする（src/world/visits.ts の KEY） */
+const safeKey = (s: string) => s.replace(/[^0-9A-Za-z.~:+\- ]/g, '').slice(0, 60);
+export const nebulaKey = (n: Nebula): string => `N:${safeKey(n.name)}`;
+export const galaxyKey = (g: Galaxy): string => `Y:${safeKey(g.name)}`;
 
 /** 近くの恒星（恒星系の記号・位置〈pc〉・距離〈pc〉） */
 export interface NearStar {
@@ -179,19 +224,31 @@ export function nearestStars(
   extra: readonly { position: Vec3; system: string }[],
   max: number,
 ): NearStar[] {
+  // 星は 100 万個ほどあるので、ここは毎回の処理を軽くする（2 秒ごとに全部を調べるので、遅いと画面全体が引っかかる）。
+  // 関数を作らず、距離は 2 乗のまま比べ、記号の文字列は近い方に入るときだけ作る
   const best: NearStar[] = [];
-  // 記号の文字列は、近い方に入るときだけ作る（星は 10 万個以上あるため）
-  const consider = (system: () => string, x: number, y: number, z: number) => {
-    const d = Math.hypot(x - positionPc.x, y - positionPc.y, z - positionPc.z);
-    if (best.length === max && d >= best[max - 1].distancePc) return;
-    const item = { system: system(), positionPc: { x, y, z }, distancePc: d };
+  const { x: px, y: py, z: pz } = positionPc;
+  let worstD2 = Number.POSITIVE_INFINITY;
+  const insert = (system: string, x: number, y: number, z: number, d2: number) => {
+    const distancePc = Math.sqrt(d2);
     let i = best.length;
-    while (i > 0 && best[i - 1].distancePc > d) i--;
-    best.splice(i, 0, item);
+    while (i > 0 && best[i - 1].distancePc > distancePc) i--;
+    best.splice(i, 0, { system, positionPc: { x, y, z }, distancePc });
     if (best.length > max) best.pop();
+    if (best.length === max) worstD2 = best[max - 1].distancePc ** 2;
   };
-  consider(() => 'SOL', 0, 0, 0);
-  for (let o = 0; o + stride <= stars.length; o += stride) consider(() => `H${stars[o + stride - 1]}`, stars[o], stars[o + 1], stars[o + 2]);
-  for (const g of extra) consider(() => g.system, g.position.x, g.position.y, g.position.z);
+  insert('SOL', 0, 0, 0, px * px + py * py + pz * pz);
+  for (let o = 0; o + stride <= stars.length; o += stride) {
+    const dx = stars[o] - px;
+    const dy = stars[o + 1] - py;
+    const dz = stars[o + 2] - pz;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 < worstD2) insert(hygSystemCode(stars[o + stride - 1]), stars[o], stars[o + 1], stars[o + 2], d2);
+  }
+  for (const g of extra) {
+    const { x, y, z } = g.position;
+    const d2 = (x - px) ** 2 + (y - py) ** 2 + (z - pz) ** 2;
+    if (d2 < worstD2) insert(g.system, x, y, z, d2);
+  }
   return best;
 }

@@ -2,13 +2,14 @@
  * 恒星系の記号から、恒星と惑星を引く（要件 F22）。
  *
  * - H＋HYG の id：星のデータ（stars.bin）の星
+ * - D＋番号：Gaia DR3 の星（stars-gaia-*.bin）
  * - G＋マス目と番号：自動で作った星（src/world/galaxy.ts）
  * - E＋ハッシュ：系外惑星のデータにだけある恒星（HYG に無い恒星）
  *
  * いる恒星系の天体は、天体の一覧（src/world/solar-system.ts）に入れ替えて登録する（enter）。
  * 遠くの恒星系の天体（そこに置かれたワープホールなど）は findBody で引く。
  */
-import { bodyAddress, SYSTEM_SOL } from './address';
+import { bodyAddress, GAIA_ID_BASE, SYSTEM_SOL } from './address';
 import type { RealSystem } from './exoplanet-data';
 import { generateCell, parseGeneratedSystem } from './galaxy';
 import { systemBodies, type HostStar } from './planets';
@@ -28,7 +29,8 @@ export class StarSystems {
   private readonly compactByCode = new Map<string, CompactObject>();
 
   constructor(
-    private readonly stars: Float32Array,
+    /** 星のデータ。Gaia の星を読み込むと data が大きくなるので、入れ物ごと持つ */
+    private readonly catalog: { data: Float32Array },
     private readonly real: ReadonlyMap<string, RealSystem>,
     compact: readonly CompactObject[] = [],
   ) {
@@ -48,15 +50,21 @@ export class StarSystems {
     return out;
   }
 
+  /** 星のデータが増えたら呼ぶ（星の id の索引を作り直す） */
+  catalogChanged(): void {
+    this.hygIndex = null;
+  }
+
   hostOf(system: string): HostStar | null {
-    if (system.startsWith('H')) {
+    if (system.startsWith('H') || (system.startsWith('D') && /^D[0-9]+$/.test(system))) {
       if (!this.hygIndex) {
         this.hygIndex = new Map();
-        for (let o = 0; o + STAR_STRIDE <= this.stars.length; o += STAR_STRIDE) this.hygIndex.set(this.stars[o + 5], o);
+        const d = this.catalog.data;
+        for (let o = 0; o + STAR_STRIDE <= d.length; o += STAR_STRIDE) this.hygIndex.set(d[o + 5], o);
       }
-      const o = this.hygIndex.get(Number(system.slice(1)));
+      const o = this.hygIndex.get(system.startsWith('D') ? GAIA_ID_BASE + Number(system.slice(1)) : Number(system.slice(1)));
       if (o === undefined) return null;
-      const s = this.stars;
+      const s = this.catalog.data;
       const bv = Number.isFinite(s[o + 4]) ? s[o + 4] : 0.65;
       return { system, positionPc: { x: s[o], y: s[o + 1], z: s[o + 2] }, absMag: s[o + 3], bv };
     }
@@ -74,7 +82,7 @@ export class StarSystems {
         absMag: c.absMag,
         bv: c.bv,
         compact: c.kind,
-        compactInfo: { name: c.name, teffK: c.teffK, periodS: c.periodS },
+        compactInfo: { name: c.name, teffK: c.teffK, periodS: c.periodS, massSun: c.massSun },
       };
     }
     const r = this.real.get(system);

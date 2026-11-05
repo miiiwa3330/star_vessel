@@ -13,9 +13,13 @@ export const VISIT_KINDS: readonly InfoKind[] = [
   'dwarf',
   'moon',
   'asteroid',
+  'comet',
   'exoplanet',
   'satellite',
+  'spacecraft',
   'cluster',
+  'nebula',
+  'galaxy',
 ];
 
 /** 1 人が記録できる数の上限（サーバーの容量のため） */

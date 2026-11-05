@@ -49,3 +49,15 @@ describe('星の燃えかす（自動で作る）', () => {
     expect(counts['neutron-star']).toBeGreaterThan(0);
   });
 });
+
+describe('いて座 A*', () => {
+  it('銀河のモデルの中心にあり、シュワルツシルト半径は約 1,230 万 km', () => {
+    const c = decodeCompact({ whiteDwarfs: [], pulsars: [], blackHoles: [] })[0];
+    expect(c.code).toBe('BSGRASTR');
+    expect(isSystemCode(c.code)).toBe(true);
+    expect(Math.hypot(c.positionPc.x, c.positionPc.y, c.positionPc.z)).toBeCloseTo(8178, -1);
+    const bodies = systemBodies({ system: c.code, positionPc: c.positionPc, absMag: c.absMag, bv: c.bv, compact: c.kind, compactInfo: { name: c.name, massSun: c.massSun } }, null);
+    expect(bodies[0].radiusKm).toBeCloseTo(schwarzschildKm(4.152e6), 0);
+    expect(bodies[0].radiusKm).toBeGreaterThan(1.2e7);
+  });
+});

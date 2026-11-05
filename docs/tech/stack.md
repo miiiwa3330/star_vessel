@@ -137,8 +137,8 @@ Web アプリとして作り、PC とスマホの両方に対応する（[`../pr
 |------|------------------------|
 | satellite.js | ISS など、地球を回る本物の人工衛星を、いまの位置に置ける（2026-11-05 に採用） |
 | JPL Horizons API | 土星・火星などの衛星の軌道の値を、開発中に集めて足せる（2026-11-05 に採用。`tools/build-moons.mjs`） |
-| OpenNGC | 星雲・星団・銀河（アンドロメダ銀河・オリオン大星雲など）を置ける |
-| NASA Exoplanet Archive | 本物の系外惑星を置ける |
+| OpenNGC | 星雲・星団・銀河の大きさと向き（2026-11-05 に採用。距離は入っていないので、位置は SIMBAD と Updated Nearby Galaxy Catalog） |
+| NASA Exoplanet Archive | 本物の系外惑星を置ける（2026-11-05 に採用。Open Exoplanet Catalogue に足す） |
 
 ## 選んでから決めること
 

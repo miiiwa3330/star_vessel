@@ -9,6 +9,10 @@ import {
   clusterKey,
   describeBody,
   describeCluster,
+  describeGalaxy,
+  describeNebula,
+  galaxyKey,
+  nebulaKey,
   describeHost,
   INFO_KIND_NAMES_JA,
   nearestStars,
@@ -19,6 +23,8 @@ import {
 } from '../world/info';
 import { allBodies, findBody, heliocentricPositionKm, type BodyInfo } from '../world/solar-system';
 import { clusterLabel, nearbyClusters, type Cluster } from '../world/clusters';
+import { insideOf, nebulaLabel, prominent, type Nebula } from '../world/nebulae';
+import { galaxyLabel, type Galaxy } from '../world/galaxies';
 import type { StarSystems } from '../world/star-systems';
 import { STAR_STRIDE } from '../world/stars';
 import { KM_PER_PC } from '../world/units';
@@ -34,7 +40,7 @@ const NEAR_CARD_MS = 8_000;
 /** 近くの恒星・星団を探し直す間隔（星は 10 万個以上あるので、毎回は探さない） */
 const FAR_SEARCH_MS = 2_000;
 /** 一覧に出す数 */
-const LIST_SIZE = { bodies: 15, stars: 8, clusters: 5 };
+const LIST_SIZE = { bodies: 15, stars: 8, clusters: 5, nebulae: 5, galaxies: 5 };
 /** クリック・タップで選べる、画面の上での距離（CSS ピクセル） */
 const TAP_RADIUS_PX = 40;
 
@@ -42,9 +48,12 @@ interface Deps {
   ui: HTMLElement;
   camera: THREE.PerspectiveCamera;
   systems: StarSystems;
-  stars: Float32Array;
+  /** 星のデータ。Gaia の星を読み込むと data が大きくなるので、入れ物ごと持つ */
+  stars: { data: Float32Array };
   extraStars: readonly { position: Vec3; system: string }[];
   clusters: readonly Cluster[];
+  nebulae: readonly Nebula[];
+  galaxies: readonly Galaxy[];
   /** 自分の見ている向きの方を向く（その方を向くボタン） */
   face: (relKm: Vec3) => void;
 }
@@ -62,7 +71,9 @@ export class InfoController {
   private loaded = false;
   private readonly pending: VisitInput[] = [];
   private online = false;
-  private last: { anchor: string; system: string; cluster: string | null } | null = null;
+  private last: { anchor: string; system: string; cluster: string | null; deep: string | null } | null = null;
+  /** 中にいる星雲・銀河（FAR_SEARCH_MS ごとに調べる） */
+  private inside: InfoTarget | null = null;
   private readonly v = new THREE.Vector3();
   private readonly q = new THREE.Quaternion();
 
@@ -126,6 +137,10 @@ export class InfoController {
     if (nowMs - this.lastFarSearch > FAR_SEARCH_MS) {
       this.lastFarSearch = nowMs;
       this.far = this.searchFar(pc);
+      const neb = insideOf(this.deps.nebulae, pc);
+      const gal = insideOf(this.deps.galaxies, pc);
+      this.inside = neb ? this.nebulaTarget(neb) : gal ? this.galaxyTarget(gal) : null;
+      hudStore.set({ deepRegion: this.inside ? `${INFO_KIND_NAMES_JA[this.inside.kind]}：${this.inside.name}` : null });
     }
     const bodies = allBodies()
       // 恒星は、恒星の一覧（far）の方で出す。太陽系の外の恒星の天体は同じ記号なので、天体の方を優先する
@@ -139,7 +154,7 @@ export class InfoController {
 
     // 近づいたとき（要件 F37）：基準の天体が変わった・恒星系に入った・星団に入った
     const sys = this.deps.systems.currentSystem;
-    const now = { anchor, system: sys, cluster: cluster ? clusterKey(cluster) : null };
+    const now = { anchor, system: sys, cluster: cluster ? clusterKey(cluster) : null, deep: this.inside?.key ?? null };
     if (!this.last) {
       // 起動したときにいる場所は、カードを出さずに記録だけする
       this.record(this.bodyTarget(findBody(anchor) ?? findBody('Sun')!, date));
@@ -156,6 +171,7 @@ export class InfoController {
         if (b) hits.push(this.bodyTarget(b, date));
       }
       if (now.cluster && now.cluster !== this.last.cluster && cluster) hits.push(this.clusterTarget(cluster));
+      if (now.deep && now.deep !== this.last.deep && this.inside) hits.push(this.inside);
       // いちばん近いもの（あとに足したもの）をカードに出す。どれも記録する
       for (const t of hits) {
         const first = this.record(t);
@@ -254,13 +270,37 @@ export class InfoController {
     };
   }
 
+  private nebulaTarget(n: Nebula): InfoTarget {
+    return {
+      key: nebulaKey(n),
+      name: nebulaLabel(n),
+      kind: 'nebula',
+      // 半径は渡さない。大きな星雲の円の中のどこを見ても選ばれると、手前の小さな天体が照準で選べなくなるため
+      positionKm: { x: n.positionPc.x * KM_PER_PC, y: n.positionPc.y * KM_PER_PC, z: n.positionPc.z * KM_PER_PC },
+      details: () => describeNebula(n),
+    };
+  }
+
+  private galaxyTarget(g: Galaxy): InfoTarget {
+    return {
+      key: galaxyKey(g),
+      name: galaxyLabel(g),
+      kind: 'galaxy',
+      positionKm: { x: g.positionPc.x * KM_PER_PC, y: g.positionPc.y * KM_PER_PC, z: g.positionPc.z * KM_PER_PC },
+      details: () => describeGalaxy(g),
+    };
+  }
+
   private searchFar(pc: Vec3): InfoTarget[] {
     const out: InfoTarget[] = [];
-    for (const s of nearestStars(pc, this.deps.stars, STAR_STRIDE, this.deps.extraStars, LIST_SIZE.stars)) {
+    for (const s of nearestStars(pc, this.deps.stars.data, STAR_STRIDE, this.deps.extraStars, LIST_SIZE.stars)) {
       const t = this.starTarget(s.system);
       if (t) out.push(t);
     }
     for (const c of nearbyClusters(this.deps.clusters, pc, LIST_SIZE.clusters)) out.push(this.clusterTarget(c));
+    // 星雲と銀河は、大きく見えている順（アンドロメダ銀河やオリオン大星雲を地球からも選べるように）
+    for (const n of prominent(this.deps.nebulae, pc, LIST_SIZE.nebulae * 3)) out.push(this.nebulaTarget(n));
+    for (const g of prominent(this.deps.galaxies, pc, LIST_SIZE.galaxies * 3)) out.push(this.galaxyTarget(g));
     return out;
   }
 
@@ -269,12 +309,16 @@ export class InfoController {
     const item = (t: InfoTarget) => ({ key: t.key, name: t.name, kindJa: INFO_KIND_NAMES_JA[t.kind], distance: formatDistance(dist(t)) });
     const byDist = (a: InfoTarget, b: InfoTarget) => dist(a) - dist(b);
     const stars = this.targets.filter((t) => isStarKind(t.kind)).sort(byDist);
-    const others = this.targets.filter((t) => !isStarKind(t.kind) && t.kind !== 'cluster').sort(byDist);
+    const others = this.targets.filter((t) => !isStarKind(t.kind) && t.kind !== 'cluster' && t.kind !== 'nebula' && t.kind !== 'galaxy').sort(byDist);
     const clusters = this.targets.filter((t) => t.kind === 'cluster').sort(byDist);
+    const nebulae = this.targets.filter((t) => t.kind === 'nebula').sort(byDist);
+    const galaxies = this.targets.filter((t) => t.kind === 'galaxy').sort(byDist);
     return [
       { title: 'この恒星系の天体', items: others.slice(0, LIST_SIZE.bodies).map(item) },
       { title: '近くの恒星', items: stars.slice(0, LIST_SIZE.stars).map(item) },
       { title: '近くの星団', items: clusters.slice(0, LIST_SIZE.clusters).map(item) },
+      { title: '大きく見える星雲', items: nebulae.slice(0, LIST_SIZE.nebulae).map(item) },
+      { title: '大きく見える銀河', items: galaxies.slice(0, LIST_SIZE.galaxies).map(item) },
     ];
   }
 

@@ -28,6 +28,7 @@ export function Hud() {
           <div>{formatSpeed(s.speedKmS)}</div>
           <Coordinates v={s.fromEarthKm} />
           {s.region && <div>{s.region}</div>}
+          {s.deepRegion && <div>{s.deepRegion}</div>}
           {s.nearbyShips !== null && <div>近くのプレイヤー：{s.nearbyShips} 人</div>}
           <div className="hud-muted">描画：{s.backend}</div>
           {s.status && <div className="hud-warn">{s.status}</div>}
@@ -85,6 +86,14 @@ export function Hud() {
           </button>
           <button
             type="button"
+            className={`hud-button${s.constellations ? ' is-selected' : ''}`}
+            aria-pressed={s.constellations}
+            onClick={(e) => { hudActions.toggleConstellations(); e.currentTarget.blur(); }}
+          >
+            星座：{s.constellations ? '表示中' : '非表示'}
+          </button>
+          <button
+            type="button"
             className="hud-button"
             disabled={!s.shipReady}
             onClick={(e) => { hudActions.openShipBuilder(); e.currentTarget.blur(); }}
@@ -104,7 +113,7 @@ export function Hud() {
         </button>
       </div>
       {/* 宇宙船を作る画面を開いている間は、下の説明と右のボタンを隠す（重なるため） */}
-      {!s.shipBuilder && <AimLabel aim={s.aimLabel} />}
+      {!s.shipBuilder && <AimLabel aim={s.aimLabel} constellation={s.aimConstellation} />}
       <BottomPanels hidden={s.shipBuilder !== null} />
     </>
   );

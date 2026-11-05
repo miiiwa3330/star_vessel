@@ -89,6 +89,24 @@ describe('実在の惑星', () => {
   });
 });
 
+/**
+ * 数は最後の桁までは比べない。Math.cbrt などの最後の桁は JavaScript の実行環境で違うことがある（2026-11-05：Node 24 で 1 桁ずれて、このテストが落ちた）。
+ * 惑星の数や id は決して変わらない（数を決める計算に対数・指数を使わないため）ので、それは厳密に比べる
+ */
+function expectClose(a: unknown, b: unknown, path = ''): void {
+  if (typeof a === 'number' && typeof b === 'number') {
+    expect(Math.abs(a - b), path).toBeLessThanOrEqual(1e-12 * Math.max(Math.abs(a), Math.abs(b)));
+  } else if (Array.isArray(a) && Array.isArray(b)) {
+    expect(a.length, path).toBe(b.length);
+    a.forEach((v, i) => expectClose(v, b[i], `${path}[${i}]`));
+  } else if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+    expect(Object.keys(a).sort(), path).toEqual(Object.keys(b).sort());
+    for (const k of Object.keys(a)) expectClose((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}.${k}`);
+  } else {
+    expect(a, path).toBe(b);
+  }
+}
+
 describe('系外惑星の衛星と環（要件 F26）', () => {
   const baseline = JSON.parse(readFileSync('src/world/__fixtures__/generated-planets-v1.json', 'utf8')) as Record<
     string,
@@ -106,7 +124,7 @@ describe('系外惑星の衛星と環（要件 F26）', () => {
       const planets = systemBodies(hostFor(code, i), null)
         .filter((b) => b.kind === 'exoplanet')
         .map((b) => ({ id: b.id, radiusKm: b.radiusKm, el: (b.motion as { elements: unknown }).elements }));
-      expect(JSON.parse(JSON.stringify(planets))).toEqual(baseline[code]);
+      expectClose(JSON.parse(JSON.stringify(planets)), baseline[code]);
     });
   });
 

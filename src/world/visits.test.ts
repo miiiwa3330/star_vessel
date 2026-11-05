@@ -10,7 +10,7 @@ describe('コレクションの記録の確かめ', () => {
   });
 
   it('知らない種類・長すぎる名前・使えない文字を通さない', () => {
-    expect(isVisitInput({ key: 'Earth', kind: 'galaxy', name: '地球' })).toBe(false);
+    expect(isVisitInput({ key: 'Earth', kind: 'quasar', name: '地球' })).toBe(false);
     expect(isVisitInput({ key: 'Earth', kind: 'planet', name: 'あ'.repeat(81) })).toBe(false);
     expect(isVisitInput({ key: 'Earth', kind: 'planet', name: '' })).toBe(false);
     expect(isVisitInput({ key: '<script>', kind: 'planet', name: 'x' })).toBe(false);

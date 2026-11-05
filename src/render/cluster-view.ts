@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three/webgpu';
 import { cameraPosition, clamp, exp, float, instancedBufferAttribute, log, min, smoothstep, uniform, uv } from 'three/tsl';
-import { clusterAbsMag, clusterStars, MAX_MEMBERS, nearbyClusters, type Cluster } from '../world/clusters';
+import { clusterAbsMag, clusterStars, MAX_MEMBERS, nearbyClusters, readRealMembers, type Cluster, type ClusterStar } from '../world/clusters';
 import { bvToRgb } from '../world/stars';
 import type { Vec3 } from '../world/vec';
 import { StarSprites } from './star-sprites';
@@ -26,6 +26,9 @@ export class ClusterView {
   private readonly members = new StarSprites(MAX_MEMBERS.globular * NEAR_CLUSTERS);
   private shown = '';
   private lastCheck = -Infinity;
+  /** 本物のメンバーの星の目次と、読んだファイル（src/world/clusters.ts の readRealMembers） */
+  private index: Record<string, [number, number, number]> | null = null;
+  private readonly shards = new Map<number, Promise<Float32Array | null>>();
 
   constructor(private readonly clusters: readonly Cluster[]) {
     this.glow = this.createGlow();
@@ -100,7 +103,35 @@ export class ClusterView {
     const key = near.map((c) => c.name).join('|');
     if (key === this.shown) return;
     this.shown = key;
-    const stars = near.flatMap(clusterStars);
+    void this.showMembers(near, key);
+  }
+
+  /** メンバーの星を入れ替える。本物のメンバーのデータが読めなければ、数と大きさに合わせて作った星を使う */
+  private async showMembers(near: readonly Cluster[], key: string): Promise<void> {
+    const lists = await Promise.all(near.map((c) => this.realMembers(c).then((real) => real ?? clusterStars(c))));
+    if (key !== this.shown) return;
+    const stars = lists.flat();
     this.members.set(stars.length, (i) => ({ ...stars[i].position, absMag: stars[i].absMag, bv: stars[i].bv }));
+  }
+
+  private async realMembers(c: Cluster): Promise<ClusterStar[] | null> {
+    if (!this.index) {
+      const j = await fetch('/data/cluster-members.json')
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      this.index = (j as { index: Record<string, [number, number, number]> } | null)?.index ?? {};
+    }
+    const at = this.index[c.name];
+    if (!at) return null;
+    let p = this.shards.get(at[0]);
+    if (!p) {
+      p = fetch(`/data/cluster-members/${at[0]}.bin`)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((b) => (b ? new Float32Array(b) : null))
+        .catch(() => null);
+      this.shards.set(at[0], p);
+    }
+    const data = await p;
+    return data ? readRealMembers(data, at[1], at[2], c) : null;
   }
 }

@@ -45,7 +45,7 @@ export interface HostStar {
   /** 星の燃えかす（白色矮星・中性子星・ブラックホール） */
   compact?: CompactKind;
   /** 実在の燃えかすのデータ（名前・温度・周期） */
-  compactInfo?: { name: string; teffK?: number; periodS?: number };
+  compactInfo?: { name: string; teffK?: number; periodS?: number; massSun?: number };
 }
 
 // ── 恒星のおおよその性質（色と明るさから） ──────────────────
@@ -355,6 +355,7 @@ export function systemBodies(host: HostStar, real: RealSystem | null): BodyInfo[
       compactBody(host.system, host.compactInfo?.name ?? host.system, host.compact, host.positionPc, {
         teffK: host.compactInfo?.teffK,
         periodS: host.compactInfo?.periodS,
+        massSun: host.compactInfo?.massSun,
         real: !!host.compactInfo,
       }),
     ];

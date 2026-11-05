@@ -10,6 +10,9 @@ import type { Rgb, SurfaceLook } from '../world/surface';
 /** public/textures/ に置くと使われる画像。地球と月は必ず置く（リポジトリに入っている） */
 export const TEXTURE_FILES: Readonly<Record<string, string>> = {
   Earth: '2k_earth_daymap.jpg',
+  // 地球の夜の灯りと雲（天体の id ではない。src/render/solar-system-view.ts が使う）
+  EarthNight: '2k_earth_nightmap.jpg',
+  EarthClouds: '2k_earth_clouds.jpg',
   Moon: '2k_moon.jpg',
   Mercury: '2k_mercury.jpg',
   Venus: '2k_venus_atmosphere.jpg',

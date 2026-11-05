@@ -10,7 +10,7 @@ import { periodDaysFromAxis, type KeplerElements } from './kepler';
 import { diameterFromH, type NearbyAsteroid } from './asteroid-search';
 import { hashInts, mulberry32 } from './random';
 import type { Atmosphere, BodyInfo, BodyKind } from './solar-system';
-import type { SurfaceLook } from './surface';
+import type { RingZone, SurfaceLook } from './surface';
 import { DEG, KM_PER_AU } from './units';
 import { rotX, type Mat3, type Vec3 } from './vec';
 
@@ -35,6 +35,7 @@ const MOON_ATMOSPHERES: Record<string, Atmosphere> = {
 const ANCHOR_RADII_WITHOUT_MASS = 10;
 
 export interface MoonRecord {
+  /** JPL の番号。正式な番号の衛星は 3 桁、仮符号の衛星は 5 桁 */
   code: string;
   planet: number;
   number: number;
@@ -101,7 +102,8 @@ export function moonBodies(records: readonly MoonRecord[], facts: PlanetFacts): 
         ? Math.max(r.radius * 3, r.a * (r.gm / facts.gm(parent)) ** 0.4)
         : r.radius * ANCHOR_RADII_WITHOUT_MASS;
     out.push({
-      id: `S${r.planet}.${r.number}`,
+      // 仮符号の衛星（番号が 0）は、JPL の 5 桁の番号で区別する。住所の衛星の番号は 0（src/world/address.ts）
+      id: r.number > 0 ? `S${r.planet}.${r.number}` : `S${r.planet}p${r.code}`,
       nameJa: r.nameJa ?? r.name,
       radiusKm: r.radius,
       kind: 'moon',
@@ -159,12 +161,30 @@ export function smallAsteroidBody(a: NearbyAsteroid): BodyInfo {
     },
     spin: { type: 'steady', pole: raDecToVec(rand() * 360, Math.asin(2 * rand() - 1) / DEG), periodHours: 2 + 20 * rand(), phaseRad: rand() * 2 * Math.PI },
     anchorRadiusKm: radiusKm * ANCHOR_RADII_WITHOUT_MASS,
+    rings: SMALL_BODY_RINGS[a.number],
     surface: {
       look: { kind: 'rocky', colors: [[70, 66, 62], [120, 114, 108], [170, 164, 156]], craters: 0.5 },
       seed: hashInts(a.number, 7),
     },
   };
 }
+
+/**
+ * 環を持つ小さな天体（小惑星番号 → 環）。半径は恒星の掩蔽の観測：カリクロ 391・405 km（Braga-Ribas ほか 2014）、
+ * ハウメア 2,285 km・幅 約 70 km（Ortiz ほか 2017）、クワオアー 2,520 km・4,057 km（Pereira ほか 2023、Morgado ほか 2023）。
+ * 環の面の向きは、天体の自転の軸（種から決めた値）に合わせる。濃さは見た目のための値
+ */
+const SMALL_BODY_RINGS: Readonly<Record<number, readonly RingZone[]>> = {
+  10199: [
+    { innerKm: 387, outerKm: 395, opacity: 0.5 },
+    { innerKm: 403, outerKm: 407, opacity: 0.15 },
+  ],
+  136108: [{ innerKm: 2_250, outerKm: 2_320, opacity: 0.5 }],
+  50000: [
+    { innerKm: 2_510, outerKm: 2_530, opacity: 0.2 },
+    { innerKm: 4_040, outerKm: 4_075, opacity: 0.25 },
+  ],
+};
 
 /** IAU が準惑星と認めている天体（冥王星は別に持つ） */
 const DWARF_PLANETS = new Set([1, 136108, 136199, 136472]);
@@ -205,6 +225,8 @@ export function largeAsteroidBodies(list: readonly LargeAsteroid[]): BodyInfo[] 
       },
       spin: { type: 'steady', pole, periodHours: 5 + 20 * rand(), phaseRad: rand() * 2 * Math.PI },
       anchorRadiusKm: radiusKm * ANCHOR_RADII_WITHOUT_MASS,
+      rings: SMALL_BODY_RINGS[a.number],
+      ringColor: SMALL_BODY_RINGS[a.number] ? ([190, 180, 170] as const) : undefined,
       surface: { look, seed: hashInts(a.number, 7) },
     };
   });
