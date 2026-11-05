@@ -49,6 +49,8 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | asn1js（パスキーが使う） | BSD-3-Clause |
 | reflect-metadata（パスキーが使う） | Apache-2.0 |
 | tslib（パスキーが使う） | 0BSD |
+| X のロゴ（タイトル画面の右上のアイコン。X への外部リンク） | `src/top/SocialLinks.tsx`（図形だけの SVG） | X Corp.（https://x.com） | X の商標（ロゴ）。リンク先を示す目的で使う | 画面に表記は出さない。公開の前に、X のブランドガイドラインを確かめる |
+| Miiiwa のロゴ（右上のアイコン） | `src/top/SocialLinks.tsx`（図形だけの SVG） | オーナー自身のロゴ（オーナーの `miwa_portfolio` の `src/app/icon.svg` の形）。オーナーの指示で参照した（2026-11-06） | オーナーのもの | 表記は要らない。もとの黒い棒を、暗い背景のために明るい色にしている |
 | @fontsource/monoton（書体 Monoton。タイトル画面の名前。woff2 を配る） | OFL-1.1（SIL Open Font License）。著作権表示は「Copyright (c) 2011, Vernon Adams」。ライセンスの全文は `public/licenses/monoton.OFL.txt` |
 | @fontsource/josefin-sans（書体 Josefin Sans。「-START-」。woff2 を配る） | OFL-1.1。著作権表示は「Copyright 2010 The Josefin Sans Project Authors」。ライセンスの全文は `public/licenses/josefin-sans.OFL.txt` |
 | wrangler | MIT または Apache-2.0 |

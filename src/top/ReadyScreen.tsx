@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { currentAccount, ensureSession, type Account } from '../net/auth';
 import { shipApi } from '../net/ship-repository';
 import { AccountPanel } from './AccountPanel';
+import { Credit } from './Credit';
 import { onlineText, useOnline } from './online';
 import { playUrl } from './routes';
 import { defaultDesignFor, HULL_TYPES, HULLS, SHIP_DESIGN_VERSION, type HullType } from '../world/ship-design';
@@ -126,6 +127,7 @@ export function ReadyScreen({ onBack }: { onBack: () => void }) {
           </button>
         </div>
       </div>
+      <Credit className="top-credit-ready" />
     </main>
   );
 }

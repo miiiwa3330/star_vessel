@@ -10,7 +10,7 @@ import { sphereToEqj, toMatrix4 } from '../render/orientation';
 import { bodyFixedToEqj, bodyInfo, heliocentricPositionKm } from '../world/solar-system';
 import type { EarthShipsSnapshot } from '../world/earth-ships-schema';
 import { add, length, normalize, scale, type Vec3 } from '../world/vec';
-import { cross3, dot3, subjectView } from './earth-camera';
+import { alphaForCenter, cross3, distanceForRadius, dot3, posedView, subjectView } from './earth-camera';
 import { ShipLights } from './ship-lights';
 import { ShipTracks } from './ship-tracks';
 
@@ -26,6 +26,16 @@ const AZIMUTH_SWING_DEG = 4;
 const SWING_PERIOD_S = 160;
 const ELEVATION = 0.32;
 const NORTH: Vec3 = { x: 0, y: 0, z: 1 };
+/**
+ * スクロールで、地球の下半分が画面の上に来る見え方へ動かす（下の詳細の画面）。
+ * 地球の中心を、画面の上の端のすぐ上（高さ 1.05）に置き、地球の見かけの半径を画面の高さの 0.9 にする
+ * （下の縁が、画面の上から約 4 割の高さに来る）。カメラは地球から離れ、見る向きは上へ振る
+ */
+const DETAIL_CENTER_NDC_Y = 1.05;
+const DETAIL_RADIUS_NDC = 0.9;
+/** 現れるとき（読み込めてから）、地球が画面の下から上がってくる時間（ms）と、最初に下へずらす量（画面の高さの単位） */
+const INTRO_MS = 2800;
+const INTRO_SHIFT_NDC = 1.8;
 /** 大気の光の強さ（世界の画面に対する割合） */
 const ATMOSPHERE_GAIN = 0.45;
 /** 船を見せるとき：船を映す高さ（画面の中心が 0、上が +1）と、太陽の当たり方の目標（カメラの位置と太陽の向きの内積）。境目と夜の灯りが見える値 */
@@ -58,6 +68,8 @@ export class EarthScene {
   private aim: Vec3 | null = null;
   private subjectId: string | null = null;
   private phi: number | undefined;
+  /** 最初に描いた時刻（地球が下から上がってくる動きの始まり）。まだ描いていなければ 0 */
+  private introStartMs = 0;
   /** 描いた最後の日時（同じ時刻なら、向きと太陽を計算し直さない） */
   private lastSecond = -1;
   private disposed = false;
@@ -124,6 +136,12 @@ export class EarthScene {
     const scene = new EarthScene(canvas, { day, night, clouds });
     await scene.renderer.init();
     scene.renderer.setClearColor(0x000000, 0);
+    // 描くのに要る処理（シェーダーのコンパイル）を、見せる前に済ませる。済ませないと、現れる最初の動きが引っかかる
+    try {
+      await scene.renderer.compileAsync(scene.scene, scene.camera);
+    } catch (e) {
+      console.warn('地球の描画の準備に失敗。そのまま描く', e);
+    }
     return scene;
   }
 
@@ -140,9 +158,13 @@ export class EarthScene {
     this.tracks.ingest(snapshot, receivedMs);
   }
 
-  /** nowMs（世界の時刻）の地球を描く。motion が false なら、カメラの揺れと船の追従を止める（「動きを減らす」の設定） */
-  render(nowMs: number, motion: boolean): void {
+  /**
+   * nowMs（世界の時刻）の地球を描く。motion が false なら、カメラの揺れ・船の追従・現れる動きを止める（「動きを減らす」の設定）。
+   * scroll は、スクロールの位置（最初の画面の高さを 1 とする。0 で最初の画面、1 で詳細の画面。1 を超えた分は、地球を画面の外へ送る）
+   */
+  render(nowMs: number, motion: boolean, scroll = 0): void {
     if (this.disposed) return;
+    if (this.introStartMs === 0) this.introStartMs = nowMs;
     const dt = this.lastFrameMs === 0 ? 0 : Math.min(0.25, Math.max(0, (nowMs - this.lastFrameMs) / 1000));
     this.lastFrameMs = nowMs;
     const date = new Date(nowMs);
@@ -177,9 +199,22 @@ export class EarthScene {
       phiHint: this.phi,
     });
     this.phi = pose.phi;
-    this.camera.position.set(pose.position.x, pose.position.y, pose.position.z);
-    this.camera.up.set(pose.up.x, pose.up.y, pose.up.z);
-    this.camera.lookAt(pose.position.x + pose.forward.x, pose.position.y + pose.forward.y, pose.position.z + pose.forward.z);
+    // スクロール：距離を離し、地球の中心を画面の上へ送る（なめらかに始まり、なめらかに止まる）
+    const p = Math.min(1, Math.max(0, scroll));
+    const e = p * p * (3 - 2 * p);
+    const detailDistance = distanceForRadius(radius, DETAIL_RADIUS_NDC, FOV);
+    const detailAlpha = alphaForCenter(DETAIL_CENTER_NDC_Y, FOV);
+    // 現れる動き：地球の中心を、最初は画面の下の外へずらし、ゆっくり元の位置へ上げる
+    const introT = motion ? Math.min(1, (nowMs - this.introStartMs) / INTRO_MS) : 1;
+    const introAlpha = (1 - introT) ** 3 * Math.atan(INTRO_SHIFT_NDC * Math.tan((FOV * Math.PI) / 360));
+    const view = posedView({
+      ...pose.basis,
+      distanceKm: pose.basis.distanceKm + (detailDistance - pose.basis.distanceKm) * e,
+      alpha: pose.basis.alpha + (detailAlpha - pose.basis.alpha) * e + introAlpha,
+    });
+    this.camera.position.set(view.position.x, view.position.y, view.position.z);
+    this.camera.up.set(view.up.x, view.up.y, view.up.z);
+    this.camera.lookAt(view.position.x + view.forward.x, view.position.y + view.forward.y, view.position.z + view.forward.z);
     this.lights.update(ships, this.camera);
     this.renderer.render(this.scene, this.camera);
   }

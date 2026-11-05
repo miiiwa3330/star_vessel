@@ -1,10 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { Backdrop } from './Backdrop';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Backdrop, type ScrollState } from './Backdrop';
 import { TitleScreen } from './TitleScreen';
 // 準備画面はアカウントの部品（Better Auth）を使うので大きい。タイトル画面を軽く開くため、開くときに読み込む
 const ReadyScreen = lazy(() => import('./ReadyScreen').then((m) => ({ default: m.ReadyScreen })));
 
 import { pathForScreen, screenForPath, type TopScreen } from './routes';
+import { attachSectionWheel } from './section-scroll';
 
 /**
  * タイトル画面と準備画面（要件 F48）。URL（/ と /ready）と戻るボタンに合わせて切り替える。
@@ -12,6 +13,9 @@ import { pathForScreen, screenForPath, type TopScreen } from './routes';
  */
 export function TopApp() {
   const [screen, setScreen] = useState<TopScreen>(() => screenForPath(location.pathname));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
 
   useEffect(() => {
     const onPop = () => setScreen(screenForPath(location.pathname));
@@ -24,9 +28,33 @@ export function TopApp() {
     setScreen(next);
   }, []);
 
+  // キーボード（Space・PageDown など）でスクロールできるよう、スクロールする箱に焦点を置く（Tab の順には入れない）。
+  // 画面が変わるたびに置き直す（準備画面も、長いと、スクロールするため）
+  useEffect(() => {
+    rootRef.current?.focus({ preventScroll: true });
+  }, [screen]);
+
+  // 最初の画面と詳細の間は、ホイールを少し回しただけでも、隣の画面まで動かす（section-scroll.ts）
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || screen !== 'title') return;
+    return attachSectionWheel(root, () => root.querySelector<HTMLElement>('.top-hero')?.offsetHeight || root.clientHeight || 1);
+  }, [screen]);
+
+  /**
+   * タイトル画面のスクロールの位置（背景の地球を動かすため）。progress：最初の画面の高さを 1 とした位置（0〜1。1 で詳細の画面）、
+   * pastPx：1 を超えた分（px。地球を画面の外へ送る）。準備画面は、スクロールしても地球を動かさない
+   */
+  const getScroll = useCallback((): ScrollState => {
+    const root = rootRef.current;
+    if (!root || screenRef.current !== 'title') return { progress: 0, pastPx: 0 };
+    const heroHeight = root.querySelector<HTMLElement>('.top-hero')?.offsetHeight || root.clientHeight || 1;
+    return { progress: Math.min(1, root.scrollTop / heroHeight), pastPx: Math.max(0, root.scrollTop - heroHeight) };
+  }, []);
+
   return (
-    <div className="top">
-      <Backdrop />
+    <div ref={rootRef} tabIndex={-1} className={`top${screen === 'title' ? ' is-title' : ''}`}>
+      <Backdrop getScroll={getScroll} />
       {screen === 'title' ? (
         <TitleScreen onStart={() => go('ready')} />
       ) : (
@@ -34,10 +62,6 @@ export function TopApp() {
           <ReadyScreen onBack={() => go('title')} />
         </Suspense>
       )}
-      {/* 地球の画像の出典（CC BY 4.0 の表記）。控えめな 1 行。画面全体のタップとは別の場所に置くので、押しても「はじめる」にはならない */}
-      <p className="top-credit">
-        地球の画像：<a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">Solar System Scope</a>（CC BY 4.0）
-      </p>
     </div>
   );
 }

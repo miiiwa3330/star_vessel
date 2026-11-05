@@ -46,17 +46,26 @@ export function makeStars(count: number, seed = 20261106): Star[] {
  * 世界の描画（three.js）は使わない。軽く開くため（要件 F48）。
  * 動きは、星のゆっくりした流れとまたたきだけ。「動きを減らす」の設定では止める。
  */
-export function Backdrop() {
+/** タイトル画面のスクロールの位置（TopApp が計る）。progress は 0〜1、pastPx は 1 を超えた分（px） */
+export interface ScrollState {
+  progress: number;
+  pastPx: number;
+}
+
+export function Backdrop({ getScroll }: { getScroll: () => ScrollState }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const [use3d] = useState(wantsEarth3d);
   const [load3d, setLoad3d] = useState(false);
   const [ready3d, setReady3d] = useState(false);
+  const [failed3d, setFailed3d] = useState(false);
   const onReady = useCallback(() => setReady3d(true), []);
+  const onFail = useCallback(() => setFailed3d(true), []);
 
   useEffect(() => {
-    if (!wantsEarth3d()) return;
+    if (!use3d) return;
     const id = window.setTimeout(() => setLoad3d(true), EARTH_DELAY_MS);
     return () => clearTimeout(id);
-  }, []);
+  }, [use3d]);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -122,11 +131,14 @@ export function Backdrop() {
   return (
     <div className={`top-backdrop${ready3d ? ' is-3d' : ''}`} aria-hidden="true">
       <canvas ref={ref} className="top-stars" />
-      {/* 3D の地球が描けるまでは、この CSS の縁を出す。描けたら入れ替える */}
-      <div className="top-earth" />
+      {/*
+        3D の地球は、描ける状態になってから、画面の下からゆっくり現れる。読み込み中に、仮の球体は出さない（2026-11-06 にオーナーの指示）。
+        CSS の縁を出すのは、3D を使わないとき（通信量の節約・?earth=css）と、3D が描けなかったときだけ
+      */}
+      {(!use3d || failed3d) && <div className="top-earth" />}
       {load3d && (
         <Suspense fallback={null}>
-          <EarthCanvas onReady={onReady} />
+          <EarthCanvas onReady={onReady} onFail={onFail} getScroll={getScroll} />
         </Suspense>
       )}
     </div>

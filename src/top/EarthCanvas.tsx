@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { fetchEarthShips } from '../net/earth-ships';
 import { SHOWCASE_REFRESH_MS } from '../world/earth-ships-schema';
+import type { ScrollState } from './Backdrop';
 import { EarthScene } from './earth-scene';
 
 /**
@@ -8,8 +9,11 @@ import { EarthScene } from './earth-scene';
  * 画面が出てから、遅れて読み込む（Backdrop の lazy）。描けたら onReady を呼び、いまの背景（CSS の縁）と入れ替える。
  * 描けない環境では、onReady を呼ばずに終わる（いまの背景のまま）。画面が見えていない間は止める。
  */
-export default function EarthCanvas({ onReady }: { onReady: () => void }) {
+export default function EarthCanvas({ onReady, onFail, getScroll }: { onReady: () => void; onFail: () => void; getScroll: () => ScrollState }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // 親が関数を作り直しても、地球の描画を作り直さない
+  const scrollRef = useRef(getScroll);
+  scrollRef.current = getScroll;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -26,7 +30,10 @@ export default function EarthCanvas({ onReady }: { onReady: () => void }) {
       const now = Date.now();
       if (now - lastDrawMs >= minGapMs) {
         lastDrawMs = now;
-        scene?.render(now, !reduce.matches);
+        const scroll = scrollRef.current();
+        // 詳細の画面より先へスクロールしたら、地球をページと一緒に画面の上へ送る
+        canvas.style.transform = scroll.pastPx > 0 ? `translateY(${-scroll.pastPx}px)` : '';
+        scene?.render(now, !reduce.matches, scroll.progress);
       }
       // 「動きを減らす」のときは、1 秒に 1 回だけ描き直す（夜の灯りと境目は、本物の時間で、ゆっくり動く）
       if (!disposed && !document.hidden) raf = reduce.matches ? window.setTimeout(frame, 1000) : requestAnimationFrame(frame);
@@ -64,7 +71,10 @@ export default function EarthCanvas({ onReady }: { onReady: () => void }) {
         void poll();
         onReady();
       })
-      .catch((e: unknown) => console.warn('地球を 3D で描けない。いまの背景のままにする', e));
+      .catch((e: unknown) => {
+        console.warn('地球を 3D で描けない。CSS の縁にする', e);
+        if (!disposed) onFail();
+      });
 
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
@@ -78,7 +88,7 @@ export default function EarthCanvas({ onReady }: { onReady: () => void }) {
       document.removeEventListener('visibilitychange', start);
       scene?.dispose();
     };
-  }, [onReady]);
+  }, [onReady, onFail]);
 
   return <canvas ref={ref} className="top-earth-canvas" />;
 }

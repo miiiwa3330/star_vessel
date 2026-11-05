@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { cross3, dot3, subjectView } from './earth-camera';
+import { alphaForCenter, cross3, distanceForRadius, dot3, posedView, subjectView, type EarthCameraPose } from './earth-camera';
 import { length } from '../world/vec';
 
-type Pose = ReturnType<typeof subjectView>;
+type Pose = EarthCameraPose;
 const unit = (a: { x: number; y: number; z: number }) => ({ x: a.x / length(a), y: a.y / length(a), z: a.z / length(a) });
 /** カメラの本当の上（forward に垂直）。lookAt が up から作るのと同じ */
 const trueUp = (p: Pose) => unit(cross3(cross3(p.forward, p.up), p.forward));
@@ -93,5 +93,54 @@ describe('見せたい船が縁の上に見えるカメラ', () => {
     const night = { x: -14_000, y: 9_000, z: 5_000 };
     const other = subjectView(opts(night, { sunTarget: -0.9 }));
     expect(c(night)).toBeGreaterThan(dot3(other.position, { x: 1, y: 0, z: 0 }) / 11_000);
+  });
+});
+
+describe('スクロールで変わるカメラ（地球の下半分が画面の上に来る）', () => {
+  const R = 6371;
+  const FOV = 42;
+  const base = subjectView({ aim: { x: 7_000, y: 7_000, z: 7_000 }, sunDir: { x: 1, y: 0, z: 0 }, radiusKm: R, distanceKm: 11_000, fovDeg: FOV, limbNdcY: -0.42, subjectNdcY: 0.1, sunTarget: 0.45 });
+  const half = Math.tan((FOV * Math.PI) / 360);
+  /** 地球の中心が画面のどの高さに映るか */
+  const centerNdc = (p: Pose) => {
+    const toCenter = { x: -p.position.x, y: -p.position.y, z: -p.position.z };
+    const f = p.forward;
+    const up = trueUp(p);
+    return dot3(toCenter, up) / dot3(toCenter, f) / half;
+  };
+
+  it('subjectView が返す basis から作り直すと、元のカメラと同じ', () => {
+    const again = posedView(base.basis);
+    expect(length({ x: again.position.x - base.position.x, y: again.position.y - base.position.y, z: again.position.z - base.position.z })).toBeLessThan(1e-6);
+    expect(dot3(again.forward, base.forward)).toBeCloseTo(1, 9);
+    expect(dot3(again.up, base.up)).toBeCloseTo(1, 9);
+  });
+
+  it('alpha を負にすると、地球の中心が画面の真ん中より上に映る。指定の高さに合わせられる', () => {
+    for (const y of [-1.9, -0.5, 0, 0.6, 1.05]) {
+      const p = posedView({ ...base.basis, alpha: alphaForCenter(y, FOV) });
+      expect(centerNdc(p)).toBeCloseTo(y, 6);
+    }
+  });
+
+  it('距離は指定どおり。地球の中心を画面の上の端の少し上に置くと、下半分が画面の上に入る', () => {
+    const D = distanceForRadius(R, 0.9, FOV);
+    // 地球の半径が画面の高さの 0.9（中心から上の端までの距離の 0.9 倍）に映る距離
+    expect(Math.asin(R / D)).toBeCloseTo(Math.atan(0.9 * half), 9);
+    const p = posedView({ ...base.basis, distanceKm: D, alpha: alphaForCenter(1.05, FOV) });
+    expect(length(p.position)).toBeCloseTo(D, 6);
+    // 地球の下の縁（中心から下へ半径ぶんの点）は、画面の中に映る：中心が 1.05、半径が 0.9 なので、縁は 0.15
+    expect(centerNdc(p) - 0.9).toBeCloseTo(0.15, 1);
+    // 上の縁は、画面の外（+1 より上）
+    expect(centerNdc(p) + 0.9).toBeGreaterThan(1);
+  });
+
+  it('スクロールで動かす途中も、カメラの向きと上は単位ベクトルのまま', () => {
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      const p = posedView({ ...base.basis, distanceKm: 11_000 + t * 8_000, alpha: base.basis.alpha + (alphaForCenter(1.05, FOV) - base.basis.alpha) * t });
+      expect(length(p.forward)).toBeCloseTo(1, 9);
+      expect(length(p.up)).toBeCloseTo(1, 9);
+    }
   });
 });

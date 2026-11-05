@@ -46,7 +46,7 @@ export interface SubjectViewOptions {
  * 太陽の当たり方（sunTarget）と、前の phi への近さで選ぶ。
  * 船が地球に近すぎて、望んだ高さに映せないときは、いちばん近く映せる位置にする（縁より下には隠れない）。
  */
-export function subjectView(o: SubjectViewOptions): EarthCameraPose & { phi: number; subjectNdcY: number } {
+export function subjectView(o: SubjectViewOptions): EarthCameraPose & { phi: number; subjectNdcY: number; basis: ViewBasis } {
   const r = length(o.aim);
   const p = scale(o.aim, 1 / r);
   const half = Math.tan((o.fovDeg * DEG) / 2);
@@ -110,5 +110,33 @@ export function subjectView(o: SubjectViewOptions): EarthCameraPose & { phi: num
   const up = unit(add(scale(dir, Math.sin(alpha)), scale(u, Math.cos(alpha))));
   // 実際に映る高さ（望んだ高さに映せないときの確認用）
   const subjectAngle = angleAt(theta) - alpha;
-  return { position: scale(dir, D), forward, up, phi, subjectNdcY: Math.tan(subjectAngle) / half };
+  return { position: scale(dir, D), forward, up, phi, subjectNdcY: Math.tan(subjectAngle) / half, basis: { dir, u, distanceKm: D, alpha } };
+}
+
+/**
+ * カメラの位置と向きを決める 4 つの値。dir は地球の中心からカメラへの向き、u は、カメラと地球の中心を結ぶ線に垂直な「上」の向き、
+ * distanceKm はカメラから地球の中心までの距離、alpha は、地球の中心が、画面の真ん中から下へ何ラジアンずれて見えるか
+ * （負なら、地球の中心が画面の真ん中より上に見える）
+ */
+export interface ViewBasis {
+  dir: Vec3;
+  u: Vec3;
+  distanceKm: number;
+  alpha: number;
+}
+
+/** basis の距離と alpha を変えたときの、カメラの位置と向き（見る向き dir・u はそのまま） */
+export function posedView(b: ViewBasis): EarthCameraPose {
+  const forward = unit(add(scale(b.dir, -Math.cos(b.alpha)), scale(b.u, Math.sin(b.alpha))));
+  const up = unit(add(scale(b.dir, Math.sin(b.alpha)), scale(b.u, Math.cos(b.alpha))));
+  return { position: scale(b.dir, b.distanceKm), forward, up };
+}
+
+/** 地球の中心を、画面の高さ centerNdcY（中心が 0、上の端が +1）に映すための alpha */
+export const alphaForCenter = (centerNdcY: number, fovDeg: number): number => -Math.atan(centerNdcY * Math.tan((fovDeg * DEG) / 2));
+
+/** 地球の見かけの半径が、画面の高さの radiusNdc（中心が 0、上の端が +1 の単位）になる、カメラと地球の中心の距離（km） */
+export function distanceForRadius(radiusKm: number, radiusNdc: number, fovDeg: number): number {
+  const rho = Math.atan(radiusNdc * Math.tan((fovDeg * DEG) / 2));
+  return radiusKm / Math.sin(rho);
 }

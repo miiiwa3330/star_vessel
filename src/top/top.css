@@ -37,11 +37,10 @@
     0 -6px 18px 2px rgba(116, 230, 255, 0.45),
     0 -22px 70px 12px rgba(60, 140, 255, 0.28);
 }
-/* 3D の地球（src/top/earth-scene.ts）。描けたらゆっくり現れ、CSS の縁は消える */
-.top-earth-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.4s ease; }
+/* 3D の地球（src/top/earth-scene.ts）。CSS の縁は、3D を使わないときと、描けなかったときだけ出る（仮の球体は、読み込み中には出さない） */
+/* 描ける状態になってから、地球が下から上がってくる（earth-scene.ts）のと一緒に、ゆっくり現れる */
+.top-earth-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.8s ease; will-change: transform; }
 .top-backdrop.is-3d .top-earth-canvas { opacity: 1; }
-.top-earth { transition: opacity 1.4s ease; }
-.top-backdrop.is-3d .top-earth { opacity: 0; }
 /* 地平線の向こうの太陽の光 */
 .top-earth::after {
   content: '';
@@ -56,9 +55,18 @@
 }
 
 /* ---- タイトル画面 ---- */
-.top-title-screen {
+/*
+ * 縦に 2 つの画面：最初の画面（.top-hero）と、サービスの詳細（.top-details）。
+ * スクロールは、2 つの画面の間で止まらず、どちらかへ吸い付く（scroll-snap の mandatory・stop: always）。
+ * 詳細が 1 画面より長いときは、その中は、自由にスクロールできる
+ */
+.top:focus { outline: none; }
+.top.is-title { scroll-snap-type: y mandatory; overscroll-behavior-y: contain; }
+.top-title-screen { position: relative; }
+.top-hero {
   position: relative;
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
   box-sizing: border-box;
   padding: 24px 16px 22vh;
   display: flex;
@@ -67,8 +75,9 @@
   justify-content: center;
   text-align: center;
   gap: 18px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
-.top-title-screen { cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
 /*
  * タイトルの文字：Monoton（OFL）。細い線を重ねたネオンの管のような書体を、オレンジに光らせる（オーナーが指定。2026-11-06）。
  * 幅が広い書体なので、文字の間は詰め、画面の幅に合わせて大きさを変える。狭いと、「STAR」と「VESSEL」の 2 行になる。
@@ -88,16 +97,29 @@
   color: #ff8a1f;
   filter: drop-shadow(0 0 6px rgba(255, 138, 31, 0.55)) drop-shadow(0 0 26px rgba(255, 110, 20, 0.4));
 }
-.top-tagline { margin: 0; text-wrap: balance; font-size: clamp(13px, 2.6vw, 17px); line-height: 1.8; opacity: 0.85; max-width: 32em; }
-/* 枠の無い「-START-」。ゆっくり明るさが変わる。画面のどこをタップしても進むので、これは見た目と読み上げのため */
+/* 一言：細字（Light）。日本語の細い書体は端末にあるものを使う（Hiragino の W3・游ゴシックの Light など） */
+.top-tagline {
+  margin: 0;
+  text-wrap: balance;
+  font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'YuGothic', 'Noto Sans JP', system-ui, sans-serif;
+  font-size: clamp(13px, 2.6vw, 17px);
+  font-weight: 200;
+  letter-spacing: 0.08em;
+  line-height: 1.9;
+  opacity: 0.9;
+  max-width: 32em;
+}
+/*
+ * 枠の無い「-START-」。ゆっくり明るさが変わる。進むのは、この文字のまわりをタップ（クリック）したとき（約 260×90px）。
+ * 画面全体のタップは、2026-11-06 にやめた（詳細をスクロールで読めるようにするため）
+ */
 .top-start {
-  margin-top: 28px;
-  padding: 12px 20px;
+  margin-top: 10px;
+  padding: 26px 64px 26px calc(64px + 0.5em);
   font-family: 'Josefin Sans', system-ui, sans-serif;
   font-size: clamp(16px, 3.6vw, 22px);
   font-weight: 300;
   letter-spacing: 0.5em;
-  padding-left: calc(20px + 0.5em);
   color: var(--top-ink);
   background: none;
   border: 0;
@@ -105,16 +127,76 @@
   -webkit-tap-highlight-color: transparent;
   animation: top-pulse 2.6s ease-in-out infinite;
 }
-.top-start:focus-visible { outline: 1px solid var(--top-accent); outline-offset: 4px; border-radius: 4px; }
+/* タップできる範囲を、見た目の文字より広げる（約 330×110px） */
+.top-start { position: relative; }
+.top-start::after { content: ''; position: absolute; inset: -14px -20px; }
+.top-start:focus-visible { outline: 1px solid var(--top-accent); outline-offset: -8px; border-radius: 12px; }
 @keyframes top-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .top-start { animation: none; opacity: 0.85; }
 }
 
-/* 出典の 1 行（要件 F48。地球の画像は CC BY 4.0）。景色をふさがないよう小さく薄く、下の端に置く */
-.top-credit { position: fixed; left: 0; right: 0; bottom: calc(6px + env(safe-area-inset-bottom)); margin: 0; text-align: center; font-size: 10px; letter-spacing: 0.04em; opacity: 0.4; pointer-events: none; z-index: 2; }
-.top-credit a { color: inherit; pointer-events: auto; }
+/* 右上の X と Miiiwa のアイコン */
+.top-social { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 14px; z-index: 3; display: flex; gap: 4px; }
+.top-social-link {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--top-ink);
+  opacity: 0.8;
+  border-radius: 999px;
+  /* 明るい地球の上（詳細の画面）でも見えるよう、うっすら暗い丸を敷く */
+  background: rgba(4, 8, 16, 0.38);
+  backdrop-filter: blur(4px);
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+.top-social-link:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 0; opacity: 1; }
+@media (hover: hover) {
+  .top-social-link:hover { opacity: 1; background: rgba(40, 60, 90, 0.6); }
+}
+
+/* 出典の 1 行（要件 F48。地球の画像は CC BY 4.0）。景色をふさがないよう小さく薄く出す */
+.top-credit { margin: 0; text-align: center; font-size: 10px; letter-spacing: 0.04em; opacity: 0.4; }
+.top-credit a { color: inherit; }
 .top-credit a:hover, .top-credit a:focus-visible { opacity: 1; text-decoration: underline; }
+.top-credit-hero { position: absolute; left: 0; right: 0; bottom: calc(6px + env(safe-area-inset-bottom)); }
+.top-credit-end { margin-top: 28px; }
+.top-credit-ready { padding: 4px 0 18px; }
+
+/* サービスの詳細。上の余白は、背景の地球の下半分（画面の上の約 4 割）を見せるため */
+.top-details {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  box-sizing: border-box;
+  padding: clamp(230px, 46vh, 480px) 20px 36px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.top-details-inner { max-width: 880px; margin: 0 auto; }
+.top-eyebrow { margin: 64px 0 8px; font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 12px; font-weight: 300; letter-spacing: 0.4em; color: #ff8a1f; }
+.top-details-inner > .top-eyebrow:first-child { margin-top: 0; }
+.top-details-title { margin: 0 0 16px; font-size: clamp(20px, 3.4vw, 30px); font-weight: 300; letter-spacing: 0.06em; line-height: 1.6; text-wrap: balance; }
+.top-details-lead { margin: 0; font-size: 15px; font-weight: 300; line-height: 2.05; opacity: 0.88; }
+.top-details-note { margin: 16px 0 0; font-size: 12px; font-weight: 300; line-height: 1.9; opacity: 0.6; }
+.top-cores { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.top-core { padding: 18px 20px 20px; background: var(--top-panel); border: 1px solid var(--top-line); border-radius: 12px; backdrop-filter: blur(6px); }
+.top-core-no { font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 12px; letter-spacing: 0.3em; color: #ff8a1f; }
+.top-core h3 { margin: 6px 0 8px; font-size: 16px; font-weight: 400; letter-spacing: 0.04em; line-height: 1.6; }
+.top-core p { margin: 0; font-size: 13px; font-weight: 300; line-height: 1.95; opacity: 0.8; }
+.top-data { margin: 20px 0 0; padding: 0; }
+.top-data-row { display: grid; grid-template-columns: minmax(120px, 190px) 1fr; gap: 6px 20px; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--top-line); }
+.top-data-row:last-child { border-bottom: 1px solid var(--top-line); }
+.top-data dt { font-size: 20px; font-weight: 300; letter-spacing: 0.04em; }
+.top-data dd { margin: 0; font-size: 13px; font-weight: 300; line-height: 1.9; opacity: 0.78; }
+.top-play dt { font-size: 15px; font-weight: 400; }
+.top-start-end { display: block; margin: 56px auto 0; }
+@media (max-width: 640px) {
+  .top-cores { grid-template-columns: 1fr; }
+  .top-data-row { grid-template-columns: 1fr; gap: 2px; }
+}
 
 /* ---- 部品 ---- */
 .top-button {
@@ -143,7 +225,7 @@
 .top-strong { font-weight: 600; color: var(--top-accent); }
 
 /* ---- 準備画面 ---- */
-.top-ready-screen { position: relative; min-height: 100%; box-sizing: border-box; padding: 24px 16px 32px; display: flex; justify-content: center; align-items: flex-start; }
+.top-ready-screen { position: relative; min-height: 100%; box-sizing: border-box; padding: 24px 16px 14px; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; }
 .top-card {
   width: min(520px, 100%);
   box-sizing: border-box;
