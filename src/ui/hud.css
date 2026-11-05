@@ -30,8 +30,6 @@
 .hud-bottom-buttons { display: flex; gap: 6px; pointer-events: auto; }
 .hud-bottom .hud-panel { position: static; }
 .hud-help { font-size: 12px; opacity: 0.85; }
-.hud-credits { font-size: 11px; opacity: 0.85; pointer-events: auto; }
-.hud-credits a { color: inherit; }
 .hud-touch-only { display: none; }
 
 .hud-speed-buttons { position: absolute; left: 16px; flex-direction: column; gap: 6px; }

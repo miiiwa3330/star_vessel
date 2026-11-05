@@ -97,20 +97,21 @@
   color: #ff8a1f;
   filter: drop-shadow(0 0 6px rgba(255, 138, 31, 0.55)) drop-shadow(0 0 26px rgba(255, 110, 20, 0.4));
 }
-/* 一言：細字（Light）。日本語の細い書体は端末にあるものを使う（Hiragino の W3・游ゴシックの Light など） */
+/* 一言：英語の細字（Josefin Sans の 300。「-START-」と同じ書体）。2026-11-06 に、日本語の文から英語に変えた */
 .top-tagline {
   margin: 0;
   text-wrap: balance;
-  font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'YuGothic', 'Noto Sans JP', system-ui, sans-serif;
-  font-size: clamp(13px, 2.6vw, 17px);
-  font-weight: 200;
-  letter-spacing: 0.08em;
-  line-height: 1.9;
+  font-family: 'Josefin Sans', system-ui, sans-serif;
+  font-size: clamp(14px, 2.6vw, 19px);
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  line-height: 1.8;
   opacity: 0.9;
   max-width: 32em;
 }
 /*
- * 枠の無い「-START-」。ゆっくり明るさが変わる。進むのは、この文字のまわりをタップ（クリック）したとき（約 260×90px）。
+ * 枠の無い「-START-」。ふだんは薄い色で、マウスを乗せる（または、キーで選ぶ・押す）と白くなる。
+ * 進むのは、この文字のまわりをタップ（クリック）したとき（約 330×110px）。
  * 画面全体のタップは、2026-11-06 にやめた（詳細をスクロールで読めるようにするため）
  */
 .top-start {
@@ -120,23 +121,23 @@
   font-size: clamp(16px, 3.6vw, 22px);
   font-weight: 300;
   letter-spacing: 0.5em;
-  color: var(--top-ink);
+  color: rgba(232, 236, 244, 0.42);
   background: none;
   border: 0;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  animation: top-pulse 2.6s ease-in-out infinite;
+  transition: color 0.25s ease;
 }
+@media (hover: hover) {
+  .top-start:hover { color: #fff; }
+}
+.top-start:active, .top-start:focus-visible { color: #fff; }
 /* タップできる範囲を、見た目の文字より広げる（約 330×110px） */
 .top-start { position: relative; }
 .top-start::after { content: ''; position: absolute; inset: -14px -20px; }
 .top-start:focus-visible { outline: 1px solid var(--top-accent); outline-offset: -8px; border-radius: 12px; }
-@keyframes top-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  .top-start { animation: none; opacity: 0.85; }
-}
 
-/* 右上の X と Miiiwa のアイコン */
+/* 右上の X と Miiiwa のアイコン。丸い背景は付けない。ふだんは少し透かし、マウスを乗せると透過を解く（アイコン自体の色の変化だけ） */
 .top-social { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 14px; z-index: 3; display: flex; gap: 4px; }
 .top-social-link {
   width: 42px;
@@ -144,25 +145,22 @@
   display: grid;
   place-items: center;
   color: var(--top-ink);
-  opacity: 0.8;
-  border-radius: 999px;
-  /* 明るい地球の上（詳細の画面）でも見えるよう、うっすら暗い丸を敷く */
-  background: rgba(4, 8, 16, 0.38);
-  backdrop-filter: blur(4px);
+  opacity: 0.55;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity 0.2s ease, background 0.2s ease;
+  transition: opacity 0.2s ease;
 }
+/* 明るい地球の上（詳細の画面）でも見えるよう、背景ではなく、アイコンの形に沿った淡い影を付ける */
+.top-social-link svg { filter: drop-shadow(0 0 3px rgba(2, 4, 10, 0.6)); }
 .top-social-link:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 0; opacity: 1; }
 @media (hover: hover) {
-  .top-social-link:hover { opacity: 1; background: rgba(40, 60, 90, 0.6); }
+  .top-social-link:hover { opacity: 1; }
 }
 
 /* 出典の 1 行（要件 F48。地球の画像は CC BY 4.0）。景色をふさがないよう小さく薄く出す */
 .top-credit { margin: 0; text-align: center; font-size: 10px; letter-spacing: 0.04em; opacity: 0.4; }
 .top-credit a { color: inherit; }
 .top-credit a:hover, .top-credit a:focus-visible { opacity: 1; text-decoration: underline; }
-.top-credit-hero { position: absolute; left: 0; right: 0; bottom: calc(6px + env(safe-area-inset-bottom)); }
-.top-credit-end { margin-top: 28px; }
+/* 準備画面の下の 1 行（背景の地球の画像の出典）。詳細の「CREDITS」にもある */
 .top-credit-ready { padding: 4px 0 18px; }
 
 /* サービスの詳細。上の余白は、背景の地球の下半分（画面の上の約 4 割）を見せるため */
@@ -192,10 +190,20 @@
 .top-data dt { font-size: 20px; font-weight: 300; letter-spacing: 0.04em; }
 .top-data dd { margin: 0; font-size: 13px; font-weight: 300; line-height: 1.9; opacity: 0.78; }
 .top-play dt { font-size: 15px; font-weight: 400; }
-.top-start-end { display: block; margin: 56px auto 0; }
+/* クレジット（詳細のいちばん下） */
+.top-credits { margin-top: 72px; padding-top: 8px; }
+.top-credits-title { margin: 0 0 12px; font-size: 14px; font-weight: 300; letter-spacing: 0.08em; opacity: 0.85; }
+.top-credits-list { margin: 0; padding: 0; font-size: 11px; line-height: 1.8; }
+.top-credits-row { display: grid; grid-template-columns: minmax(120px, 230px) 1fr; gap: 2px 18px; padding: 8px 0; border-top: 1px solid var(--top-line); }
+.top-credits-row:last-child { border-bottom: 1px solid var(--top-line); }
+.top-credits-list dt { font-weight: 300; opacity: 0.6; }
+.top-credits-list dd { margin: 0; font-weight: 300; opacity: 0.8; }
+.top-credits-list a { color: inherit; text-decoration: underline; text-decoration-color: rgba(232, 236, 244, 0.3); text-underline-offset: 3px; }
+.top-credits-list a:hover, .top-credits-list a:focus-visible { text-decoration-color: currentColor; }
 @media (max-width: 640px) {
   .top-cores { grid-template-columns: 1fr; }
   .top-data-row { grid-template-columns: 1fr; gap: 2px; }
+  .top-credits-row { grid-template-columns: 1fr; }
 }
 
 /* ---- 部品 ---- */

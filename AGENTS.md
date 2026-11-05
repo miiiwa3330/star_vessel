@@ -205,7 +205,7 @@ src/
                           stamp-bubbles.ts はスタンプの吹き出し（毎フレーム動かすので DOM を直接動かす）。
                           info-controller.ts は天体の情報とコレクションをつなぐところ、target-marker.ts は選んだ天体の印
   top/                    タイトル画面（/）と準備画面（/ready）。世界は読み込まない。routes.ts は URL の決まり、Backdrop.tsx は星空と CSS の地球の縁（3D の地球が出るまでの代わり）、EarthCanvas.tsx・earth-scene.ts は 3D の地球と本物の船（three.js なので遅れて読む）、earth-camera.ts は地球の縁の上に船が見えるカメラの計算、ship-tracks.ts・ship-lights.ts は背景の船の動かし方と光の点、
-                          TitleScreen.tsx は最初の画面と詳細（ServiceDetails.tsx。文章は仮）、SocialLinks.tsx は右上のアイコン（リンク先は links.ts）、section-scroll.ts は 2 つの画面の間のホイール、Credit.tsx は出典の 1 行、ReadyScreen.tsx は宇宙船とアカウントと出発、ShipPreview.tsx は船のプレビュー（three.js なので遅れて読む）、AccountPanel.tsx は登録・ログイン・回復、RecoveryCodeDialog.tsx は回復コードを見せる画面、PasskeySection.tsx はパスキーの追加・削除、last-username.ts はこの端末で最後に使ったユーザー名
+                          TitleScreen.tsx は最初の画面と詳細（ServiceDetails.tsx。文章は仮）、SocialLinks.tsx は右上のアイコン（リンク先は links.ts）、section-scroll.ts は 2 つの画面の間のホイール、Credits.tsx はデータ・画像・書体の出典のまとめ（詳細の最後。世界の画面には出さない）、Credit.tsx は準備画面の下の出典の 1 行、ReadyScreen.tsx は宇宙船とアカウントと出発、ShipPreview.tsx は船のプレビュー（three.js なので遅れて読む）、AccountPanel.tsx は登録・ログイン・回復、RecoveryCodeDialog.tsx は回復コードを見せる画面、PasskeySection.tsx はパスキーの追加・削除、last-username.ts はこの端末で最後に使ったユーザー名
   net/                    サーバーとのやりとり（アカウント・回復コード・ワープホールの API・宇宙の部屋の WebSocket・いま遊んでいる人数）
 public/
   data/stars.bin          星のデータ（npm run stars で作る。stars.LICENSE.txt と必ず一緒に置く）
@@ -244,7 +244,7 @@ docs/                     仕様・判断・経緯の正本（地図は docs/REA
 - サーバーと共有する `src/world/address.ts`・`warp-schema.ts`・`ship-schema.ts`・`visits.ts`・`account.ts`・`account-link.ts`・`recovery-code.ts`・`presence.ts`・`earth-ships-schema.ts`・`galaxy.ts`・`random.ts` は、astronomy-engine・DOM も読み込まない（Worker に余計なものを入れないため）
 - **自動で生成するもの（銀河・星）は、誰の端末でも同じ結果にする。** 乱数は `src/world/random.ts` を使い、`Math.random` を使わない。数（星の数など）を決める計算に対数・指数を使わない（ブラウザによって最後の桁が違うことがある）
 - **サーバーは、ブラウザから受け取ったものを必ず確かめてから使う**（`isWarpPlacement` など）。秘密の値（`.dev.vars`）はコミットしない
-- 外部の素材（データ・画像）を足したら、[`docs/tech/credits.md`](docs/tech/credits.md) に書き、表記が要るものは画面のクレジットにも出す
+- 外部の素材（データ・画像）を足したら、[`docs/tech/credits.md`](docs/tech/credits.md) に書き、表記が要るものは、タイトル画面の詳細の「CREDITS」（`src/top/Credits.tsx`。世界の画面には出さない。2026-11-06 にオーナーが決めた）にも出す
 
 ---
 

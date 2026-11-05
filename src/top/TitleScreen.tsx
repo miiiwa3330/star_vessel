@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Credit } from './Credit';
 import { ServiceDetails } from './ServiceDetails';
 import { SocialLinks } from './SocialLinks';
 
@@ -40,14 +39,13 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
       <SocialLinks />
       <section className="top-hero">
         <h1 className="top-title">STAR VESSEL</h1>
-        <p className="top-tagline">地球から飛び立ち、世界中のプレイヤーと同じ宇宙を旅する。</p>
+        <p className="top-tagline" lang="en">Travel the same universe as players around the world.</p>
         {/* 見た目は枠の無い文字。まわり（約 330×110px）をタップできる */}
         <button type="button" className="top-start" onClick={start}>
           -START-
         </button>
-        <Credit className="top-credit-hero" />
       </section>
-      <ServiceDetails onStart={start} />
+      <ServiceDetails />
     </main>
   );
 }

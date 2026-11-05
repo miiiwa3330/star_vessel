@@ -1,4 +1,4 @@
-import { Credit } from './Credit';
+import { Credits } from './Credits';
 
 /**
  * サービスの詳細（タイトル画面の、スクロールした先の画面）。書いてあることは、docs/concept/README.md（体験の核・世界観）と、
@@ -27,7 +27,7 @@ const PLAY = [
   ['星座をたどる', '星座の線は本物の星の 3 次元の位置を結ぶので、遠くへ行くと、形が崩れていきます'],
 ] as const;
 
-export function ServiceDetails({ onStart }: { onStart: () => void }) {
+export function ServiceDetails() {
   return (
     <section className="top-details" aria-labelledby="top-details-title">
       <div className="top-details-inner">
@@ -80,10 +80,7 @@ export function ServiceDetails({ onStart }: { onStart: () => void }) {
 
         <p className="top-details-note">いまは「世界の創造」の段階で、操縦などは仮のものです。探索のほかの遊びは、世界ができてから考えます。</p>
 
-        <button type="button" className="top-start top-start-end" onClick={onStart}>
-          -START-
-        </button>
-        <Credit className="top-credit-end" />
+        <Credits />
       </div>
     </section>
   );
