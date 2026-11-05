@@ -19,3 +19,4 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-05 | [ユーザー目線の調整：もや・大きさ・天体の情報](entries/2026-11-05-user-view-tuning.md) |
 | 2026-11-05 | [画面の整理と衛星の日本語の名前](entries/2026-11-05-ui-declutter.md) |
 | 2026-11-05 | [星座と実データの追加](entries/2026-11-05-real-data-and-constellations.md) |
+| 2026-11-05 | [動くものを滑らかにする](entries/2026-11-05-smooth-motion.md) |
