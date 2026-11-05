@@ -1,7 +1,7 @@
 /**
  * 一人称の操縦（仮）。要件 F7 の「近くは速さを連続で上げ下げして自分で操縦する」の最初の形。
  *
- * PC：ドラッグで向きを変える、W/S で前後、A/D で左右、R/F で上下、Q/E で傾き、
+ * PC：ドラッグで向きを変える、W/S で前後、A/D で左右、Space で上昇、Shift＋Space で下降（R/F でも上下）、Q/E で傾き、
  *     ホイールか +/− で速さを変える
  * スマホ：1 本指のドラッグで向きを変える、2 本指で触れている間は前に進む
  * 視点（src/controls/chase-camera.ts）：V キーで一人称と三人称を切り替える。三人称では、右ドラッグで船のまわりを回り、
@@ -19,6 +19,15 @@ export const MIN_SPEED_KM_S = 0.1;
 export { MAX_SPEED_KM_S };
 /** Shift を押しながらだと、1 段で速さを 10 倍にする（秒速 500 km から上限まで、約 13 段） */
 const FAST_SPEED_STEP = 10;
+
+/** キーの組み合わせから上下の操作を返す（+1 上昇、−1 下降、0 動かない）。Space は Shift を押していると下降になる */
+export function verticalInput(keys: ReadonlySet<string>): number {
+  const space = keys.has('Space');
+  const shift = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  const up = keys.has('KeyR') || (space && !shift);
+  const down = keys.has('KeyF') || (space && shift);
+  return (up ? 1 : 0) - (down ? 1 : 0);
+}
 
 export class FlightControls {
   readonly orientation = new Quaternion();
@@ -55,6 +64,7 @@ export class FlightControls {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('click', this.onClick, true);
     // 右ドラッグでカメラを回すので、右クリックのメニューを出さない
     element.addEventListener('contextmenu', (e) => e.preventDefault());
   }
@@ -88,8 +98,7 @@ export class FlightControls {
 
     const forward = (this.keys.has('KeyW') || this.touches >= 2 ? 1 : 0) - (this.keys.has('KeyS') ? 1 : 0);
     const right = (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0);
-    const up = (this.keys.has('KeyR') ? 1 : 0) - (this.keys.has('KeyF') ? 1 : 0);
-    this.dir.set(right, up, -forward);
+    this.dir.set(right, verticalInput(this.keys), -forward);
     if (this.dir.lengthSq() === 0) return { x: 0, y: 0, z: 0 };
     this.dir.normalize().applyQuaternion(this.orientation).multiplyScalar(this.speedKmS * dt);
     return { x: this.dir.x, y: this.dir.y, z: this.dir.z };
@@ -148,7 +157,22 @@ export class FlightControls {
     else this.changeSpeed(e.deltaY < 0 ? 1 : -1, e.shiftKey);
   };
 
+  /**
+   * マウスや指で押したボタンからフォーカスを外す。残っていると、次の Space が上昇ではなくそのボタンをもう一度押してしまう。
+   * キーボードで押したとき（detail が 0）は外さない（Tab で選んで Space で押す操作を続けられるように）
+   */
+  private onClick = (e: MouseEvent) => {
+    if (e.detail === 0) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active.tagName === 'BUTTON') active.blur();
+  };
+
   private onKeyDown = (e: KeyboardEvent) => {
+    if (e.code === 'Space') {
+      // Tab で選んだボタンの上では、ふつうにそのボタンを押す
+      if (e.target instanceof HTMLElement && e.target.tagName === 'BUTTON') return;
+      e.preventDefault(); // Space でページが動かないように
+    }
     if (e.key === '+' || e.key === '=' || e.key === ']') this.changeSpeed(1, e.shiftKey);
     else if (e.key === '-' || e.key === '_' || e.key === '[') this.changeSpeed(-1, e.shiftKey);
     else if (e.code === 'KeyV' && !e.repeat) this.onToggleView();
