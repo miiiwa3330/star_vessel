@@ -96,6 +96,17 @@ export function cometPositionKm(c: Comet, date: Date): Vec3 {
   return { x: v.x * KM_PER_AU, y: v.y * KM_PER_AU, z: v.z * KM_PER_AU };
 }
 
+/** 速度を出すときの時間の幅（ms）。光の点はこの幅より長い間隔で計算し直さないので、次の計算と継ぎ目ができにくい */
+const MOTION_STEP_MS = 1_000;
+
+/** 位置（km）と、次の 1 秒の平均の速度（km/s）。全部の彗星を毎フレーム解くと重いので、間は速度で進める（src/render/comet-field.ts） */
+export function cometMotionKm(c: Comet, date: Date): { p: Vec3; v: Vec3 } {
+  const p = cometPositionKm(c, date);
+  const q = cometPositionKm(c, new Date(date.getTime() + MOTION_STEP_MS));
+  const k = 1000 / MOTION_STEP_MS;
+  return { p, v: { x: (q.x - p.x) * k, y: (q.y - p.y) * k, z: (q.z - p.z) * k } };
+}
+
 /** 核の半径が分からない彗星の半径（km）。木星族彗星の核の半径の典型的な値（1〜2 km）から置いた値 */
 const DEFAULT_NUCLEUS_RADIUS_KM = 1.5;
 /** 基準の天体にする範囲は半径の何倍か（小さな天体と同じ） */

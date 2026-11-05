@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { activeComets, cometBody, cometPositionKm, decodeComets, tailLengthKm } from './comets';
+import { activeComets, cometBody, cometMotionKm, cometPositionKm, decodeComets, tailLengthKm, type Comet } from './comets';
 import { bodyAddress } from './address';
 import { KM_PER_AU } from './units';
 
@@ -8,6 +8,21 @@ const comets = decodeComets(JSON.parse(readFileSync('public/data/comets.json', '
 const byCode = (code: string) => comets.find((c) => c.code === code)!;
 const DATE = new Date(Date.UTC(2026, 10, 5));
 const dist = (p: { x: number; y: number; z: number }, q: readonly [number, number, number]) => Math.hypot(p.x - q[0], p.y - q[1], p.z - q[2]);
+
+describe('cometMotionKm', () => {
+  // ハレー彗星の軌道。近日点を通る時刻の前後でも、1 秒の間は速度で進めた位置が本物とほぼ同じ
+  const halley: Comet = { code: 'C1P', name: 'Halley', e: 0.967, qAu: 0.586, iDeg: 162, nodeDeg: 59, periDeg: 112, tpDays: 20000, diameterKm: null, m1: null, k1: null };
+  it.each([-400, -1, 0, 1, 400])('近日点から %d 日のところ', (fromTp) => {
+    const date = new Date((halley.tpDays + fromTp) * 86_400_000);
+    const { p, v } = cometMotionKm(halley, date);
+    expect(Math.hypot(v.x, v.y, v.z)).toBeGreaterThan(1);
+    for (const ms of [250, 500, 1000]) {
+      const q = cometPositionKm(halley, new Date(date.getTime() + ms));
+      const err = Math.hypot(p.x + (v.x * ms) / 1000 - q.x, p.y + (v.y * ms) / 1000 - q.y, p.z + (v.z * ms) / 1000 - q.z);
+      expect(err).toBeLessThan(0.001);
+    }
+  });
+});
 
 describe('彗星（要件 F41）', () => {
   it('JPL Horizons の位置と合う（2026-11-05 00:00 TDB。Horizons の値は 2026-11-05 に取得）', () => {

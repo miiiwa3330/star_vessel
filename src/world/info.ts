@@ -224,19 +224,31 @@ export function nearestStars(
   extra: readonly { position: Vec3; system: string }[],
   max: number,
 ): NearStar[] {
+  // 星は 100 万個ほどあるので、ここは毎回の処理を軽くする（2 秒ごとに全部を調べるので、遅いと画面全体が引っかかる）。
+  // 関数を作らず、距離は 2 乗のまま比べ、記号の文字列は近い方に入るときだけ作る
   const best: NearStar[] = [];
-  // 記号の文字列は、近い方に入るときだけ作る（星は 10 万個以上あるため）
-  const consider = (system: () => string, x: number, y: number, z: number) => {
-    const d = Math.hypot(x - positionPc.x, y - positionPc.y, z - positionPc.z);
-    if (best.length === max && d >= best[max - 1].distancePc) return;
-    const item = { system: system(), positionPc: { x, y, z }, distancePc: d };
+  const { x: px, y: py, z: pz } = positionPc;
+  let worstD2 = Number.POSITIVE_INFINITY;
+  const insert = (system: string, x: number, y: number, z: number, d2: number) => {
+    const distancePc = Math.sqrt(d2);
     let i = best.length;
-    while (i > 0 && best[i - 1].distancePc > d) i--;
-    best.splice(i, 0, item);
+    while (i > 0 && best[i - 1].distancePc > distancePc) i--;
+    best.splice(i, 0, { system, positionPc: { x, y, z }, distancePc });
     if (best.length > max) best.pop();
+    if (best.length === max) worstD2 = best[max - 1].distancePc ** 2;
   };
-  consider(() => 'SOL', 0, 0, 0);
-  for (let o = 0; o + stride <= stars.length; o += stride) consider(() => hygSystemCode(stars[o + stride - 1]), stars[o], stars[o + 1], stars[o + 2]);
-  for (const g of extra) consider(() => g.system, g.position.x, g.position.y, g.position.z);
+  insert('SOL', 0, 0, 0, px * px + py * py + pz * pz);
+  for (let o = 0; o + stride <= stars.length; o += stride) {
+    const dx = stars[o] - px;
+    const dy = stars[o + 1] - py;
+    const dz = stars[o + 2] - pz;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 < worstD2) insert(hygSystemCode(stars[o + stride - 1]), stars[o], stars[o + 1], stars[o + 2], d2);
+  }
+  for (const g of extra) {
+    const { x, y, z } = g.position;
+    const d2 = (x - px) ** 2 + (y - py) ** 2 + (z - pz) ** 2;
+    if (d2 < worstD2) insert(g.system, x, y, z, d2);
+  }
   return best;
 }
