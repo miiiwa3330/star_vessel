@@ -76,9 +76,9 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 
 ## アカウント
 
-要件 F14・F49。Better Auth の anonymous プラグイン（登録なしで始める）と username プラグイン（ユーザー名で登録・ログイン）。設定は `worker/auth-options.ts`、画面からの呼び出しは `src/net/auth.ts`、準備画面は `src/top/`（[`../product/top-screen.md`](../product/top-screen.md)）。
+要件 F14・F49。Better Auth の anonymous プラグイン（登録なしで始める）と username プラグイン（ユーザー名で登録・ログイン）。設定は `worker/auth-options.ts`、画面からの呼び出しは `src/net/auth.ts`、アカウントの箱（月の画面）は `src/top/`（[`../product/top-screen.md`](../product/top-screen.md)）。
 
-- 世界（`/play`）を開くと、ログインしていなければ自動的に匿名のアカウントを作ってログインする（`src/net/auth.ts` の `ensureSession`）。セッションはクッキー（7 日）。準備画面（`/ready`）も開いたときに作る。**タイトル画面（`/`）は作らない**（見るだけの人のアカウントを増やさないため）
+- 世界（`/play`）を開くと、ログインしていなければ自動的に匿名のアカウントを作ってログインする（`src/net/auth.ts` の `ensureSession`）。セッションはクッキー（7 日）。タイトル画面の「-START-」（船を選ぶ）と、SIGN IN・SIGN UP（月の箱）を押したときにも作る。**タイトル画面（`/`）は作らない**（見るだけの人のアカウントを増やさないため）
 - **登録・ログインはユーザー名＋パスワード**（`signUp.email`・`signIn.username`）。決まりは `src/world/account.ts`（ユーザー名は英数字と `_` の 3〜20 文字・大文字小文字は区別しない、パスワードは 8〜64 文字）。サーバーとブラウザの両方が同じ関数で確かめる
 - **メールアドレスは集めない**。Better Auth はアカウントごとにメールを必須とするので、内部ではユーザー名から作った仮のアドレス（`<ユーザー名の小文字>@users.star-vessel.invalid`。`.invalid` は実在しないと決められたドメインなので、間違って送られない）を入れる。画面には出さない。大文字小文字だけ違うユーザー名は、同じ仮のアドレスになるので重複して登録できない（`internalEmailFor`）。**将来メールを集めるようにするときは、仮のアドレスを本物に置き換える作業が要る**
 - **忘れたときに戻す手段は回復コード**（下の「回復コード」）。メールを集めないので、再設定のメールは送れない
@@ -119,7 +119,7 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 
 ## 地球のまわりの船
 
-要件 F53。タイトル画面と準備画面の背景に出す船。`GET /api/earth-ships`（`worker/showcase.ts`）。形と確かめ方は `src/world/earth-ships-schema.ts`、計算は `src/world/earth-ships.ts`。
+要件 F53。タイトル画面の背景に出す船。`GET /api/earth-ships`（`worker/showcase.ts`）。形と確かめ方は `src/world/earth-ships-schema.ts`、計算は `src/world/earth-ships.ts`。
 
 - **ログイン不要の読み取り専用**。出すのは `{ now, ships: [{ id, hue, position, velocity }] }` だけ：位置（地球の中心から・km・EQJ）、地球に対する速度（km/s）、船の色（色相）、接続ごとの短い ID（8 文字。宇宙の部屋で近くのプレイヤーにも配っているもの）。**アカウントの ID・ユーザー名・船の設計は出さない**
 - **集め方**：太陽系の宇宙の部屋（Durable Object `SOL`）に `currentShips()`（RPC）を新しく足した。いま状態が届いている船（`SHIP_STALE_MS` 以内）の、最後の状態を返す。Worker が `earthShips()` で、地球から `SHOWCASE_RADIUS_KM`（100 万 km）以内の船だけを、地球に近い順に `MAX_SHOWCASE_SHIPS`（24）隻まで選ぶ

@@ -1,5 +1,5 @@
 /*
- * タイトル画面と準備画面（要件 F48）。見た目の決まりは docs/design/README.md。
+ * タイトル画面（要件 F48）。見た目の決まりは docs/design/README.md。
  * 色と部品は、操縦席の画面（src/ui/hud.css）と同じ：暗い半透明の面、水色の線、system-ui。
  */
 .top {
@@ -64,6 +64,9 @@
 .top.is-title { scroll-snap-type: y mandatory; overscroll-behavior-y: contain; }
 /* 慣性のある動き（section-scroll.ts）の間は、吸い付きを切る。切らないと、1 フレームごとに、近い画面の先頭へ引き戻される */
 .top.is-title.is-gliding { scroll-snap-type: none; }
+/* 船を選ぶ間・月へ行く間は、スクロールできない（詳細は隠す） */
+.top.is-locked { overflow: hidden; }
+.top.is-locked .top-details { display: none; }
 .top-title-screen { position: relative; }
 .top-hero {
   position: relative;
@@ -79,7 +82,10 @@
   gap: 18px;
   scroll-snap-align: start;
   scroll-snap-stop: always;
+  transition: opacity 0.9s ease, padding 0.6s ease;
 }
+/* 月へ行く間は、文字を隠す。帰ってきたら、ゆっくり現れる */
+.top-hero.is-away { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.45s ease, visibility 0s 0.45s; }
 /*
  * タイトルの文字：Monoton（OFL）。細い線を重ねたネオンの管のような書体を、オレンジに光らせる（オーナーが指定。2026-11-06）。
  * 幅が広い書体なので、文字の間は詰め、画面の幅に合わせて大きさを変える。狭いと、「STAR」と「VESSEL」の 2 行になる。
@@ -99,6 +105,17 @@
   color: #ff8a1f;
   filter: drop-shadow(0 0 6px rgba(255, 138, 31, 0.55)) drop-shadow(0 0 26px rgba(255, 110, 20, 0.4));
 }
+/* 選ぶ画面では、名前を押すとタイトルへ戻る。少し明るくなって、押せることが分かるようにする */
+.top-hero.is-select .top-title { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.top-title:focus-visible { outline: 1px solid var(--top-accent); outline-offset: 8px; border-radius: 6px; }
+@media (hover: hover) {
+  .top-hero.is-select .top-title:hover { filter: drop-shadow(0 0 8px rgba(255, 138, 31, 0.75)) drop-shadow(0 0 34px rgba(255, 110, 20, 0.55)); }
+}
+/* 一言は、選ぶ画面で消える（高さも縮めて、名前が上がる） */
+/* 選ぶ画面からタイトルへ戻るときは、船が左へ消えてから（0.55 秒待って）戻る。船が一言に重ならないように */
+.top-tagline-wrap { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.55s ease 0.5s, opacity 0.5s ease 0.55s, margin 0.55s ease 0.5s; }
+.top-tagline-wrap > .top-tagline { overflow: hidden; min-height: 0; }
+.top-hero.is-select .top-tagline-wrap, .top-hero.is-away .top-tagline-wrap { grid-template-rows: 0fr; opacity: 0; margin-block: -9px; transition: grid-template-rows 0.55s ease, opacity 0.4s ease, margin 0.55s ease; }
 /* 一言：英語の細字（Josefin Sans の 300。「-START-」と同じ書体）。2026-11-06 に、日本語の文から英語に変えた */
 .top-tagline {
   margin: 0;
@@ -119,6 +136,8 @@
 .top-start {
   margin-top: 10px;
   padding: 26px 64px 26px calc(64px + 0.5em);
+  display: grid;
+  place-items: center;
   font-family: 'Josefin Sans', system-ui, sans-serif;
   font-size: clamp(16px, 3.6vw, 22px);
   font-weight: 300;
@@ -128,16 +147,58 @@
   border: 0;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: color 0.25s ease;
+  transition: color 0.25s ease, transform 0.6s ease;
 }
+/* 「-START-」と「-Go!-」は同じ場所に重ね、押したあとで入れ替わる */
+.top-start-word { grid-area: 1 / 1; transition: opacity 0.4s ease, transform 0.4s ease; }
+.top-start-b { letter-spacing: 0.3em; font-size: 1.15em; opacity: 0; transform: scale(0.85); transition: opacity 0.4s ease 0.15s, transform 0.4s ease 0.15s; }
+.top-start.is-go .top-start-a { opacity: 0; transform: scale(1.12); transition-delay: 0s; }
+.top-start.is-go .top-start-b { opacity: 1; transform: none; }
 @media (hover: hover) {
-  .top-start:hover { color: #fff; }
+  .top-start:hover:not(:disabled) { color: #fff; }
 }
-.top-start:active, .top-start:focus-visible { color: #fff; }
-/* タップできる範囲を、見た目の文字より広げる（約 330×110px） */
+.top-start:active:not(:disabled), .top-start:focus-visible { color: #fff; }
+.top-start:disabled { cursor: default; }
+/* タップできる範囲を、見た目の文字より広げる（約 330×110px）。選ぶ画面では、地球の縁の近くまで下げる（2026-11-06 にオーナーの指示） */
 .top-start { position: relative; }
+.top-hero.is-select .top-start { transform: translateY(clamp(36px, 7vh, 64px)); }
 .top-start::after { content: ''; position: absolute; inset: -14px -20px; }
 .top-start:focus-visible { outline: 1px solid var(--top-accent); outline-offset: -8px; border-radius: 12px; }
+
+/*
+ * 宇宙船を選ぶ列（UfoPicker）。船そのものは 3D の canvas に描く（src/top/ufo-layer.ts）ので、ここは場所と、押せる範囲だけ。
+ * 選ぶ画面で高さが広がり、名前と「GO」の間に宇宙船が入る。広がりきってから、船が右から飛んでくる
+ */
+.top-ufos {
+  width: min(96vw, 760px);
+  height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+  transition: height 0.55s ease, opacity 0.3s ease, transform 0.55s ease;
+}
+.top-ufos.is-open { transform: translateY(clamp(22px, 4.5vh, 44px)); height: clamp(190px, 33vh, 310px); opacity: 1; pointer-events: auto; overflow: visible; }
+.top-ufo-zone {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 4px;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.top-ufo-zone.is-center { cursor: grab; }
+.top-ufo-zone:focus-visible { outline: 1px solid var(--top-accent); outline-offset: -6px; border-radius: 18px; }
+/* 3D が使えないときだけ出る、船の名前 */
+.top-ufo-name { font-size: 12px; letter-spacing: 0.08em; opacity: 0.55; padding: 6px 4px; }
+.top-ufo-zone.is-center .top-ufo-name { opacity: 1; font-weight: 600; color: var(--top-accent); }
+.top-go-error { text-align: center; }
 
 /* 右下の X と Miiiwa のアイコン（2026-11-06 に、右上から右下へ移した）。丸い背景は付けない。ふだんは少し透かし、マウスを乗せると透過を解く（アイコン自体の色の変化だけ） */
 .top-social { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); right: 14px; z-index: 3; display: flex; gap: 4px; }
@@ -178,6 +239,8 @@
   transition: color 0.25s ease, border-color 0.25s ease;
   filter: drop-shadow(0 0 3px rgba(2, 4, 10, 0.6));
 }
+.top-auth { transition: opacity 0.45s ease; }
+.top-auth.is-away { opacity: 0; pointer-events: none; }
 .top-auth-outline { border-color: rgba(232, 236, 244, 0.34); }
 .top-auth-user { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0.08em; padding-left: 14px; }
 .top-auth-button:active, .top-auth-button:focus-visible { color: #fff; border-color: #fff; }
@@ -186,13 +249,6 @@
   .top-auth-button:hover { color: #fff; }
   .top-auth-outline:hover { border-color: #fff; }
 }
-
-/* 出典の 1 行（要件 F48。地球の画像は CC BY 4.0）。景色をふさがないよう小さく薄く出す */
-.top-credit { margin: 0; text-align: center; font-size: 10px; letter-spacing: 0.04em; opacity: 0.4; }
-.top-credit a { color: inherit; }
-.top-credit a:hover, .top-credit a:focus-visible { opacity: 1; text-decoration: underline; }
-/* 準備画面の下の 1 行（背景の地球の画像の出典）。詳細の「CREDITS」にもある */
-.top-credit-ready { padding: 4px 0 18px; }
 
 /* サービスの詳細。上の余白は、背景の地球の下半分（画面の上の約 4 割）を見せるため */
 .top-details {
@@ -252,9 +308,8 @@
 /* ホバーは、マウスのように「触れずに指せる」端末だけ（スマホでは、タップした場所に色が残るため） */
 @media (hover: hover) {
   .top-button:hover:not(:disabled) { background: var(--top-button-hover); }
-  .top-ship-option:hover { background: rgba(30, 60, 90, 0.5); }
 }
-.top-button:focus-visible, .top-tab:focus-visible, .top-ship-option:focus-visible, .top-field input:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 2px; }
+.top-button:focus-visible, .top-tab:focus-visible, .top-field input:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 2px; }
 .top-button:disabled { opacity: 0.55; cursor: default; }
 .top-button-primary { font-size: 16px; letter-spacing: 0.2em; padding: 12px 36px; min-height: 48px; border-radius: 999px; box-shadow: 0 0 24px rgba(116, 230, 255, 0.18); }
 .top-button-small { min-height: 32px; padding: 5px 12px; font-size: 12px; }
@@ -263,50 +318,73 @@
 .top-small { font-size: 11px; }
 .top-strong { font-weight: 600; color: var(--top-accent); }
 
-/* ---- 準備画面 ---- */
-.top-ready-screen { position: relative; min-height: 100%; box-sizing: border-box; padding: 24px 16px 14px; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; }
-.top-card {
-  width: min(520px, 100%);
+/* ---- アカウントの箱（月の画面。AuthBox） ---- */
+.top-auth-box {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 16px;
   box-sizing: border-box;
-  padding: 16px 18px 18px;
-  background: var(--top-panel);
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+  /* 箱の外は、下の画面（アイコンなど）の操作を邪魔しない */
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.top-auth-box.is-open { opacity: 1; transform: none; }
+.top-auth-box .top-card { pointer-events: none; }
+.top-auth-box.is-open .top-card { pointer-events: auto; }
+.top-card {
+  position: relative;
+  width: min(440px, 100%);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100svh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 22px 20px 20px;
+  background: rgba(6, 10, 22, 0.72);
   border: 1px solid var(--top-line);
-  border-radius: 12px;
-  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
   gap: 16px;
   font-size: 13px;
   line-height: 1.6;
 }
-.top-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.top-auth-close {
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--top-ink);
+  opacity: 0.6;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.top-auth-close:focus-visible { outline: 2px solid var(--top-accent); opacity: 1; }
+@media (hover: hover) {
+  .top-auth-close:hover { opacity: 1; }
+}
 .top-heading { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; }
 .top-section { display: flex; flex-direction: column; gap: 8px; }
-.top-section + .top-section, .top-card > .top-section + .top-depart { border-top: 1px solid var(--top-line); padding-top: 14px; }
+.top-section + .top-section { border-top: 1px solid var(--top-line); padding-top: 14px; }
+.top-user-name { font-size: 18px; letter-spacing: 0.03em; overflow-wrap: anywhere; }
+.top-signout { margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--top-line); display: flex; }
 .top-section-title { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; opacity: 0.75; }
 .top-line { margin: 0; }
 .top-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .top-hint { margin: 0; font-size: 11px; opacity: 0.6; }
 .top-error { margin: 0; font-size: 12px; color: var(--top-warn); }
-
-.top-ship-stage { height: clamp(150px, 30vh, 230px); border-radius: 10px; background: radial-gradient(ellipse at 50% 100%, rgba(40, 90, 150, 0.35), rgba(4, 8, 16, 0.4) 70%); border: 1px solid var(--top-line); overflow: hidden; }
-.top-ship-canvas { width: 100%; height: 100%; display: block; }
-.top-ship-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.top-ship-option {
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  background: rgba(8, 12, 24, 0.5);
-  border: 1px solid var(--top-line);
-  border-radius: 8px;
-  cursor: pointer;
-}
-.top-ship-option.is-selected { border-color: rgba(116, 230, 255, 0.8); background: rgba(30, 60, 90, 0.7); }
-.top-ship-option-name { font-weight: 600; font-size: 12px; }
 
 .top-form { display: flex; flex-direction: column; gap: 8px; }
 .top-tabs { display: flex; gap: 6px; }
@@ -326,14 +404,9 @@
   box-sizing: border-box;
 }
 
-.top-depart { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
 
-@media (max-width: 480px) {
-  .top-ship-options { grid-template-columns: 1fr; }
-  .top-ship-option { flex-direction: row; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .top-button, .top-ship-option { transition: none; }
+  .top-button, .top-hero, .top-tagline-wrap, .top-ufos, .top-start-word, .top-auth, .top-auth-box { transition: none; }
 }
 
 /* ---- 回復コード（要件 F51） ---- */

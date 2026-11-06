@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { mulberry32 } from '../world/random';
+import type { TopStage } from './top-stage';
 
 // 3D の地球は three.js と画像を読み込むので大きい。画面が出てから、遅れて読み込む
 const EarthCanvas = lazy(() => import('./EarthCanvas'));
@@ -42,7 +43,7 @@ export function makeStars(count: number, seed = 20261106): Star[] {
 }
 
 /**
- * タイトル画面と準備画面の背景。星空（2D の canvas）と、画面の下に見える地球の縁（CSS）。
+ * タイトル画面の背景。星空（2D の canvas）と、画面の下に見える地球の縁（CSS）。
  * 世界の描画（three.js）は使わない。軽く開くため（要件 F48）。
  * 動きは、星のゆっくりした流れとまたたきだけ。「動きを減らす」の設定では止める。
  */
@@ -52,14 +53,27 @@ export interface ScrollState {
   pastPx: number;
 }
 
-export function Backdrop({ getScroll }: { getScroll: () => ScrollState }) {
+/** 3D の地球の様子：pending はまだ読み込み中、ready は描けている、none は使わない（通信量の節約・?earth=css）か描けなかった */
+export type Earth3dState = 'pending' | 'ready' | 'none';
+
+export function Backdrop({ getScroll, stage, onEarth3d }: { getScroll: () => ScrollState; stage: TopStage; onEarth3d: (state: Earth3dState) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [use3d] = useState(wantsEarth3d);
   const [load3d, setLoad3d] = useState(false);
   const [ready3d, setReady3d] = useState(false);
   const [failed3d, setFailed3d] = useState(false);
-  const onReady = useCallback(() => setReady3d(true), []);
-  const onFail = useCallback(() => setFailed3d(true), []);
+  const onReady = useCallback(() => {
+    setReady3d(true);
+    onEarth3d('ready');
+  }, [onEarth3d]);
+  const onFail = useCallback(() => {
+    setFailed3d(true);
+    onEarth3d('none');
+  }, [onEarth3d]);
+  // 3D を使わないと決まっているときは、すぐ知らせる（画面の部品が、飛ぶのを待たないように）
+  useEffect(() => {
+    if (!use3d) onEarth3d('none');
+  }, [use3d, onEarth3d]);
 
   useEffect(() => {
     if (!use3d) return;
@@ -90,6 +104,10 @@ export function Backdrop({ getScroll }: { getScroll: () => ScrollState }) {
 
     const draw = (now: number) => {
       const t = reduce.matches ? 0 : now / 1000;
+      // 月へ飛んでいる間、星は、画面の真ん中から外へ向かって伸びる（光の速さで進んでいる見え方）
+      const warp = reduce.matches ? 0 : stage.warp;
+      const cx = w / 2;
+      const cy = h / 2;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
       for (const s of stars) {
@@ -99,6 +117,20 @@ export function Backdrop({ getScroll }: { getScroll: () => ScrollState }) {
         const twinkle = reduce.matches ? 1 : 0.75 + 0.25 * Math.sin(t * (0.6 + s.depth * 1.4) + s.phase);
         const alpha = (0.25 + 0.7 * s.depth) * twinkle;
         const r = 0.35 + 1.25 * s.depth;
+        if (warp > 0.01) {
+          const dx = x - cx;
+          const dy = y - cy;
+          const d = Math.hypot(dx, dy) || 1;
+          // 外にある星ほど、手前の星ほど、長く伸びる
+          const len = warp * (0.12 + 0.55 * s.depth) * d * 0.85;
+          ctx.strokeStyle = `hsla(${s.hue}, 70%, ${85 + 10 * s.depth}%, ${Math.min(1, alpha * (1 + 1.5 * warp))})`;
+          ctx.lineWidth = Math.max(0.6, r * 1.1);
+          ctx.beginPath();
+          ctx.moveTo(x - (dx / d) * len, y - (dy / d) * len);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          continue;
+        }
         ctx.fillStyle = `hsla(${s.hue}, 70%, ${80 + 15 * s.depth}%, ${alpha})`;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -138,7 +170,7 @@ export function Backdrop({ getScroll }: { getScroll: () => ScrollState }) {
       {(!use3d || failed3d) && <div className="top-earth" />}
       {load3d && (
         <Suspense fallback={null}>
-          <EarthCanvas onReady={onReady} onFail={onFail} getScroll={getScroll} />
+          <EarthCanvas onReady={onReady} onFail={onFail} getScroll={getScroll} stage={stage} />
         </Suspense>
       )}
     </div>

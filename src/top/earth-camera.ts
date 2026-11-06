@@ -51,8 +51,7 @@ export function subjectView(o: SubjectViewOptions): EarthCameraPose & { phi: num
   const p = scale(o.aim, 1 / r);
   const half = Math.tan((o.fovDeg * DEG) / 2);
   const D = o.distanceKm;
-  const rho = Math.asin(o.radiusKm / D);
-  const alpha = rho + Math.atan(Math.abs(o.limbNdcY) * half);
+  const alpha = limbAlpha(o.radiusKm, D, o.fovDeg, o.limbNdcY);
   // 船と地球の中心が、カメラから見てなす角（地球の中心の向きから測る）
   const beta = alpha + Math.atan(o.subjectNdcY * half);
 
@@ -139,4 +138,77 @@ export const alphaForCenter = (centerNdcY: number, fovDeg: number): number => -M
 export function distanceForRadius(radiusKm: number, radiusNdc: number, fovDeg: number): number {
   const rho = Math.atan(radiusNdc * Math.tan((fovDeg * DEG) / 2));
   return radiusKm / Math.sin(rho);
+}
+
+/**
+ * 天体の縁が画面の高さ limbNdcY（下が負）に見えるときの、alpha（天体の中心が、画面の真ん中から下へ何ラジアンずれて見えるか）。
+ * 天体の中心から distanceKm の位置で、中心の向きから縁までが asin(半径 / 距離)、縁から画面の真ん中までが atan(|limbNdcY| × tan(画角 / 2))
+ */
+export function limbAlpha(radiusKm: number, distanceKm: number, fovDeg: number, limbNdcY: number): number {
+  return Math.asin(radiusKm / distanceKm) + Math.atan(Math.abs(limbNdcY) * Math.tan((fovDeg * DEG) / 2));
+}
+
+const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
+const smooth01 = (x: number): number => {
+  const t = clamp01(x);
+  return t * t * (3 - 2 * t);
+};
+
+export interface LegOptions {
+  /** 地平線の上の向き（出発の天体の中心から、カメラへ）と、前（奥）の向き。たがいに垂直な単位ベクトル。出発のカメラの dir・u と同じ */
+  up: Vec3;
+  forward: Vec3;
+  /** 出発のカメラ：天体の中心からの距離と alpha */
+  rFrom: number;
+  alphaFrom: number;
+  /** 着くカメラ：行き先の天体の中心からの距離と alpha */
+  rTo: number;
+  alphaTo: number;
+  /** カメラが進む距離（km）。見た目のための距離で、出発の天体も行き先も同じ */
+  stageKm: number;
+  /** 進み具合（0：出発、1：着いた） */
+  f: number;
+}
+
+/** 出発のカメラの、見る向き（まっすぐ進む向き） */
+function legDirection(o: LegOptions): Vec3 {
+  return posedView({ dir: o.up, u: o.forward, distanceKm: 1, alpha: o.alphaFrom }).forward;
+}
+
+/**
+ * 行き先の天体の中心（出発の天体の中心が原点）。着いたカメラが、出発のカメラから、見る向きへ stageKm まっすぐ進んだ点で、
+ * 着いたカメラは、行き先の中心から、上の向きへ rTo の点にある。つまり、行き先は、出発のカメラの視線の先の、ずっと遠くにある
+ * （出発のカメラからは、画面の真ん中に、小さく見える）。
+ */
+export function legEndCenter(o: Omit<LegOptions, 'f'>): Vec3 {
+  const dir = legDirection({ ...o, f: 0 });
+  const start = scale(o.up, o.rFrom);
+  return sub(add(start, scale(dir, o.stageKm)), scale(o.up, o.rTo));
+}
+
+/**
+ * 「月ー地球ー火星」の移動の、1 回分。**カメラは、向きを変えず、見ている向きへ、まっすぐ進む**。返すカメラの位置は、出発の天体の中心が原点。
+ *
+ * 行き先の天体は、視線の先のずっと遠く（legEndCenter）にあるので、最初は、画面の真ん中に小さな点として見え、近づくほど大きくなる。
+ * 着く直前、行き先の中心は、遠近法だけで、画面の真ん中から下へ動き、出発のときと同じ構図（縁が画面の下に弧）に落ち着く（向きを回す必要がない）。
+ * 出発の天体は、出発の構図で画面の下にあり、カメラが前へ進むので、そのまま画面の下へ消える。
+ *
+ * 前へ進む距離は、出発の距離から指数で伸ばし（前半）、着くときの距離へ指数で縮める（後半）。
+ * 動き出しの数コマで進む距離を小さくして、出発の天体が一瞬で消えないようにするため（始まりと終わりはゆるやかに）。
+ * alpha が出発と着くときで違うとき（地球の現れる動きの間など）だけ、向きを、なめらかに合わせる。
+ * 行き先から地球へ戻る移動も、同じ式で、行き先の中心を出発点にして、前へ進む。
+ */
+export function forwardLeg(o: LegOptions): EarthCameraPose {
+  const S = o.stageKm;
+  const f = clamp01(o.f);
+  const p = f * f * f * (f * (6 * f - 15) + 10);
+  const u = Math.min(1, 2 * p);
+  const w = Math.max(0, 2 * p - 1);
+  const k1 = Math.log(S / (2 * o.rFrom));
+  const k2 = Math.log(S / (2 * o.rTo));
+  const along = p < 0.5 ? ((S / 2) * Math.expm1(k1 * u)) / Math.expm1(k1) : S - ((S / 2) * Math.expm1(k2 * (1 - w))) / Math.expm1(k2);
+  const dir = legDirection({ ...o, f: 0 });
+  const alpha = o.alphaFrom + (o.alphaTo - o.alphaFrom) * smooth01(f);
+  const look = posedView({ dir: o.up, u: o.forward, distanceKm: 1, alpha });
+  return { position: add(scale(o.up, o.rFrom), scale(dir, along)), forward: look.forward, up: look.up };
 }

@@ -18,18 +18,27 @@ const GENERIC = 'うまくいきませんでした。しばらくしてからも
 const messageOf = (e: unknown): string => (e instanceof AccountError ? e.message : GENERIC);
 
 /**
- * アカウント（要件 F14・F49・F51）。登録しなくても遊べる。登録（ユーザー名とパスワード）すると、
+ * アカウント（要件 F14・F49・F51）。タイトル画面の SIGN IN・SIGN UP で、月の画面に出る箱（AuthBox）の中身。登録しなくても遊べる。登録（ユーザー名とパスワード）すると、
  * ほかの端末でも続きから遊べ、いまの記録（宇宙船・ワープホール・訪れた天体）も引き継がれる。
  * メールアドレスは集めないので、忘れたときに戻す手段は、登録のあとに 1 回だけ見せる回復コード。
  */
-export function AccountPanel({ account, onChanged, initialMode }: { account: Account; onChanged: () => void; initialMode?: AccountMode }) {
+export function AccountPanel({
+  account,
+  onChanged,
+  initialMode,
+  onComplete,
+  onCancel,
+}: {
+  account: Account;
+  onChanged: () => void;
+  initialMode?: AccountMode;
+  /** ログイン・登録が終わったとき（登録とパスワードの決め直しは、回復コードを保存して閉じたあと）。呼ぶと、箱が閉じる */
+  onComplete?: () => void;
+  /** 登録・ログインの入力で「やめる」を押したとき。無ければ、登録とログインの選び直しに戻る */
+  onCancel?: () => void;
+}) {
   const [mode, setMode] = useState<Mode>(initialMode ?? 'closed');
   const [username, setUsername] = useState(() => (initialMode === 'login' ? lastUsername() : ''));
-  const sectionRef = useRef<HTMLElement>(null);
-  // タイトル画面から来て、入力が最初から開いているときは、画面の中に入れる（スマホで、下にあるため）
-  useEffect(() => {
-    if (initialMode) sectionRef.current?.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
-  }, [initialMode]);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +48,8 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
   const [found, setFound] = useState<string | null>(null);
   /** いま見せている回復コード（1 回だけ） */
   const [shownCode, setShownCode] = useState<string | null>(null);
+  /** 回復コードの画面を閉じたら、終わりにする（登録・パスワードの決め直しのとき） */
+  const completeAfterCode = useRef(false);
   const [status, setStatus] = useState<RecoveryStatus | null>(null);
 
   const userId = account.kind === 'registered' ? account.userId : null;
@@ -92,13 +103,21 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
       if (mode === 'register') {
         await registerAccount(username, password);
         // 登録はできたので、コードが作れなくても続ける（登録したあとの画面から作り直せる）
-        await recoveryApi.create(password).then(setShownCode, (err: unknown) => console.error(err));
+        // コードが作れなかったときは、終わりにせず、登録したあとの画面（「回復コードがありません」）を見せる
+        await recoveryApi.create(password).then(
+          (c) => {
+            completeAfterCode.current = true;
+            setShownCode(c);
+          },
+          (err: unknown) => console.error(err),
+        );
       } else {
         await loginAccount(username, password);
       }
       switchMode('closed');
       setUsername('');
       onChanged();
+      if (mode === 'login') onComplete?.();
     });
   };
 
@@ -122,6 +141,7 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
       setUsername('');
       try {
         await loginAccount(r.username, newPassword);
+        completeAfterCode.current = true;
         onChanged();
       } catch {
         setNotice('パスワードを決め直しました。新しいパスワードでログインしてください');
@@ -145,6 +165,7 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
       switchMode('closed');
       setUsername('');
       onChanged();
+      onComplete?.();
     });
 
   const logout = () =>
@@ -152,9 +173,18 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
       await logoutAccount();
       switchMode('closed');
       onChanged();
+      // サインアウトしたら、箱を閉じて、地球へ戻る（右上は SIGN IN・SIGN UP に戻る）
+      onComplete?.();
     });
 
-  const dialog = shownCode && <RecoveryCodeDialog code={shownCode} onClose={() => setShownCode(null)} />;
+  const closeCodeDialog = () => {
+    setShownCode(null);
+    if (completeAfterCode.current) {
+      completeAfterCode.current = false;
+      onComplete?.();
+    }
+  };
+  const dialog = shownCode && <RecoveryCodeDialog code={shownCode} onClose={closeCodeDialog} />;
   const errorLine = error && <p className="top-error" role="alert">{error}</p>;
 
   // 回復コードの画面は、登録の前後で作り直されないよう、どちらの場合も section の次の同じ位置に置く
@@ -162,9 +192,9 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
     return (
       <>
       <section className="top-section" aria-labelledby="top-account-title">
-        <h2 id="top-account-title" className="top-section-title">アカウント</h2>
+        <h2 id="top-account-title" className="top-section-title">ユーザー情報</h2>
         <p className="top-line">
-          <span className="top-strong">{account.name}</span> でログインしています
+          <span className="top-strong top-user-name">{account.name}</span> でサインインしています
         </p>
         {status && (
           <p className={status.hasCode ? 'top-hint' : 'top-warn'}>
@@ -199,14 +229,18 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
                   {status.hasCode ? '回復コードを作り直す' : '回復コードを作る'}
                 </button>
               )}
-              <button type="button" className="top-button top-button-small top-button-quiet" onClick={logout} disabled={busy}>
-                ログアウト
-              </button>
             </div>
             {errorLine}
           </>
         )}
         <PasskeySection username={account.name} />
+        {mode !== 'code' && (
+          <div className="top-signout">
+            <button type="button" className="top-button" onClick={logout} disabled={busy}>
+              サインアウト
+            </button>
+          </div>
+        )}
       </section>
       {dialog}
       </>
@@ -215,7 +249,7 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
 
   return (
     <>
-    <section ref={sectionRef} className="top-section" aria-labelledby="top-account-title">
+    <section className="top-section" aria-labelledby="top-account-title">
       <h2 id="top-account-title" className="top-section-title">アカウント</h2>
       <p className="top-line top-muted">登録しなくても遊べます。登録すると、ほかの端末でも続きから遊べます。</p>
       {notice && <p className="top-line" role="status">{notice}</p>}
@@ -286,7 +320,7 @@ export function AccountPanel({ account, onChanged, initialMode }: { account: Acc
             <button type="submit" className="top-button top-button-small" disabled={busy}>
               {busy ? '送っています…' : mode === 'register' ? '登録する' : 'ログインする'}
             </button>
-            <button type="button" className="top-button top-button-small top-button-quiet" onClick={() => switchMode('closed')} disabled={busy}>
+            <button type="button" className="top-button top-button-small top-button-quiet" onClick={() => (onCancel ? onCancel() : switchMode('closed'))} disabled={busy}>
               やめる
             </button>
           </div>
