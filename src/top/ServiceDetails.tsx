@@ -72,9 +72,9 @@ export function ServiceDetails() {
         </dl>
 
         <p className="top-eyebrow">ACCOUNT</p>
-        <h2 className="top-details-title">登録しなくても、始められます</h2>
+        <h2 className="top-details-title">サインアップしなくても、始められます</h2>
         <p className="top-details-lead">
-          記録を残したい人だけ、あとから、ユーザー名とパスワード（またはパスキー）で登録できます。メールアドレスは集めません。
+          記録を残したい人だけ、あとから、宇宙船名とパスワード（またはパスキー）でサインアップできます。メールアドレスは集めません。
           ワープホール・宇宙船・訪れた天体の記録は、ほかの端末でも、続きから遊べます。
         </p>
 

@@ -12,7 +12,7 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 | Cloudflare Workers | `/api/` を受ける入口。それ以外は Vite が書き出した静的なファイルを配る（Worker を通らないので料金がかからない） | `worker/index.ts`、`wrangler.jsonc` |
 | Hono | `/api/` の中の振り分け | `worker/index.ts` |
 | D1（SQLite） | ワープホール・宇宙船の設計・訪れた天体・アカウント・いま遊んでいる人数の保存 | `migrations/` |
-| Better Auth | アカウント。匿名と、ユーザー名＋パスワードと、パスキー | `worker/auth.ts`、`worker/auth-options.ts` |
+| Better Auth | アカウント。匿名と、ユーザー名（画面では「宇宙船名」と呼ぶ）＋パスワードと、パスキー | `worker/auth.ts`、`worker/auth-options.ts` |
 | Durable Objects | 他のプレイヤーの宇宙船の位置のやりとり。恒星系ごとに 1 つの部屋 | `worker/space-room.ts` |
 
 - サーバーとブラウザで同じ決まりを使うコード（宇宙の住所・ワープホールの形の確かめ）は `src/world/address.ts` と `src/world/warp-schema.ts` に置き、両方から読み込む。この 2 つは three.js・DOM・astronomy-engine を読み込まない

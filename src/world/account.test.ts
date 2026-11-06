@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { accountErrorMessage, credentialProblem, isPasskeyCancel, internalEmailFor, isInternalEmail, isPassword, isUsername, PASSWORD_MAX, USERNAME_MAX } from './account';
+import { accountErrorMessage, credentialProblem, usernameProblem, isPasskeyCancel, internalEmailFor, isInternalEmail, isPassword, isUsername, PASSWORD_MAX, USERNAME_MAX } from './account';
 
 describe('ユーザー名とパスワードの決まり', () => {
+  it('入力しながらの OK・NG：宇宙船名の決まりに合うときだけ、理由が無い', () => {
+    expect(usernameProblem('abc')).toBeNull();
+    expect(usernameProblem('Star_Ship_01')).toBeNull();
+    expect(usernameProblem('ab')).toContain('宇宙船名');
+    expect(usernameProblem('a'.repeat(21))).toContain('宇宙船名');
+    expect(usernameProblem('ab cd')).toContain('英数字');
+    expect(usernameProblem('宇宙船です')).toContain('英数字');
+  });
+
   it('ユーザー名は英数字とアンダースコアの 3〜20 文字', () => {
     expect(isUsername('abc')).toBe(true);
     expect(isUsername('Star_Vessel_01')).toBe(true);
@@ -32,7 +41,7 @@ describe('ユーザー名とパスワードの決まり', () => {
 
   it('入力の問題を、画面に出す日本語で返す', () => {
     expect(credentialProblem('abc', 'password1')).toBeNull();
-    expect(credentialProblem('ab', 'password1')).toContain('ユーザー名');
+    expect(credentialProblem('ab', 'password1')).toContain('宇宙船名');
     expect(credentialProblem('abc!', 'password1')).toContain('英数字');
     expect(credentialProblem('abc', 'short')).toContain('パスワード');
   });
@@ -49,8 +58,8 @@ describe('ユーザー名とパスワードの決まり', () => {
 
   it('パスキーのエラーを日本語にする。自分でやめたときはエラーにしない', () => {
     expect(accountErrorMessage('ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED')).toContain('すでに追加');
-    expect(accountErrorMessage('SESSION_NOT_FRESH')).toContain('もう一度ログイン');
-    expect(accountErrorMessage('PASSKEY_NOT_FOUND')).toContain('ログインできません');
+    expect(accountErrorMessage('SESSION_NOT_FRESH')).toContain('もう一度サインイン');
+    expect(accountErrorMessage('PASSKEY_NOT_FOUND')).toContain('サインインできません');
     expect(isPasskeyCancel('AUTH_CANCELLED')).toBe(true);
     expect(isPasskeyCancel('PASSKEY_NOT_FOUND')).toBe(false);
     expect(isPasskeyCancel(undefined)).toBe(false);

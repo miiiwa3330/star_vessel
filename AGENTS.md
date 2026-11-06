@@ -188,7 +188,7 @@ src/
     ships.ts              近い船を選ぶ・位置の予測
     address.ts            宇宙の住所（サーバーと共有）
     earth-ships-schema.ts 背景の船のやりとりの形（サーバーと共有）。earth-ships.ts は地球から見た位置・速度にする計算（サーバー）
-    account.ts            ユーザー名・パスワードの決まりとエラーの日本語（サーバーと共有）。account-link.ts は匿名の記録を登録したアカウントへ移す SQL（サーバーと共有）。recovery-code.ts は回復コードの形・ハッシュ・SQL（サーバーと共有）
+    account.ts            宇宙船名（内部の名前は username）・パスワードの決まりとエラーの日本語（サーバーと共有）。account-link.ts は匿名の記録を登録したアカウントへ移す SQL（サーバーと共有）。recovery-code.ts は回復コードの形・ハッシュ・SQL（サーバーと共有）
     presence.ts           いま遊んでいる人数の書き方・数え方（サーバーと共有）
     warp-schema.ts        ワープホールの形と確かめ方（サーバーと共有）
     stars.ts              星のデータの読み方と、見た目（大きさ・明るさ・色）

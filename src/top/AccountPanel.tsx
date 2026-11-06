@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AccountError, loginAccount, loginWithPasskey, logoutAccount, passkeySupported, registerAccount, type Account } from '../net/auth';
 import { recoveryApi, type RecoveryStatus } from '../net/recovery';
-import { credentialProblem, passwordProblem, PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, USERNAME_MIN } from '../world/account';
+import { credentialProblem, passwordProblem, usernameProblem, PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, USERNAME_MIN } from '../world/account';
 import { normalizeRecoveryCode } from '../world/recovery-code';
-import { formatDateJa } from './format-date';
+import { formatDateSlash } from './format-date';
 import { lastUsername, rememberUsername } from './last-username';
 import { PasskeySection } from './PasskeySection';
 import { RecoveryCodeDialog } from './RecoveryCodeDialog';
@@ -14,11 +14,24 @@ type Mode = 'closed' | 'register' | 'login' | 'recover' | 'code';
 /** 開いたときに、最初から開いておく入力（タイトル画面の SIGN IN・SIGN UP から来たとき） */
 export type AccountMode = 'login' | 'register';
 
+/**
+ * 入力しながらの、決まりに合っているかの印（2026-11-06 にオーナーの指示）：合っていれば緑の「OK」、合っていなければ赤の「NG」。
+ * 空のときは、何も出さない（まだ入れていないだけなので、赤くしない）。problem は、合っていないときの理由（なければ null）
+ */
+function FieldMark({ value, problem }: { value: string; problem: string | null }) {
+  if (value === '') return null;
+  return problem === null ? (
+    <span className="top-mark is-ok" aria-label="決まりに合っています">OK</span>
+  ) : (
+    <span className="top-mark is-ng" title={problem} aria-label={`NG：${problem}`}>NG</span>
+  );
+}
+
 const GENERIC = 'うまくいきませんでした。しばらくしてからもう一度お試しください';
 const messageOf = (e: unknown): string => (e instanceof AccountError ? e.message : GENERIC);
 
 /**
- * アカウント（要件 F14・F49・F51）。タイトル画面の SIGN IN・SIGN UP で、月の画面に出る箱（AuthBox）の中身。登録しなくても遊べる。登録（ユーザー名とパスワード）すると、
+ * アカウント（要件 F14・F49・F51）。タイトル画面の SIGN IN・SIGN UP で、月の画面に出る箱（AuthBox）の中身。登録しなくても遊べる。サインアップ（宇宙船名とパスワード）すると、
  * ほかの端末でも続きから遊べ、いまの記録（宇宙船・ワープホール・訪れた天体）も引き継がれる。
  * メールアドレスは集めないので、忘れたときに戻す手段は、登録のあとに 1 回だけ見せる回復コード。
  */
@@ -34,7 +47,7 @@ export function AccountPanel({
   initialMode?: AccountMode;
   /** ログイン・登録が終わったとき（登録とパスワードの決め直しは、回復コードを保存して閉じたあと）。呼ぶと、箱が閉じる */
   onComplete?: () => void;
-  /** 登録・ログインの入力で「やめる」を押したとき。無ければ、登録とログインの選び直しに戻る */
+  /** サインアップ・サインインの入力で「Cancel」を押したとき。無ければ、サインアップとサインインの選び直しに戻る */
   onCancel?: () => void;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode ?? 'closed');
@@ -54,7 +67,7 @@ export function AccountPanel({
 
   const userId = account.kind === 'registered' ? account.userId : null;
   const registeredName = account.kind === 'registered' ? account.name : null;
-  // パスキーでログインしたときも含めて、この端末で最後に使った名前を覚える
+  // パスキーでサインインしたときも含めて、この端末で最後に使った名前を覚える
   useEffect(() => {
     if (registeredName) rememberUsername(registeredName);
   }, [registeredName]);
@@ -144,7 +157,7 @@ export function AccountPanel({
         completeAfterCode.current = true;
         onChanged();
       } catch {
-        setNotice('パスワードを決め直しました。新しいパスワードでログインしてください');
+        setNotice('パスワードを決め直しました。新しいパスワードでサインインしてください');
       }
     });
   };
@@ -159,14 +172,24 @@ export function AccountPanel({
     });
   };
 
-  const passkeyLogin = () =>
+  const passkeyLogin = () => {
+    // パスキーでも、宇宙船名は入れてもらう（2026-11-06 にオーナーの指示）
+    if (!username.trim()) return setError('宇宙船名を入れてください');
     void run(async () => {
-      if (!(await loginWithPasskey())) return;
+      let ok: boolean;
+      try {
+        ok = await loginWithPasskey(username);
+      } catch (e) {
+        onChanged(); // 違う宇宙船名でサインアウトしたので、表示を合わせる
+        throw e;
+      }
+      if (!ok) return;
       switchMode('closed');
       setUsername('');
       onChanged();
       onComplete?.();
     });
+  };
 
   const logout = () =>
     void run(async () => {
@@ -191,17 +214,26 @@ export function AccountPanel({
   if (account.kind === 'registered') {
     return (
       <>
-      <section className="top-section" aria-labelledby="top-account-title">
-        <h2 id="top-account-title" className="top-section-title">ユーザー情報</h2>
-        <p className="top-line">
-          <span className="top-strong top-user-name">{account.name}</span> でサインインしています
-        </p>
+      <section className="top-section" aria-label="アカウント">
+        <p className="top-eyebrow">ACCOUNT</p>
+        <p className="top-code-label">{'{宇宙船名}'}</p>
+        <p className="top-user-name">{account.name}</p>
         {status && (
-          <p className={status.hasCode ? 'top-hint' : 'top-warn'}>
-            {status.hasCode
-              ? `回復コード：作成済み${status.createdAt ? `（${formatDateJa(status.createdAt)}）` : ''}`
-              : '回復コードがありません。作っておくと、ユーザー名やパスワードを忘れても戻せます'}
-          </p>
+          <>
+            {/* 回復コード・作った日・作り直すボタンを、縦に一列に並べる（2026-11-06 にオーナーの指示。最初は横の一列だった）。ボタンは、「宇宙船名やパスワードを忘れたとき」と同じ、下線の文字 */}
+            <div className="top-code-row">
+              <span className="top-code-label">{'{回復コード}'}</span>
+              <span className={status.hasCode ? 'top-code-status' : 'top-code-status is-none'}>
+                {status.hasCode ? `Created${status.createdAt ? ` [${formatDateSlash(status.createdAt)}]` : ''}` : 'Not created'}
+              </span>
+              {mode !== 'code' && (
+                <button type="button" className="top-link" onClick={() => switchMode('code')} disabled={busy}>
+                  {status.hasCode ? 'Re:Creat' : 'Create'}
+                </button>
+              )}
+            </div>
+            {!status.hasCode && <p className="top-warn">回復コードがありません。作っておくと、宇宙船名やパスワードを忘れても戻せます</p>}
+          </>
         )}
         {mode === 'code' ? (
           <form className="top-form" onSubmit={createCode} noValidate>
@@ -217,27 +249,20 @@ export function AccountPanel({
                 {busy ? '作っています…' : status?.hasCode ? '作り直す' : '作る'}
               </button>
               <button type="button" className="top-button top-button-small top-button-quiet" onClick={() => switchMode('closed')} disabled={busy}>
-                やめる
+                Cancel
               </button>
             </div>
           </form>
         ) : (
           <>
-            <div className="top-row">
-              {status && (
-                <button type="button" className="top-button top-button-small" onClick={() => switchMode('code')} disabled={busy}>
-                  {status.hasCode ? '回復コードを作り直す' : '回復コードを作る'}
-                </button>
-              )}
-            </div>
             {errorLine}
           </>
         )}
-        <PasskeySection username={account.name} />
+        {mode !== 'code' && <PasskeySection username={account.name} />}
         {mode !== 'code' && (
           <div className="top-signout">
             <button type="button" className="top-button" onClick={logout} disabled={busy}>
-              サインアウト
+              SIGN OUT
             </button>
           </div>
         )}
@@ -249,40 +274,31 @@ export function AccountPanel({
 
   return (
     <>
-    <section className="top-section" aria-labelledby="top-account-title">
-      <h2 id="top-account-title" className="top-section-title">アカウント</h2>
-      <p className="top-line top-muted">登録しなくても遊べます。登録すると、ほかの端末でも続きから遊べます。</p>
+    <section className="top-section" aria-label="サインアップ・サインイン">
+      <p className="top-eyebrow">ACCOUNT</p>
       {notice && <p className="top-line" role="status">{notice}</p>}
       {mode === 'closed' && (
         <div className="top-row">
-          <button type="button" className="top-button top-button-small" onClick={() => switchMode('register')}>
-            登録する
+          <button type="button" className="top-button" onClick={() => switchMode('register')}>
+            SIGN UP
           </button>
-          <button type="button" className="top-button top-button-small" onClick={() => switchMode('login')}>
-            ログイン
+          <button type="button" className="top-button" onClick={() => switchMode('login')}>
+            SIGN IN
           </button>
         </div>
       )}
       {(mode === 'register' || mode === 'login') && (
         <form className="top-form" onSubmit={submitCredentials} noValidate>
-          <div className="top-tabs" role="group" aria-label="登録かログイン">
+          <div className="top-tabs" role="group" aria-label="サインアップかサインイン">
             <button type="button" className={`top-tab${mode === 'register' ? ' is-selected' : ''}`} aria-pressed={mode === 'register'} onClick={() => switchMode('register')}>
-              登録する
+              SIGN UP
             </button>
             <button type="button" className={`top-tab${mode === 'login' ? ' is-selected' : ''}`} aria-pressed={mode === 'login'} onClick={() => switchMode('login')}>
-              ログイン
+              SIGN IN
             </button>
           </div>
-          {mode === 'login' && passkeySupported() && (
-            <div className="top-row">
-              <button type="button" className="top-button top-button-small" onClick={passkeyLogin} disabled={busy}>
-                パスキーでログイン
-              </button>
-              <span className="top-hint top-row-note">ユーザー名もパスワードも要りません</span>
-            </div>
-          )}
           <label className="top-field">
-            <span>ユーザー名</span>
+            <span className="top-field-head">宇宙船名<FieldMark value={username} problem={usernameProblem(username)} /></span>
             <input
               type="text"
               name="username"
@@ -298,7 +314,7 @@ export function AccountPanel({
             />
           </label>
           <label className="top-field">
-            <span>パスワード</span>
+            <span className="top-field-head">パスワード<FieldMark value={password} problem={passwordProblem(password)} /></span>
             <input
               type="password"
               name="password"
@@ -312,21 +328,26 @@ export function AccountPanel({
           </label>
           {mode === 'register' && (
             <p className="top-hint">
-              ユーザー名は英数字と _ の {USERNAME_MIN}〜{USERNAME_MAX} 文字、パスワードは {PASSWORD_MIN} 文字以上。メールアドレスは集めません。登録のあとに出る回復コードで、忘れたときに戻せます。
+              宇宙船名は英数字と _ の {USERNAME_MIN}〜{USERNAME_MAX} 文字、パスワードは {PASSWORD_MIN} 文字以上。メールアドレスは集めません。サインアップのあとに出る回復コードで、忘れたときに戻せます。
             </p>
           )}
           {errorLine}
           <div className="top-row">
             <button type="submit" className="top-button top-button-small" disabled={busy}>
-              {busy ? '送っています…' : mode === 'register' ? '登録する' : 'ログインする'}
+              {busy ? '送っています…' : 'OK'}
             </button>
             <button type="button" className="top-button top-button-small top-button-quiet" onClick={() => (onCancel ? onCancel() : switchMode('closed'))} disabled={busy}>
-              やめる
+              Cancel
             </button>
           </div>
+          {mode === 'login' && passkeySupported() && (
+            <button type="button" className="top-link" onClick={passkeyLogin} disabled={busy}>
+              パスキーでサインイン
+            </button>
+          )}
           {mode === 'login' && (
             <button type="button" className="top-link" onClick={() => switchMode('recover')}>
-              ユーザー名やパスワードを忘れたとき
+              宇宙船名やパスワードを忘れたとき
             </button>
           )}
         </form>
@@ -348,14 +369,14 @@ export function AccountPanel({
               autoFocus
             />
           </label>
-          <p className="top-hint">登録したときに保存したコードです。回復コードも無いと、戻す方法はありません。</p>
+          <p className="top-hint">サインアップしたときに保存したコードです。回復コードも無いと、戻す方法はありません。</p>
           {errorLine}
           <div className="top-row">
             <button type="submit" className="top-button top-button-small" disabled={busy}>
-              {busy ? '確かめています…' : '確かめる'}
+              {busy ? '確かめています…' : 'OK'}
             </button>
             <button type="button" className="top-button top-button-small top-button-quiet" onClick={() => switchMode('login')} disabled={busy}>
-              戻る
+              Cancel
             </button>
           </div>
         </form>
@@ -363,7 +384,7 @@ export function AccountPanel({
       {mode === 'recover' && found !== null && (
         <form className="top-form" onSubmit={resetPassword} noValidate>
           <p className="top-line">
-            ユーザー名は <span className="top-strong">{found}</span> です。
+            宇宙船名は <span className="top-strong">{found}</span> です。
           </p>
           <div className="top-row">
             <button
@@ -376,22 +397,22 @@ export function AccountPanel({
               }}
               disabled={busy}
             >
-              このユーザー名でログインする
+              この宇宙船名でサインインする
             </button>
           </div>
           <input type="text" name="username" autoComplete="username" value={found} readOnly hidden />
           <label className="top-field">
-            <span>パスワードも忘れたときは、新しいパスワード</span>
+            <span className="top-field-head">パスワードも忘れたときは、新しいパスワード<FieldMark value={password} problem={passwordProblem(password)} /></span>
             <input type="password" name="new-password" autoComplete="new-password" maxLength={PASSWORD_MAX} value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
-          <p className="top-hint">決め直すと、ほかの端末のログインが切れます。使った回復コードは無効になり、新しいコードが出ます。</p>
+          <p className="top-hint">決め直すと、ほかの端末のサインインが切れます。使った回復コードは無効になり、新しいコードが出ます。</p>
           {errorLine}
           <div className="top-row">
             <button type="submit" className="top-button top-button-small" disabled={busy}>
               {busy ? '決め直しています…' : 'パスワードを決め直す'}
             </button>
             <button type="button" className="top-button top-button-small top-button-quiet" onClick={() => switchMode('closed')} disabled={busy}>
-              やめる
+              Cancel
             </button>
           </div>
         </form>

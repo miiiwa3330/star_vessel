@@ -7,8 +7,6 @@
   --top-accent: #74e6ff;
   --top-panel: rgba(8, 12, 24, 0.62);
   --top-line: rgba(160, 190, 255, 0.18);
-  --top-button: rgba(30, 60, 90, 0.7);
-  --top-button-hover: rgba(40, 90, 130, 0.8);
   --top-warn: #ffd38a;
   position: fixed;
   inset: 0;
@@ -293,39 +291,48 @@
   .top-credits-row { grid-template-columns: 1fr; }
 }
 
-/* ---- 部品 ---- */
+/* ---- 部品（アカウントの箱・回復コードの画面。タイトル画面と同じ作り：細い Josefin Sans・字間を広げる・枠は細い線だけ・ふだんは薄く、ホバーで白） ---- */
 .top-button {
-  font: inherit;
-  font-size: 13px;
-  color: var(--top-ink);
-  background: var(--top-button);
-  border: 1px solid rgba(116, 230, 255, 0.45);
-  border-radius: 8px;
-  padding: 8px 14px;
+  font-family: 'Josefin Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.22em;
+  color: rgba(232, 236, 244, 0.62);
+  background: none;
+  border: 1px solid rgba(232, 236, 244, 0.34);
+  border-radius: 999px;
+  padding: 9px 22px 9px calc(22px + 0.22em);
   min-height: 36px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease, border-color 0.25s ease;
 }
 /* ホバーは、マウスのように「触れずに指せる」端末だけ（スマホでは、タップした場所に色が残るため） */
 @media (hover: hover) {
-  .top-button:hover:not(:disabled) { background: var(--top-button-hover); }
+  .top-button:hover:not(:disabled) { color: #fff; border-color: #fff; }
 }
-.top-button:focus-visible, .top-tab:focus-visible, .top-field input:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 2px; }
-.top-button:disabled { opacity: 0.55; cursor: default; }
-.top-button-primary { font-size: 16px; letter-spacing: 0.2em; padding: 12px 36px; min-height: 48px; border-radius: 999px; box-shadow: 0 0 24px rgba(116, 230, 255, 0.18); }
-.top-button-small { min-height: 32px; padding: 5px 12px; font-size: 12px; }
-.top-button-quiet { background: transparent; border-color: var(--top-line); }
+.top-button:active:not(:disabled) { color: #fff; border-color: #fff; }
+.top-button:focus-visible, .top-tab:focus-visible, .top-field input:focus-visible, .top-link:focus-visible { outline: 1px solid var(--top-accent); outline-offset: 3px; }
+.top-button:disabled { opacity: 0.4; cursor: default; }
+.top-button-small { min-height: 34px; }
+/* 枠の無いボタン（やめる・消す など）：SIGN IN と同じ */
+.top-button-quiet { border-color: transparent; color: rgba(232, 236, 244, 0.5); }
 .top-muted { opacity: 0.6; }
 .top-small { font-size: 11px; }
-.top-strong { font-weight: 600; color: var(--top-accent); }
+.top-strong { font-weight: 400; color: #ff8a1f; }
 
 /* ---- アカウントの箱（月の画面。AuthBox） ---- */
 .top-auth-box {
+  /* 箱の上の端の位置：画面の真ん中あたりから約 230px 上。中身の高さが変わっても（回復コードを作り直す・SIGN UP と SIGN IN の切り替え）、上の端は動かさない（下へ伸び縮みする）。低い画面では、上から 16px まで上がる */
+  --top-auth-top: max(16px, calc(50vh - 230px));
+  --top-auth-top: max(16px, calc(50svh - 230px));
   position: fixed;
   inset: 0;
   z-index: 4;
   display: grid;
-  place-items: center;
-  padding: 16px;
+  justify-items: center;
+  align-items: start;
+  padding: var(--top-auth-top) 16px 16px;
   box-sizing: border-box;
   opacity: 0;
   transform: translateY(14px) scale(0.98);
@@ -334,25 +341,34 @@
   transition: opacity 0.5s ease, transform 0.5s ease;
 }
 .top-auth-box.is-open { opacity: 1; transform: none; }
-.top-auth-box .top-card { pointer-events: none; }
+.top-auth-box .top-card { pointer-events: none; position: relative; }
 .top-auth-box.is-open .top-card { pointer-events: auto; }
 .top-card {
   position: relative;
-  width: min(440px, 100%);
-  max-height: calc(100vh - 32px);
-  max-height: calc(100svh - 32px);
+  width: min(400px, 100%);
+  max-height: calc(100vh - var(--top-auth-top) - 16px);
+  max-height: calc(100svh - var(--top-auth-top) - 16px);
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 22px 20px 20px;
-  background: rgba(6, 10, 22, 0.72);
-  border: 1px solid var(--top-line);
-  border-radius: 14px;
-  backdrop-filter: blur(10px);
+  padding: 26px 20px 22px;
+  /* 枠も背景の面も無い（タイトル画面と同じ）。読みやすさは、箱の後ろの暗い光（.top-auth-box::before）で足す */
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+  font-family: 'Josefin Sans', system-ui, sans-serif;
   font-size: 13px;
-  line-height: 1.6;
+  font-weight: 300;
+  line-height: 1.8;
+  text-align: center;
+  filter: drop-shadow(0 0 4px rgba(2, 4, 10, 0.7));
+}
+/* 箱の後ろ：天体の上でも文字が読めるよう、画面の真ん中を、ふんわり暗くする */
+.top-auth-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse min(560px, 90vw) min(460px, 80vh) at 50% 50%, rgba(2, 4, 10, 0.72), transparent 72%);
+  pointer-events: none;
 }
 .top-auth-close {
   position: absolute;
@@ -362,7 +378,8 @@
   width: 36px;
   height: 36px;
   font: inherit;
-  font-size: 22px;
+  font-size: 26px;
+  font-weight: 200;
   line-height: 1;
   color: var(--top-ink);
   opacity: 0.6;
@@ -375,35 +392,79 @@
 @media (hover: hover) {
   .top-auth-close:hover { opacity: 1; }
 }
-.top-heading { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; }
-.top-section { display: flex; flex-direction: column; gap: 8px; }
+.top-heading { margin: 0; font-size: 15px; font-weight: 300; letter-spacing: 0.12em; }
+.top-section { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .top-section + .top-section { border-top: 1px solid var(--top-line); padding-top: 14px; }
-.top-user-name { font-size: 18px; letter-spacing: 0.03em; overflow-wrap: anywhere; }
-.top-signout { margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--top-line); display: flex; }
-.top-section-title { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; opacity: 0.75; }
+/* 小さなオレンジの英字の見出し（ACCOUNT）。サービスの詳細（ABOUT など）と同じ */
+.top-card .top-eyebrow { margin: 0; }
+/* 宇宙船名：タイトルの名前と同じ、オレンジの光 */
+.top-user-name { margin: -6px 0 0; font-size: clamp(22px, 5vw, 30px); font-weight: 400; letter-spacing: 0.05em; color: #ff8a1f; overflow-wrap: anywhere; filter: drop-shadow(0 0 6px rgba(255, 138, 31, 0.5)); }
+.top-signout .top-button { color: #ff6b6b; border-color: rgba(255, 107, 107, 0.55); }
+@media (hover: hover) {
+  .top-signout .top-button:hover:not(:disabled) { color: #ff9a9a; border-color: #ff9a9a; }
+}
+.top-signout .top-button:active:not(:disabled) { color: #ff9a9a; border-color: #ff9a9a; }
+.top-signout { margin-top: 8px; padding-top: 18px; border-top: 1px solid var(--top-line); display: flex; justify-content: center; }
+.top-section-title { margin: 0; font-size: 12px; font-weight: 300; letter-spacing: 0.1em; opacity: 0.75; }
 .top-line { margin: 0; }
-.top-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.top-hint { margin: 0; font-size: 11px; opacity: 0.6; }
+.top-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.top-hint { margin: 0; font-size: 11px; line-height: 1.9; opacity: 0.55; }
 .top-error { margin: 0; font-size: 12px; color: var(--top-warn); }
 
-.top-form { display: flex; flex-direction: column; gap: 8px; }
-.top-tabs { display: flex; gap: 6px; }
-.top-tab { font: inherit; font-size: 12px; color: inherit; background: transparent; border: 1px solid var(--top-line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
-.top-tab.is-selected { border-color: rgba(116, 230, 255, 0.8); background: rgba(30, 60, 90, 0.7); }
-.top-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.top-form { display: flex; flex-direction: column; gap: 18px; }
+/* SIGN UP と SIGN IN の切り替え：枠の無い文字。選んでいる方が白く、下に細い線 */
+.top-tabs { display: flex; justify-content: center; gap: 22px; margin-bottom: 4px; }
+.top-tab {
+  font-family: 'Josefin Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.22em;
+  padding: 6px 2px 6px calc(2px + 0.22em);
+  color: rgba(232, 236, 244, 0.5);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease, border-color 0.25s ease;
+}
+.top-tab.is-selected { color: #fff; border-bottom-color: rgba(255, 255, 255, 0.7); }
+@media (hover: hover) {
+  .top-tab:hover { color: #fff; }
+}
+.top-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; letter-spacing: 0.12em; color: rgba(232, 236, 244, 0.6); }
+/* 入力：枠は下の細い線だけ */
+.top-field-head { display: flex; align-items: center; justify-content: center; gap: 10px; }
+/* 入力しながらの印：決まりに合っていれば緑の OK、合っていなければ赤の NG */
+.top-mark { font-size: 11px; font-weight: 400; letter-spacing: 0.16em; }
+.top-mark.is-ok { color: #5fe08a; }
+.top-mark.is-ng { color: #ff6b6b; }
+/* 回復コード・作った日・作り直す文字ボタンを、縦に一列に */
+.top-code-row { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.top-code-label { font-size: 12px; letter-spacing: 0.12em; color: rgba(232, 236, 244, 0.6); white-space: nowrap; }
+.top-code-status { font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; color: #5fe08a; }
+/* 作っていない：回復コードは黄色（作っておくよう促す）、パスキーは任意なので、薄い色 */
+.top-code-status.is-none { color: var(--top-warn); }
+.top-code-status.is-empty { color: rgba(232, 236, 244, 0.5); }
 .top-field input {
   font: inherit;
   /* 16px 未満だと、iPhone の Safari が入力のたびに拡大する */
   font-size: 16px;
-  color: var(--top-ink);
-  background: rgba(4, 8, 16, 0.6);
-  border: 1px solid var(--top-line);
-  border-radius: 6px;
-  padding: 7px 10px;
-  min-height: 38px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(232, 236, 244, 0.4);
+  border-radius: 0;
+  padding: 8px 2px;
+  min-height: 40px;
   box-sizing: border-box;
+  transition: border-color 0.25s ease;
 }
-
+.top-field input:focus { border-bottom-color: #fff; }
+.top-field input:focus-visible { outline: none; }
+.top-field input::placeholder { color: rgba(232, 236, 244, 0.3); }
 
 @media (prefers-reduced-motion: reduce) {
   .top-button, .top-hero, .top-tagline-wrap, .top-ufos, .top-start-word, .top-auth, .top-auth-box { transition: none; }
@@ -411,19 +472,26 @@
 
 /* ---- 回復コード（要件 F51） ---- */
 .top-warn { margin: 0; font-size: 12px; color: var(--top-warn); }
-.top-link { align-self: flex-start; font: inherit; font-size: 12px; color: var(--top-accent); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-.top-link:focus-visible, .top-check input:focus-visible { outline: 2px solid var(--top-accent); outline-offset: 2px; }
-.top-row-end { justify-content: flex-end; }
+.top-link:disabled { opacity: 0.4; cursor: default; }
+.top-link { align-self: center; font: inherit; font-size: 12px; letter-spacing: 0.08em; color: rgba(232, 236, 244, 0.55); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(232, 236, 244, 0.3); text-underline-offset: 4px; transition: color 0.25s ease; }
+@media (hover: hover) {
+  .top-link:hover { color: #fff; }
+}
+.top-check input:focus-visible { outline: 1px solid var(--top-accent); outline-offset: 2px; }
+.top-row-end { justify-content: center; }
 .top-dialog {
   width: min(460px, calc(100vw - 32px));
   box-sizing: border-box;
-  padding: 18px;
+  padding: 24px 22px 20px;
   color: var(--top-ink);
-  background: #070b16;
-  border: 1px solid rgba(116, 230, 255, 0.45);
-  border-radius: 12px;
+  background: rgba(5, 8, 18, 0.94);
+  border: 1px solid var(--top-line);
+  border-radius: 14px;
+  font-family: 'Josefin Sans', system-ui, sans-serif;
   font-size: 13px;
-  line-height: 1.6;
+  font-weight: 300;
+  line-height: 1.8;
+  text-align: center;
 }
 .top-dialog[open] { display: flex; flex-direction: column; gap: 12px; }
 .top-dialog::backdrop { background: rgba(2, 4, 10, 0.75); }
@@ -436,14 +504,13 @@
   letter-spacing: 0.04em;
   user-select: all;
   overflow-wrap: anywhere;
-  background: rgba(30, 60, 90, 0.45);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--top-line);
   border-radius: 8px;
 }
-.top-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
-.top-check input { width: 18px; height: 18px; accent-color: var(--top-accent); }
+.top-check { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.top-check input { width: 18px; height: 18px; accent-color: #ff8a1f; }
 
 /* ---- パスキー（要件 F52） ---- */
 .top-passkey { align-items: center; }
-.top-passkey > span { flex: 1 1 auto; }
-.top-row-note { align-self: center; }
+.top-passkey > span { flex: 0 1 auto; }

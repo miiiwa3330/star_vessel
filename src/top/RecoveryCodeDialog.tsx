@@ -7,7 +7,7 @@ export const recoveryFileText = (code: string): string =>
     '',
     code,
     '',
-    'ユーザー名やパスワードを忘れたときに、タイトル画面の右上の「SIGN IN」→「ユーザー名やパスワードを忘れたとき」で入力します。',
+    '宇宙船名やパスワードを忘れたときに、タイトル画面の右上の「SIGN IN」→「宇宙船名やパスワードを忘れたとき」で入力します。',
     'このコードを知っている人は、あなたのアカウントに入れます。人に見せないでください。',
     '',
   ].join('\n');
@@ -55,7 +55,7 @@ export function RecoveryCodeDialog({ code, onClose }: { code: string; onClose: (
     >
       <h2 id="top-recovery-title" className="top-heading">回復コードを保存してください</h2>
       <p className="top-line">
-        ユーザー名やパスワードを忘れたときは、このコードで戻せます。<strong>ここで閉じると、二度と表示できません。</strong>
+        宇宙船名やパスワードを忘れたときは、このコードで戻せます。<strong>ここで閉じると、二度と表示できません。</strong>
       </p>
       <p className="top-code" data-testid="recovery-code">{code}</p>
       <div className="top-row">
