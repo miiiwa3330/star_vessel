@@ -42,7 +42,7 @@ export function TopApp() {
     rootRef.current?.focus({ preventScroll: true });
   }, [screen]);
 
-  // 最初の画面と詳細の間は、ホイールを少し回しただけでも、隣の画面まで動かす（section-scroll.ts）
+  // タイトル画面のホイールは、最初の画面も詳細の中も、1 つの動きで動かす（section-scroll.ts）
   useEffect(() => {
     const root = rootRef.current;
     if (!root || screen !== 'title') return;

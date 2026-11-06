@@ -205,7 +205,7 @@ src/
                           stamp-bubbles.ts はスタンプの吹き出し（毎フレーム動かすので DOM を直接動かす）。
                           info-controller.ts は天体の情報とコレクションをつなぐところ、target-marker.ts は選んだ天体の印
   top/                    タイトル画面（/）と準備画面（/ready）。世界は読み込まない。routes.ts は URL の決まり、Backdrop.tsx は星空と CSS の地球の縁（3D の地球が出るまでの代わり）、EarthCanvas.tsx・earth-scene.ts は 3D の地球と本物の船（three.js なので遅れて読む）、earth-camera.ts は地球の縁の上に船が見えるカメラの計算、ship-tracks.ts・ship-lights.ts は背景の船の動かし方と光の点、
-                          TitleScreen.tsx は最初の画面と詳細（ServiceDetails.tsx。文章は仮）、SocialLinks.tsx は右下のアイコン（リンク先は links.ts）、AuthLinks.tsx は右上の SIGN IN・SIGN UP、section-scroll.ts は 2 つの画面の間のホイール（慣性のある動き）、Credits.tsx はデータ・画像・書体の出典のまとめ（詳細の最後。世界の画面には出さない）、Credit.tsx は準備画面の下の出典の 1 行、ReadyScreen.tsx は宇宙船とアカウントと出発、ShipPreview.tsx は船のプレビュー（three.js なので遅れて読む）、AccountPanel.tsx は登録・ログイン・回復、RecoveryCodeDialog.tsx は回復コードを見せる画面、PasskeySection.tsx はパスキーの追加・削除、last-username.ts はこの端末で最後に使ったユーザー名
+                          TitleScreen.tsx は最初の画面と詳細（ServiceDetails.tsx。文章は仮）、SocialLinks.tsx は右下のアイコン（リンク先は links.ts）、AuthLinks.tsx は右上の SIGN IN・SIGN UP、section-scroll.ts はタイトル画面のホイール（慣性のある動き・速さの上限）、Credits.tsx はデータ・画像・書体の出典のまとめ（詳細の最後。世界の画面には出さない）、Credit.tsx は準備画面の下の出典の 1 行、ReadyScreen.tsx は宇宙船とアカウントと出発、ShipPreview.tsx は船のプレビュー（three.js なので遅れて読む）、AccountPanel.tsx は登録・ログイン・回復、RecoveryCodeDialog.tsx は回復コードを見せる画面、PasskeySection.tsx はパスキーの追加・削除、last-username.ts はこの端末で最後に使ったユーザー名
   net/                    サーバーとのやりとり（アカウント・ログイン中のユーザー名（session.ts）・回復コード・ワープホールの API・宇宙の部屋の WebSocket・いま遊んでいる人数）
 public/
   data/stars.bin          星のデータ（npm run stars で作る。stars.LICENSE.txt と必ず一緒に置く）
