@@ -64,12 +64,24 @@ export interface PasskeyItem {
   createdAt: string | null;
 }
 
-/** パスキーでログインする。ユーザー名は要らない。自分でやめたら false（エラーにしない）。匿名のセッションがあれば、その記録を引き継ぐ */
-export async function loginWithPasskey(): Promise<boolean> {
+/**
+ * パスキーでサインインする。宇宙船名（ユーザー名）も入れてもらい、そのパスキーが、入れた宇宙船名のアカウントのものか確かめる
+ * （2026-11-06 にオーナーの指示。パスキーだけで入れる作りは、やめた）。違えばサインアウトして、エラー。
+ * 自分でやめたら false（エラーにしない）。匿名のセッションがあれば、その記録を引き継ぐ。
+ * 確かめは、サインインのあとにブラウザで行う（パスキー自体が本人確認なので、宇宙船名は、入れ間違いを防ぐためのもの）
+ */
+export async function loginWithPasskey(username: string): Promise<boolean> {
   const res = await authClient.signIn.passkey();
-  if (!res.error) return true;
-  if (isPasskeyCancel((res.error as { code?: string }).code)) return false;
-  return fail(res.error);
+  if (res.error) {
+    if (isPasskeyCancel((res.error as { code?: string }).code)) return false;
+    return fail(res.error);
+  }
+  const acc = await currentAccount();
+  if (acc.kind !== 'registered' || acc.name.toLowerCase() !== username.trim().toLowerCase()) {
+    await authClient.signOut();
+    throw new AccountError('この宇宙船名のパスキーではありません。宇宙船名を確かめてください');
+  }
+  return true;
 }
 
 /** この端末のパスキーを足す。name は端末のパスキーの一覧に出る名前（ユーザー名を渡す）。自分でやめたら false */

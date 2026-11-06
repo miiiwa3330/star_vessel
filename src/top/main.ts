@@ -1,5 +1,5 @@
 /**
- * タイトル画面と準備画面の起動（src/entry.ts から）。世界は読み込まない。
+ * タイトル画面の起動（src/entry.ts から）。世界は読み込まない。
  */
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';

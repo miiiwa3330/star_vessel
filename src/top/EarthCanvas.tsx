@@ -3,13 +3,14 @@ import { fetchEarthShips } from '../net/earth-ships';
 import { SHOWCASE_REFRESH_MS } from '../world/earth-ships-schema';
 import type { ScrollState } from './Backdrop';
 import { EarthScene } from './earth-scene';
+import type { TopStage } from './top-stage';
 
 /**
- * タイトル画面と準備画面の背景の、3D の地球（src/top/earth-scene.ts）。three.js と画像を読み込むので、
+ * タイトル画面の背景の、3D の地球（と月、船を選ぶ列）（src/top/earth-scene.ts）。three.js と画像を読み込むので、
  * 画面が出てから、遅れて読み込む（Backdrop の lazy）。描けたら onReady を呼び、いまの背景（CSS の縁）と入れ替える。
  * 描けない環境では、onReady を呼ばずに終わる（いまの背景のまま）。画面が見えていない間は止める。
  */
-export default function EarthCanvas({ onReady, onFail, getScroll }: { onReady: () => void; onFail: () => void; getScroll: () => ScrollState }) {
+export default function EarthCanvas({ onReady, onFail, getScroll, stage }: { onReady: () => void; onFail: () => void; getScroll: () => ScrollState; stage: TopStage }) {
   const ref = useRef<HTMLCanvasElement>(null);
   // 親が関数を作り直しても、地球の描画を作り直さない
   const scrollRef = useRef(getScroll);
@@ -22,21 +23,23 @@ export default function EarthCanvas({ onReady, onFail, getScroll }: { onReady: (
     let disposed = false;
     let raf = 0;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-    // スマホ（指で操作する端末）は、電池のため 1 秒に約 30 回までにする
-    const minGapMs = window.matchMedia('(pointer: coarse)').matches ? 30 : 0;
+    // スマホ（指で操作する端末）は、電池のため 1 秒に約 30 回までにする。ただし、船を選んでいる間と月へ飛んでいる間は、指に付いて動くので、全部描く
+    const coarse = window.matchMedia('(pointer: coarse)');
+    const interacting = () => stage.ufoShown || stage.ufoBusy || stage.view !== stage.arrival;
     let lastDrawMs = 0;
     // 世界の時刻と同じく、いまの本物の時刻で描く
     const frame = () => {
       const now = Date.now();
-      if (now - lastDrawMs >= minGapMs) {
+      if (now - lastDrawMs >= (coarse.matches && !interacting() ? 30 : 0)) {
         lastDrawMs = now;
         const scroll = scrollRef.current();
         // 詳細の画面より先へスクロールしたら、地球をページと一緒に画面の上へ送る
         canvas.style.transform = scroll.pastPx > 0 ? `translateY(${-scroll.pastPx}px)` : '';
-        scene?.render(now, !reduce.matches, scroll.progress);
+        scene?.render(now, !reduce.matches, scroll.progress, stage);
       }
-      // 「動きを減らす」のときは、1 秒に 1 回だけ描き直す（夜の灯りと境目は、本物の時間で、ゆっくり動く）
-      if (!disposed && !document.hidden) raf = reduce.matches ? window.setTimeout(frame, 1000) : requestAnimationFrame(frame);
+      // 「動きを減らす」のときは、1 秒に 1 回だけ描き直す（夜の灯りと境目は、本物の時間で、ゆっくり動く）。
+      // ただし、船を選ぶ操作と月への移動の間は、操作に付いて動けるよう、毎フレーム描く（動きそのものは scene が止める）
+      if (!disposed && !document.hidden) raf = reduce.matches && !interacting() ? window.setTimeout(frame, 1000) : requestAnimationFrame(frame);
     };
     const start = () => {
       cancelAnimationFrame(raf);
@@ -88,7 +91,7 @@ export default function EarthCanvas({ onReady, onFail, getScroll }: { onReady: (
       document.removeEventListener('visibilitychange', start);
       scene?.dispose();
     };
-  }, [onReady, onFail]);
+  }, [onReady, onFail, stage]);
 
   return <canvas ref={ref} className="top-earth-canvas" />;
 }

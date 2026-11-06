@@ -3,7 +3,7 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 ---
 # 素材とライセンスの一覧
 
-外部の素材を足したら、ここに書く（AGENTS.md の「実装の方針」）。クレジット表記が要るものは、**タイトル画面の詳細（スクロールした先）の、いちばん下の「CREDITS」**（`src/top/Credits.tsx`）にまとめて出す。準備画面の下にも、地球の画像の 1 行を出す。
+外部の素材を足したら、ここに書く（AGENTS.md の「実装の方針」）。クレジット表記が要るものは、**タイトル画面の詳細（スクロールした先）の、いちばん下の「CREDITS」**（`src/top/Credits.tsx`）にまとめて出す。（準備画面の下にあった、地球の画像の 1 行は、2026-11-06 に準備画面と一緒に無くした）
 
 **2026-11-06 にオーナーの指示で、世界の画面（`/play`）の左下の「クレジット」は、やめた。** それまでは、世界の画面の左下のボタンで、同じ内容を開けた。以下の表の「画面に〜と出している」は、いまは、タイトル画面の詳細の「CREDITS」のこと。**`/play` を直接開いた人には、出典が出ない**（タイトル画面を通れば見られる）。CC BY・CC BY-SA は、媒体に合った妥当な方法での表記を求める。タイトル画面の詳細で足りるかは、公開の前に確かめる（足りなければ、世界の画面に、「CREDITS」へのリンクを 1 つ置く）。
 
@@ -27,9 +27,9 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | NASA Exoplanet Archive（系外惑星） | `public/data/exoplanets.json` に足した | https://exoplanetarchive.ipac.caltech.edu/ | 公開データ。使ったことの表記を求められる | 画面に「系外惑星（追加）：NASA Exoplanet Archive」とリンク |
 | Hunt & Reffert (2023) の星団のメンバー（Gaia DR3 の星） | `public/data/cluster-members/`（変換したもの） | VizieR J/A+A/673/A114/members（ハーバード大学のミラー） | 出典を書けば使える（CDS の利用の条件）。もとの Gaia のデータは下の行 | 画面の星団のクレジットに含む |
 | ESA Gaia DR3（近くの星） | `public/data/stars-gaia-*.bin`（変換したもの。`stars-gaia.LICENSE.txt`） | GAVO の TAP（https://dc.g-vo.org/tap。`gcns.main`・`gaia.dr3lite`）。もとは ESA と Gaia Collaboration, Smart ほか 2021 | CC BY-SA 3.0 IGO | 画面に「星（近く）：ESA Gaia DR3（CC BY-SA 3.0 IGO）」とリンク。[`gaia-stars.md`](gaia-stars.md) |
-| 地球の夜の灯りと雲の画像（2k_earth_nightmap.jpg・2k_earth_clouds.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク。タイトル画面・準備画面でも使うので、下の端に「地球の画像：Solar System Scope（CC BY 4.0）」を小さく出す |
+| 地球の夜の灯りと雲の画像（2k_earth_nightmap.jpg・2k_earth_clouds.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク。タイトル画面の背景でも使うので、詳細の「CREDITS」に出している |
 | 地球の画像（2k_earth_daymap.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク |
-| 月の画像（2k_moon.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |
+| 月の画像（2k_moon.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上。タイトル画面の月の画面（SIGN IN・SIGN UP）でも使う。火星の画像（2k_mars.jpg）も、同じ配布元・条件で、ユーザー情報の画面で使う（詳細の「CREDITS」の「地球・天体の画像」に含まれる） |
 | 水星・金星・火星・木星・土星・天王星・海王星の画像（2k_*.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |
 
 - 2026-11-04 に、それぞれの配布元でライセンスの文を確かめた（Open Exoplanet Catalogue は 2026-11-05 に README の License の節で確かめた）
