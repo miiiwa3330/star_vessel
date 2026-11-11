@@ -1,14 +1,18 @@
 /**
- * 一人称と三人称の視点（要件 F28）。
+ * 一人称と三人称の視点（要件 F28。2026-11-10 に、マインクラフトの F5 と同じ 3 つにした。要件 F60）。
  *
- * - 一人称：カメラは船の位置・向きそのもの
- * - 三人称：カメラは船の後ろの少し上から船を見る。船が向きを変えるとカメラもついていく。
+ * - 一人称（first）：カメラは船の位置・向きそのもの
+ * - 後ろから（third）：カメラは船の後ろの少し上から船を見る。船が向きを変えるとカメラもついていく。
  *   回り込み（船のまわりを回る角度）と距離を変えられる
+ * - 前から（front）：後ろからと同じで、船の前に回って、船の方を見る
  * 位置は「船から見た相対位置（km・EQJ）」で返す。世界の原点は自分（船）なので、そのままカメラの位置になる。
  */
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 
-export type ViewMode = 'first' | 'third';
+export type ViewMode = 'first' | 'third' | 'front';
+
+/** 切り替える順（マインクラフトの F5 と同じ） */
+const ORDER: readonly ViewMode[] = ['first', 'third', 'front'];
 
 /** 後ろから見下ろす角度（ラジアン） */
 const BASE_PITCH = (12 * Math.PI) / 180;
@@ -32,7 +36,7 @@ export class ChaseCamera {
   private readonly up = new Vector3();
 
   toggle(): ViewMode {
-    this.mode = this.mode === 'first' ? 'third' : 'first';
+    this.mode = ORDER[(ORDER.indexOf(this.mode) + 1) % ORDER.length];
     return this.mode;
   }
 
@@ -65,8 +69,9 @@ export class ChaseCamera {
     }
     const pitch = BASE_PITCH + this.pitch;
     const d = shipLengthKm * this.distanceFactor;
-    // 船から見て：後ろ（+Z）から、yaw だけ回り、pitch だけ上がった位置
-    this.local.set(Math.sin(this.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(this.yaw) * Math.cos(pitch)).multiplyScalar(d);
+    // 船から見て：後ろ（+Z）から、yaw だけ回り、pitch だけ上がった位置。前からは、さらに半周回る
+    const yaw = this.yaw + (this.mode === 'front' ? Math.PI : 0);
+    this.local.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).multiplyScalar(d);
     outPosition.copy(this.local).applyQuaternion(ship);
     this.up.set(0, 1, 0).applyQuaternion(ship);
     this.target.copy(this.up).multiplyScalar(-this.aimBelow * d);

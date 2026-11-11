@@ -4,11 +4,13 @@
  * 毎フレーム React を動かさないため（docs/tech/stack.md「2. 3D と画面の部品のつなぎ方」）。
  */
 import type { RadarBlip } from '../world/radar';
-import type { HullType } from '../world/ship-design';
 import type { StampId } from '../world/stamps';
 import { DEFAULT_STAR_LIMIT, type StarLimitMode } from '../world/stars';
 import type { ViewMode } from '../controls/chase-camera';
 import type { Visit } from '../world/visits';
+
+/** スマホの画面のボタンで押せるキー */
+export type MoveKeyCode = 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD' | 'Space' | 'ShiftLeft';
 
 /** 情報のカード（要件 F36・F37） */
 export interface InfoCardState {
@@ -46,15 +48,6 @@ export interface StampLogItem {
   mine: boolean;
 }
 
-/** 宇宙船を作る画面の状態（開いていなければ null） */
-export interface ShipBuilderState {
-  /** 選んでいる船体（画面の後ろに、この船を見せる） */
-  hull: HullType;
-  /** 初めて遊ぶときに出したか */
-  firstTime: boolean;
-  saving: boolean;
-}
-
 export interface WarpListItem {
   id: string;
   /** 宇宙の住所（例：MW-ORI-SOL-3-1-002） */
@@ -82,13 +75,14 @@ export interface HudState {
   warps: WarpListItem[];
   /** ワープホールが使えるか（サーバーにつながらないときは false） */
   warpsReady: boolean;
-  /** 一人称・三人称 */
+  /** 一人称・後ろから・前から */
   viewMode: ViewMode;
+  /** ゲームメニュー（一時停止）を出しているか。PC で Esc を押してカーソルを出したとき（要件 F60） */
+  paused: boolean;
+  /** 左上の表示（座標など）を出しているか（F3 キーで切り替え） */
+  statusVisible: boolean;
   /** スマホの三人称で、1 本指のドラッグでカメラを回すか */
   orbitDrag: boolean;
-  shipBuilder: ShipBuilderState | null;
-  /** 宇宙船の設定がサーバーに保存できるか */
-  shipReady: boolean;
   /** スタンプを送れるか（宇宙の部屋につながっているか） */
   stampReady: boolean;
   stampLog: StampLogItem[];
@@ -128,9 +122,9 @@ let state: HudState = {
   warps: [],
   warpsReady: false,
   viewMode: 'first',
+  paused: false,
+  statusVisible: true,
   orbitDrag: false,
-  shipBuilder: null,
-  shipReady: false,
   stampReady: false,
   stampLog: [],
   region: null,
@@ -169,15 +163,14 @@ export const hudActions = {
   refreshWarps: (): void => {},
   /** 速さを変える（スマホのボタン用） */
   changeSpeed: (_steps: number): void => {},
-  /** 一人称・三人称を切り替える */
+  /** 一人称 → 後ろから → 前から と切り替える */
   toggleView: (): void => {},
+  /** ゲームメニューから操縦に戻る（カーソルを消す。押したときの処理の中で呼ぶ） */
+  resume: (): void => {},
+  /** スマホの十字のボタン・上昇・下降のボタンで、キーを押す・離す（code は KeyboardEvent.code） */
+  setMoveKey: (_code: MoveKeyCode, _down: boolean): void => {},
   /** スマホの三人称で、ドラッグを「船の向き」と「カメラを回す」で切り替える */
   toggleOrbitDrag: (): void => {},
-  openShipBuilder: (): void => {},
-  /** 船体を選ぶ（画面の後ろの船が変わる） */
-  previewHull: (_hull: HullType): void => {},
-  saveShip: (): void => {},
-  closeShipBuilder: (): void => {},
   /** 星の見え方を、肉眼 → 双眼鏡 → 写真 → 肉眼…と切り替える */
   cycleStarLimit: (): void => {},
   /** 星座の線を出す・消す（要件 F40） */
@@ -191,6 +184,10 @@ export const hudActions = {
   /** 左の列のパネルを開く・閉じる（同じものを押すと閉じる） */
   toggleLeftPanel: (panel: Exclude<LeftPanel, null>): void => {
     hudStore.set({ leftPanel: hudStore.get().leftPanel === panel ? null : panel });
+  },
+  /** 左上の表示（座標など）を出す・消す（F3 キー） */
+  toggleStatus: (): void => {
+    hudStore.set({ statusVisible: !hudStore.get().statusVisible });
   },
 };
 

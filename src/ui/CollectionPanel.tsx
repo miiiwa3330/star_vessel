@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { INFO_KIND_NAMES_JA, type InfoKind } from '../world/info';
 import { VISIT_KINDS, type Visit } from '../world/visits';
+import { hudActions } from './hud-store';
 
 /** 訪れた天体のコレクション（要件 F38）。種類ごとの数と、初めて訪れた日時の一覧 */
 export function CollectionPanel({ visits }: { visits: Visit[] }) {
@@ -9,8 +10,13 @@ export function CollectionPanel({ visits }: { visits: Visit[] }) {
   for (const v of visits) counts.set(v.kind, (counts.get(v.kind) ?? 0) + 1);
   const shown = visits.filter((v) => kind === 'all' || v.kind === kind).slice(-100).reverse();
   return (
-    <div className="hud-panel hud-list-panel" role="dialog" aria-label="訪れた天体のコレクション">
-      <div className="hud-title">コレクション（{visits.length}）</div>
+    <div className="hud-panel hud-list-panel hud-collection-modal" role="dialog" aria-label="訪れた天体のコレクション">
+      <div className="hud-warp-list-head">
+        <span className="hud-title">コレクション（{visits.length}）</span>
+        <button type="button" className="hud-button hud-button-small" onClick={() => hudActions.toggleLeftPanel('collection')}>
+          閉じる
+        </button>
+      </div>
       <div className="hud-chips" role="group" aria-label="種類で絞る">
         <button type="button" className={`hud-chip${kind === 'all' ? ' is-selected' : ''}`} onClick={() => setKind('all')}>
           すべて {visits.length}

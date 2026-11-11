@@ -10,37 +10,116 @@
   box-sizing: border-box;
   max-width: calc(100vw - 32px);
 }
-.hud-status { top: 16px; left: 16px; }
+/* 左上の STAR VESSEL ヘッダー：タイトル画面と同じ Monoton・オレンジの光のにじみ */
+.hud-brand {
+  font-family: 'Monoton', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  word-spacing: 0.18em;
+  color: #ff8a1f;
+  filter: drop-shadow(0 0 6px rgba(255, 138, 31, 0.55)) drop-shadow(0 0 26px rgba(255, 110, 20, 0.4));
+  pointer-events: none;
+}
+/* 左上の表示：カードの枠も影も持たず、緑色のピクセル調の文字（DotGothic16）で描く（F3 で表示・非表示） */
+.hud-status {
+  font-family: 'DotGothic16', ui-monospace, 'SF Mono', Menlo, monospace;
+  color: #5eff72;
+  font-size: 16px;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
 /* 左上の列：状態とスタンプ（重ならないよう縦に並べる） */
 .hud-left { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .hud-left .hud-panel { position: static; }
 .hud-title { font-weight: 600; letter-spacing: 0.08em; }
 .hud-muted { opacity: 0.6; }
 .hud-warn { color: #ffd38a; }
-.hud-bottom {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  max-width: min(720px, calc(100vw - 32px - 216px));
-}
-.hud-bottom-buttons { display: flex; gap: 6px; pointer-events: auto; }
-.hud-bottom .hud-panel { position: static; }
-.hud-help { font-size: 12px; opacity: 0.85; }
+.hud-help { font-size: 12px; opacity: 0.85; text-align: left; }
 .hud-touch-only { display: none; }
 
 .hud-speed-buttons { position: absolute; left: 16px; flex-direction: column; gap: 6px; }
 
 /* スマホ：操作の説明はタッチだけにし、下の 2 つは縦に並べる */
 @media (max-width: 720px), (pointer: coarse) {
-  .hud-bottom { max-width: calc(100vw - 32px - 64px); }
   .hud-keyboard-only { display: none; }
   .hud-touch-only { display: block; }
   /* スマホでは右上にレーダーとボタンがあり、右下が空くので、速さのボタンは右下に置く */
   .hud-speed-buttons.hud-touch-only { display: flex; left: auto; right: 16px; bottom: 16px; }
+}
+
+/* ゲームメニュー（PC で Esc。要件 F60）。後ろを少し暗くするだけで、クリックは通す（画面をクリックすると戻る・まわりのボタンを押せる） */
+.hud-pause { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); pointer-events: none; }
+.hud-pause-menu {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(320px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+  pointer-events: auto;
+}
+.hud-pause-button { font-size: 14px; padding: 10px 12px; }
+/* ワープホールの一覧・コレクション（画面の真ん中）を開いている間は、ゲームメニューを隠す（重なるため） */
+#ui:has(.hud-warp-list, .hud-collection-modal) .hud-pause-menu { display: none; }
+
+/* 画面中央下のアイコンバー（コレクション・星の見え方・星座・ワープ） */
+.hud-hotbar {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+.hud-icon-button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* スマホの操縦のボタン（要件 F60。マインクラフト統合版の形）。左下に十字、右下に上昇・下降 */
+.hud-touchpad { display: none; }
+.hud-pad-button {
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  font-size: 16px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  background: rgba(30, 60, 90, 0.45);
+}
+.hud-pad-button:active { background: rgba(60, 120, 170, 0.75); }
+.hud-dpad {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 46px);
+  gap: 4px;
+}
+.hud-dpad .is-up { grid-area: 1 / 2; }
+.hud-dpad .is-left { grid-area: 2 / 1; }
+.hud-dpad .is-right { grid-area: 2 / 3; }
+.hud-dpad .is-down { grid-area: 3 / 2; }
+.hud-lift { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 4px; }
+.hud-lift .is-lift { width: 64px; font-size: 12px; }
+@media (max-width: 720px), (pointer: coarse) {
+  .hud-touchpad { display: block; }
+  /* 十字のボタン（高さ 146px）の上にアイコンバー、上昇・下降（96px）の上に速さのボタンを置く */
+  .hud-hotbar { bottom: 172px; }
+  .hud-speed-buttons.hud-touch-only { bottom: 120px; }
 }
 
 /* 右の列：レーダーとワープの操作 */
@@ -96,6 +175,15 @@
   background: rgba(8, 12, 24, 0.88);
 }
 .hud-warp-list-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.hud-warp-place { display: flex; flex-direction: column; margin-bottom: 6px; }
+.hud-collection-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(60vh, 480px);
+}
 .hud-warp-list ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .hud-warp-list li { display: flex; gap: 6px; align-items: center; }
 .hud-warp-item {
@@ -121,7 +209,8 @@
 @media (max-width: 720px), (pointer: coarse) {
   .hud-dock { top: 16px; bottom: auto; width: 130px; }
   .hud-radar { width: 130px; height: 130px; }
-  .hud-notice { top: auto; bottom: 64px; left: 16px; right: 16px; transform: none; max-width: none; }
+  /* 十字のボタンと「？ 操作」の上に出す（要件 F60 で左下に十字のボタンを置いた） */
+  .hud-notice { top: auto; bottom: 210px; left: 16px; right: 16px; transform: none; max-width: none; }
 }
 
 .hud-view-buttons { display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
@@ -306,7 +395,7 @@
   .hud-notice { top: auto; }
   /* スマホ：左上の状態の下に重ならないよう、カードは右上に小さく */
   .hud-left .hud-info-card { position: static; transform: none; width: min(230px, calc(100vw - 32px)); font-size: 12px; line-height: 1.5; }
-  .hud-list-panel { width: calc(100vw - 32px - 138px); max-height: 36vh; }
+  .hud-left .hud-list-panel { width: calc(100vw - 32px - 138px); max-height: 36vh; }
 }
 
 /* 選んだ天体の印 */
@@ -343,8 +432,9 @@
 /* 照準の先の天体の下に、星座の名前を出す */
 .hud-aim-second { top: 44px; }
 
-/* スマホ：左上の状態を、右上のレーダーとボタン（130px）に重ならない幅にする */
+/* スマホ：左上の状態を、右上のレーダー（130px）に重ならない幅にする */
 @media (max-width: 720px), (pointer: coarse) {
   .hud-left { max-width: calc(100vw - 32px - 138px); }
-  .hud-left .hud-status { font-size: 12px; line-height: 1.5; padding: 8px 10px; }
+  .hud-brand { font-size: 18px; }
+  .hud-left .hud-status { font-size: 13px; line-height: 1.45; }
 }

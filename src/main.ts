@@ -10,7 +10,7 @@ import { SolarSystemView } from './render/solar-system-view';
 import { ChaseCamera } from './controls/chase-camera';
 import { hullLengthKm } from './render/ship-models';
 import { shipApi } from './net/ship-repository';
-import { defaultDesignFor, HULLS, SHIP_DESIGN_VERSION, type ShipDesign } from './world/ship-design';
+import { defaultDesignFor, SHIP_DESIGN_VERSION, type ShipDesign } from './world/ship-design';
 import { StampBubbles } from './ui/stamp-bubbles';
 import { STAMP_LOG_SIZE, stampText } from './world/stamps';
 import { AsteroidField, type AsteroidFile } from './render/asteroid-field';
@@ -326,11 +326,9 @@ async function main() {
     online = true;
     await refreshWarps();
     hudStore.set({ warpsReady: true });
-    // 自分の宇宙船の設計。まだ決めていなければ、作る画面を出す
+    // 自分の宇宙船の設計（宇宙船はタイトル画面の出発前に選ぶ。まだ無ければ仮のソーサーのまま）
     const saved = await shipApi.get();
-    hudStore.set({ shipReady: true });
     if (saved) myDesign = saved;
-    else hudStore.set({ shipBuilder: { hull: myDesign.hull, firstTime: true, saving: false } });
   } catch (e) {
     console.error(e);
     hudStore.set({ status: 'サーバーにつながらないため、ワープホールは使えません' });
@@ -356,19 +354,22 @@ async function main() {
 
   // 視点（要件 F28）と自分の宇宙船（要件 F27）
   const chase = new ChaseCamera();
-  /** 宇宙船を作る画面を開いている間に、船を見せるためのカメラ（ゆっくり回る） */
-  const previewCam = new ChaseCamera();
-  previewCam.mode = 'third';
-  previewCam.pitch = 0.2;
-  previewCam.distanceFactor = 2.4;
-  previewCam.aimBelow = 0.35;
   controls.onOrbit = (dx, dy) => {
-    if (chase.mode === 'third') chase.orbit(dx, dy);
+    if (chase.mode === 'first') return false;
+    chase.orbit(dx, dy);
+    return true;
   };
   controls.onZoom = (steps) => {
-    if (chase.mode === 'third') chase.zoom(steps);
+    if (chase.mode !== 'first') chase.zoom(steps);
   };
   controls.onToggleView = () => hudActions.toggleView();
+  controls.onToggleStatus = () => hudActions.toggleStatus();
+  // マウスのカーソルを消して操縦する（PC。要件 F60）。Esc でカーソルが戻り、ゲームメニューが出る
+  controls.onPauseChange = (paused) => hudStore.set({ paused });
+  controls.onLockError = () => showNotice('操縦に戻れませんでした。少し待ってから、もう一度クリックしてください');
+  hudStore.set({ paused: controls.isPaused });
+  hudActions.resume = () => controls.requestLock();
+  hudActions.setMoveKey = (code, down) => controls.setVirtualKey(code, down);
   // 星の見え方（要件 F34）。選んだものは、この端末に覚えておく
   const setStarLimit = (mode: StarLimitMode) => {
     starLimitMag.value = STAR_LIMITS[mode];
@@ -430,37 +431,6 @@ async function main() {
     controls.dragMode = controls.dragMode === 'orbit' ? 'steer' : 'orbit';
     hudStore.set({ orbitDrag: controls.dragMode === 'orbit' });
   };
-  hudActions.openShipBuilder = () => {
-    hudStore.set({ shipBuilder: { hull: myDesign.hull, firstTime: false, saving: false } });
-  };
-  hudActions.previewHull = (hull) => {
-    const b = hudStore.get().shipBuilder;
-    if (b) hudStore.set({ shipBuilder: { ...b, hull } });
-  };
-  const saveDesign = async (design: ShipDesign, notice: boolean) => {
-    const b = hudStore.get().shipBuilder;
-    if (b) hudStore.set({ shipBuilder: { ...b, saving: true } });
-    try {
-      await shipApi.save(design);
-      myDesign = design;
-      hudStore.set({ shipBuilder: null });
-      if (notice) showNotice(`宇宙船を ${HULLS[design.hull].nameJa} にしました`);
-    } catch (e) {
-      console.error(e);
-      if (b) hudStore.set({ shipBuilder: { ...b, saving: false } });
-      showNotice('宇宙船を保存できませんでした。少し待ってからもう一度試してください', 5000);
-    }
-  };
-  hudActions.saveShip = () => {
-    const b = hudStore.get().shipBuilder;
-    if (b) void saveDesign({ v: SHIP_DESIGN_VERSION, hull: b.hull }, true);
-  };
-  hudActions.closeShipBuilder = () => {
-    const b = hudStore.get().shipBuilder;
-    // 初めての画面を閉じたら、いまの船（自動で決めた船）を保存して、次から聞かない
-    if (b?.firstTime) void saveDesign(myDesign, false);
-    else hudStore.set({ shipBuilder: null });
-  };
   {
     const d = worldNow();
     const earthRel = sub(heliocentricPositionKm('Earth', d), absolutePositionKm(observer, d));
@@ -512,6 +482,7 @@ async function main() {
     if (!w || findBody(w.anchor) === null) return;
     observer = arriveAt(w);
     lastRoomCheck = -Infinity;
+    controls.stop();
     // 輪の正面に出て、輪の方を向く
     controls.lookAt({ x: -w.facing.x, y: -w.facing.y, z: -w.facing.z }, controls.up());
     showNotice(`${w.code} へワープしました`);
@@ -538,6 +509,7 @@ async function main() {
       teleportPc(p: { x: number; y: number; z: number }, lookAtPc = { x: 0, y: 0, z: 0 }) {
         observer = reanchor({ anchor: 'Sun', offsetKm: { x: p.x * KM_PER_PC, y: p.y * KM_PER_PC, z: p.z * KM_PER_PC } }, worldNow());
         lastRoomCheck = -Infinity;
+        controls.stop();
         controls.lookAt({ x: lookAtPc.x - p.x, y: lookAtPc.y - p.y, z: lookAtPc.z - p.z }, { x: 0, y: 0, z: 1 });
       },
       /** 天体（id）のそばへ行き、その天体の方を向く。distanceKm は中心からの距離（省略すると半径の 4 倍） */
@@ -551,6 +523,7 @@ async function main() {
         const p = add(center, scale(dir, distanceKm ?? info.radiusKm * 4));
         observer = reanchor({ anchor: 'Sun', offsetKm: p }, d);
         lastRoomCheck = -Infinity;
+        controls.stop();
         controls.lookAt(sub(center, p), { x: 0, y: 0, z: 1 });
       },
       /** 恒星系（例：H70666、E1WHADEK）の恒星の近くへ行く。distanceAu は恒星からの距離 */
@@ -561,6 +534,7 @@ async function main() {
         const p = add(center, scale(normalize(scale(host.positionPc, -1)), distanceAu * KM_PER_AU));
         observer = reanchor({ anchor: 'Sun', offsetKm: p }, worldNow());
         controls.lookAt(sub(center, p), { x: 0, y: 0, z: 1 });
+        controls.stop();
         lastRoomCheck = -Infinity;
       },
       /** 銀河中心の座標（kpc）で瞬間移動する */
@@ -662,14 +636,10 @@ async function main() {
     const others = shipSmoother.update(link.ships, date, dt);
     shipView.update(others, abs);
 
-    // 視点：宇宙船を作る画面を開いている間は、選んでいる船をゆっくり回して見せる
-    const builder = hudStore.get().shipBuilder;
-    const shownHull = builder?.hull ?? myDesign.hull;
-    const cam = builder ? previewCam : chase;
-    if (builder) previewCam.yaw += dt * 0.5;
-    cam.pose(controls.orientation, hullLengthKm(shownHull), camera.position, camera.quaternion);
+    const shownHull = myDesign.hull;
+    chase.pose(controls.orientation, hullLengthKm(shownHull), camera.position, camera.quaternion);
     const q = controls.orientation;
-    shipView.setOwn(cam.mode === 'third', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w });
+    shipView.setOwn(chase.mode !== 'first', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w });
     starCamera.quaternion.copy(camera.quaternion);
 
     // スタンプの吹き出しを、船の少し上に置く。自分の船は、一人称のときは画面の下の方に出す
@@ -680,7 +650,7 @@ async function main() {
       let rel: { x: number; y: number; z: number };
       let size: number;
       if (id === SELF_BUBBLE) {
-        if (cam.mode === 'first') return { x: w / 2, y: h * 0.72 };
+        if (chase.mode === 'first') return { x: w / 2, y: h * 0.72 };
         rel = { x: 0, y: 0, z: 0 };
         size = hullLengthKm(shownHull);
       } else {
@@ -700,7 +670,7 @@ async function main() {
     nebulaView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, nowMs);
     constellationView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
 
-    info.updateMarker(w, h, builder !== null);
+    info.updateMarker(w, h, false);
 
     renderer.clear();
     renderer.render(starScene, starCamera);
@@ -729,7 +699,7 @@ async function main() {
       {
         const f = new THREE.Vector3();
         camera.getWorldDirection(f);
-        info.updateHud(nowMs, abs, date, observer.anchor, inCluster, { x: f.x, y: f.y, z: f.z }, builder !== null);
+        info.updateHud(nowMs, abs, date, observer.anchor, inCluster, { x: f.x, y: f.y, z: f.z }, false);
         // 照準の先の星座（線を出しているときだけ）。明るくして、名前を照準の下に出す
         const aimedConstellation = constellationView.aim({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, { x: f.x, y: f.y, z: f.z });
         const aimName = aimedConstellation?.nameJa ?? null;
