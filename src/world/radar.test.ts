@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { chooseRadarLabels, radarBlips, type RadarTarget } from './radar';
+import {
+  chooseRadarLabels,
+  clampRadarMaxKm,
+  formatRingKm,
+  mapLayerOfBody,
+  placeBlips,
+  radarBlips,
+  radarRange,
+  radarRingRadius,
+  radarRings,
+  RADAR_MAX_KM_LIMITS,
+  RADAR_RANGE,
+  type RadarTarget,
+} from './radar';
 import type { Quat } from './quat';
 
 const identity: Quat = { x: 0, y: 0, z: 0, w: 1 };
@@ -75,5 +88,72 @@ describe('レーダーの名前', () => {
     const many = Array.from({ length: 10 }, (_, i) => ({ id: `b${i}`, x: -0.8, y: -0.9 + i * 0.18, label: 'あ', priority: i }));
     expect(chooseRadarLabels(many, 4).size).toBe(4);
     expect(chooseRadarLabels([{ id: 'edge', x: 0.95, y: 0, label: 'とても長い名前', priority: 0 }], 4).size).toBe(0);
+  });
+});
+
+describe('マップの範囲（二本指・ホイールで変える）', () => {
+  it('ふだんの範囲は、これまでと同じ（1,000 km 〜 100 億 km、輪は 10 億・1,000 万・10 万 km）', () => {
+    expect(radarRange(RADAR_RANGE.maxKm)).toEqual(RADAR_RANGE);
+    expect(radarRings(RADAR_RANGE)).toEqual([1e9, 1e7, 1e5]);
+  });
+
+  it('範囲は 1 万 km 〜 1,000 兆 km に収める', () => {
+    expect(clampRadarMaxKm(10)).toBe(RADAR_MAX_KM_LIMITS.min);
+    expect(clampRadarMaxKm(1e30)).toBe(RADAR_MAX_KM_LIMITS.max);
+    expect(clampRadarMaxKm(Number.NaN)).toBe(RADAR_RANGE.maxKm);
+  });
+
+  it('範囲を狭めると、同じ物が外へ動き、範囲の外はふちに置く', () => {
+    const [b] = radarBlips(origin, identity, [target(0, 0, -1e6)]);
+    const [wide] = placeBlips([b], radarRange(1e12));
+    const [narrow] = placeBlips([b], radarRange(1e7));
+    const [tiny] = placeBlips([b], radarRange(1e5));
+    expect(narrow.y).toBeGreaterThan(wide.y);
+    expect(tiny.y).toBeCloseTo(1, 9);
+    expect(tiny.clamped).toBe(true);
+    expect(narrow.clamped).toBe(false);
+  });
+
+  it('置き直しても、radarBlips でその範囲を使ったときと同じ位置', () => {
+    const r = radarRange(3e8);
+    const [a] = radarBlips(origin, identity, [target(2e6, 0, -5e6)], r);
+    const [b] = placeBlips(radarBlips(origin, identity, [target(2e6, 0, -5e6)]), r);
+    expect(b.x).toBeCloseTo(a.x, 12);
+    expect(b.y).toBeCloseTo(a.y, 12);
+  });
+
+  it('輪はふちの内側にあり、ふちの上には出さない', () => {
+    for (const m of [1e4, 3.3e6, 1e10, 2.5e13, 1e15]) {
+      const r = radarRange(m);
+      const rings = radarRings(r);
+      expect(rings.length).toBeGreaterThan(0);
+      for (const km of rings) {
+        expect(radarRingRadius(km, r)).toBeGreaterThan(0);
+        expect(radarRingRadius(km, r)).toBeLessThan(1);
+      }
+    }
+  });
+
+  it('輪の名前は、万・億・兆で短く書く', () => {
+    expect(formatRingKm(1e3)).toBe('1,000km');
+    expect(formatRingKm(1e5)).toBe('10万km');
+    expect(formatRingKm(1e7)).toBe('1千万km');
+    expect(formatRingKm(1e9)).toBe('10億km');
+    expect(formatRingKm(1e12)).toBe('1兆km');
+    expect(formatRingKm(1e15)).toBe('1千兆km');
+  });
+});
+
+describe('マップに出すものの種類', () => {
+  it('天体の種類から決め、指定が無い点は形から決める', () => {
+    expect(mapLayerOfBody('moon')).toBe('planets');
+    expect(mapLayerOfBody('comet')).toBe('small');
+    expect(mapLayerOfBody('spacecraft')).toBe('craft');
+    const [w, s, st] = radarBlips(origin, identity, [
+      { kind: 'warp', id: 'w', label: '', positionKm: { x: 1, y: 0, z: 0 } },
+      { kind: 'ship', id: 's', label: '', positionKm: { x: 1, y: 0, z: 0 } },
+      { kind: 'star', id: 'x', label: '', positionKm: { x: 1, y: 0, z: 0 } },
+    ]);
+    expect([w.layer, s.layer, st.layer]).toEqual(['warps', 'ships', 'stars']);
   });
 });

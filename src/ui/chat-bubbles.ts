@@ -1,21 +1,21 @@
 /**
- * 船の上に出すスタンプの吹き出し（要件 F6）。毎フレーム船の画面上の位置に合わせて動かすので、
+ * 船の上に出すチャットの吹き出し（要件 F6）。毎フレーム船の画面上の位置に合わせて動かすので、
  * React ではなく DOM を直接動かす（React を毎フレーム動かさない決まり。docs/tech/stack.md）。
  */
-import { STAMP_SHOW_MS } from '../world/stamps';
+import { CHAT_SHOW_MS } from '../world/chat';
 
 interface Bubble {
   el: HTMLDivElement;
   until: number;
 }
 
-export class StampBubbles {
+export class ChatBubbles {
   private readonly root: HTMLDivElement;
   private readonly bubbles = new Map<string, Bubble>();
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
-    this.root.className = 'stamp-bubbles';
+    this.root.className = 'chat-bubbles';
     this.root.setAttribute('aria-hidden', 'true');
     parent.appendChild(this.root);
   }
@@ -25,18 +25,19 @@ export class StampBubbles {
     let b = this.bubbles.get(shipId);
     if (!b) {
       const el = document.createElement('div');
-      el.className = 'stamp-bubble';
+      el.className = 'chat-bubble';
       this.root.appendChild(el);
       b = { el, until: 0 };
       this.bubbles.set(shipId, b);
     }
     b.el.textContent = text;
     b.el.style.setProperty('--hue', String(hue));
+    // 絵文字 1〜2 文字だけのときは大きく、文は小さく
     b.el.classList.toggle('is-phrase', [...text].length > 2);
     b.el.classList.remove('is-pop');
     void b.el.offsetWidth; // 出るときの動きをやり直す
     b.el.classList.add('is-pop');
-    b.until = nowMs + STAMP_SHOW_MS;
+    b.until = nowMs + CHAT_SHOW_MS;
   }
 
   /**

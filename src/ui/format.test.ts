@@ -8,6 +8,11 @@ describe('formatDistance', () => {
     expect(formatDistance(KM_PER_AU)).toBe('1.00 天文単位');
     expect(formatDistance(4.24 * KM_PER_LY)).toBe('4.24 光年');
   });
+
+  it('1,000 以上は、指数ではなく桁の区切りで書く', () => {
+    expect(formatDistance(2448 * KM_PER_AU)).toBe('2,450 天文単位');
+    expect(formatDistance(25_300 * KM_PER_LY)).toBe('25,300 光年');
+  });
 });
 
 describe('formatCoordinates', () => {

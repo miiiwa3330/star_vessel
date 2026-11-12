@@ -10,9 +10,9 @@ import { SolarSystemView } from './render/solar-system-view';
 import { ChaseCamera } from './controls/chase-camera';
 import { hullLengthKm } from './render/ship-models';
 import { shipApi } from './net/ship-repository';
-import { defaultDesignFor, HULLS, SHIP_DESIGN_VERSION, type ShipDesign } from './world/ship-design';
-import { StampBubbles } from './ui/stamp-bubbles';
-import { STAMP_LOG_SIZE, stampText } from './world/stamps';
+import { defaultDesignFor, SHIP_DESIGN_VERSION, type ShipDesign } from './world/ship-design';
+import { ChatBubbles } from './ui/chat-bubbles';
+import { CHAT_LOG_SIZE, CHAT_MIN_INTERVAL_MS } from './world/chat';
 import { AsteroidField, type AsteroidFile } from './render/asteroid-field';
 import { REQUIRED_TEXTURES, TEXTURE_FILES } from './render/body-looks';
 import { WarpView } from './render/warp-view';
@@ -25,7 +25,7 @@ import { hudActions, hudStore, showNotice } from './ui/hud-store';
 import { worldNow } from './world/clock';
 import { keepOutsideBodies } from './world/collision';
 import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/observer';
-import { radarBlips, type RadarTarget } from './world/radar';
+import { mapLayerOfBody, radarBlips, radarRange, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
 import { ShipSmoother } from './world/ship-smoothing';
 import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, unregisterBodies, type BodyInfo, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
@@ -296,18 +296,28 @@ async function main() {
   const link = new SpaceLink();
   const shipSmoother = new ShipSmoother();
 
-  // スタンプ（要件 F6）。届いたら、送った人の船の上に吹き出しを出し、画面の隅の履歴にも残す
-  const bubbles = new StampBubbles(document.getElementById('ui')!);
-  let stampKey = 0;
-  link.onStamp = ({ from, hue, k }) => {
+  // チャット（要件 F6）。届いたら、送った人の船の上に吹き出しを出し、画面の左下の履歴にも残す
+  const bubbles = new ChatBubbles(document.getElementById('ui')!);
+  let chatKey = 0;
+  link.onChat = ({ from, hue, name, text }) => {
     const mine = from === link.selfId;
-    const text = stampText(k);
     bubbles.show(mine ? SELF_BUBBLE : from, text, hue, performance.now());
-    const log = [{ key: ++stampKey, hue, text, mine }, ...hudStore.get().stampLog].slice(0, STAMP_LOG_SIZE);
-    hudStore.set({ stampLog: log });
+    const log = [{ key: ++chatKey, hue, name, text, mine, at: Date.now() }, ...hudStore.get().chatLog].slice(0, CHAT_LOG_SIZE);
+    hudStore.set({ chatLog: log });
   };
-  hudActions.sendStamp = (id) => {
-    if (!link.sendStamp(id)) showNotice('宇宙の部屋につながっていないため、スタンプを送れません', 4000);
+  let chatSentAt = -Infinity;
+  hudActions.sendChat = (text) => {
+    // サーバーは間隔の短いものを黙って捨てるので、先にここで知らせる（スタンプを続けて押したときなど）
+    if (performance.now() - chatSentAt < CHAT_MIN_INTERVAL_MS) {
+      showNotice('少し待ってから送ってください');
+      return false;
+    }
+    if (link.sendChat(text)) {
+      chatSentAt = performance.now();
+      return true;
+    }
+    showNotice(link.connected ? '送れない文です' : '宇宙の部屋につながっていないため、チャットを送れません', 4000);
+    return false;
   };
   const projected = new THREE.Vector3();
 
@@ -326,11 +336,9 @@ async function main() {
     online = true;
     await refreshWarps();
     hudStore.set({ warpsReady: true });
-    // 自分の宇宙船の設計。まだ決めていなければ、作る画面を出す
+    // 自分の宇宙船の設計（宇宙船はタイトル画面の出発前に選ぶ。まだ無ければ仮のソーサーのまま）
     const saved = await shipApi.get();
-    hudStore.set({ shipReady: true });
     if (saved) myDesign = saved;
-    else hudStore.set({ shipBuilder: { hull: myDesign.hull, firstTime: true, saving: false } });
   } catch (e) {
     console.error(e);
     hudStore.set({ status: 'サーバーにつながらないため、ワープホールは使えません' });
@@ -356,19 +364,71 @@ async function main() {
 
   // 視点（要件 F28）と自分の宇宙船（要件 F27）
   const chase = new ChaseCamera();
-  /** 宇宙船を作る画面を開いている間に、船を見せるためのカメラ（ゆっくり回る） */
-  const previewCam = new ChaseCamera();
-  previewCam.mode = 'third';
-  previewCam.pitch = 0.2;
-  previewCam.distanceFactor = 2.4;
-  previewCam.aimBelow = 0.35;
   controls.onOrbit = (dx, dy) => {
-    if (chase.mode === 'third') chase.orbit(dx, dy);
+    if (chase.mode === 'first') return false;
+    chase.orbit(dx, dy);
+    return true;
   };
   controls.onZoom = (steps) => {
-    if (chase.mode === 'third') chase.zoom(steps);
+    if (chase.mode !== 'first') chase.zoom(steps);
   };
   controls.onToggleView = () => hudActions.toggleView();
+  controls.onToggleStatus = () => hudActions.toggleStatus();
+  // 開いている画面（ゲームメニュー・マップ・チャット・コレクション・ワープ）。どれか 1 つだけ。
+  // PC では、開くとカーソルを出し、閉じると操縦に戻る（カーソルを消す）。入ったばかりのときは何も開かず、クリックを待つ
+  controls.isBlocked = () => hudStore.get().overlay !== null;
+  hudActions.setOverlay = (overlay) => {
+    const prev = hudStore.get();
+    if (overlay === prev.overlay) return;
+    // ワープはマップから（2026-11-12）。開くたびに、全員のワープホールを取り直す
+    if (overlay === 'map') hudActions.refreshWarps();
+    // ワープはマップからだけ。マップを閉じたら、選んだワープホールのカードも消す
+    if (prev.overlay === 'map' && prev.selectedWarp) hudStore.set({ selectedWarp: null });
+    // 写真の画面を閉じたら、写真はブラウザから消す（保存・共有していなければ残らない）
+    if (prev.overlay === 'photo' && prev.photo) {
+      URL.revokeObjectURL(prev.photo.url);
+      hudStore.set({ photo: null });
+    }
+    hudStore.set({ overlay });
+    if (overlay === null) controls.requestLock();
+    else controls.exitLock();
+  };
+  // ゲームメニューの間は、メニューのボタンのほかは受け付けない（M・1〜4 で別の画面に切り替えない）
+  const unlessMenu = (f: () => void) => () => {
+    if (hudStore.get().overlay !== 'menu') f();
+  };
+  controls.onToggleMap = unlessMenu(() => hudActions.toggleOverlay('map'));
+  controls.onHotbar = (n) =>
+    unlessMenu(() => {
+      if (n === 1) hudActions.toggleOverlay('collection');
+      else if (n === 2) hudActions.cycleStarLimit();
+      else if (n === 3) hudActions.toggleConstellations();
+      else if (n === 4 && hudStore.get().warpsReady) hudActions.placeWarp();
+      else if (n === 5) hudActions.takePhoto();
+    })();
+  controls.onPhoto = unlessMenu(() => hudActions.takePhoto());
+  controls.onEscape = () => hudActions.setOverlay(hudStore.get().overlay === null ? 'menu' : null);
+  // Enter・T でチャットの入力欄を開く
+  controls.onOpenChat = () => {
+    // つながる前は入力欄を使えない
+    if (!hudStore.get().chatReady) {
+      showNotice('宇宙の部屋につながると、チャットを使えます');
+      return;
+    }
+    hudActions.setOverlay('chat');
+  };
+  // マウスのカーソルを消して操縦する（PC。要件 F60）。操縦中に Esc でカーソルが戻ったら、ゲームメニューを出す
+  controls.onUserUnlock = () => {
+    if (hudStore.get().overlay === null) hudStore.set({ overlay: 'menu' });
+  };
+  controls.onLockState = (locked, pointerLock) => hudStore.set({ locked, pointerLock });
+  controls.onLockError = () => {
+    // Esc の直後は、ブラウザがしばらくカーソルを消させない。何も開いていない状態で止まらないよう、ゲームメニューに戻す
+    if (hudStore.get().overlay === null && controls.usesPointerLock) hudStore.set({ overlay: 'menu' });
+    showNotice('操縦に戻れませんでした。少し待ってから、もう一度押してください');
+  };
+  hudStore.set({ pointerLock: controls.usesPointerLock, locked: false, overlay: null });
+  hudActions.setMoveKey = (code, down) => controls.setVirtualKey(code, down);
   // 星の見え方（要件 F34）。選んだものは、この端末に覚えておく
   const setStarLimit = (mode: StarLimitMode) => {
     starLimitMag.value = STAR_LIMITS[mode];
@@ -430,37 +490,6 @@ async function main() {
     controls.dragMode = controls.dragMode === 'orbit' ? 'steer' : 'orbit';
     hudStore.set({ orbitDrag: controls.dragMode === 'orbit' });
   };
-  hudActions.openShipBuilder = () => {
-    hudStore.set({ shipBuilder: { hull: myDesign.hull, firstTime: false, saving: false } });
-  };
-  hudActions.previewHull = (hull) => {
-    const b = hudStore.get().shipBuilder;
-    if (b) hudStore.set({ shipBuilder: { ...b, hull } });
-  };
-  const saveDesign = async (design: ShipDesign, notice: boolean) => {
-    const b = hudStore.get().shipBuilder;
-    if (b) hudStore.set({ shipBuilder: { ...b, saving: true } });
-    try {
-      await shipApi.save(design);
-      myDesign = design;
-      hudStore.set({ shipBuilder: null });
-      if (notice) showNotice(`宇宙船を ${HULLS[design.hull].nameJa} にしました`);
-    } catch (e) {
-      console.error(e);
-      if (b) hudStore.set({ shipBuilder: { ...b, saving: false } });
-      showNotice('宇宙船を保存できませんでした。少し待ってからもう一度試してください', 5000);
-    }
-  };
-  hudActions.saveShip = () => {
-    const b = hudStore.get().shipBuilder;
-    if (b) void saveDesign({ v: SHIP_DESIGN_VERSION, hull: b.hull }, true);
-  };
-  hudActions.closeShipBuilder = () => {
-    const b = hudStore.get().shipBuilder;
-    // 初めての画面を閉じたら、いまの船（自動で決めた船）を保存して、次から聞かない
-    if (b?.firstTime) void saveDesign(myDesign, false);
-    else hudStore.set({ shipBuilder: null });
-  };
   {
     const d = worldNow();
     const earthRel = sub(heliocentricPositionKm('Earth', d), absolutePositionKm(observer, d));
@@ -490,20 +519,43 @@ async function main() {
 
   const describeError = (e: unknown) =>
     e instanceof WarpApiError && e.kind === 'limit'
-      ? `ワープホールを置けるのは ${MAX_WARPS_PER_PLAYER} 個までです。一覧で自分のものを消すと、また置けます`
+      ? `ワープホールを作れるのは ${MAX_WARPS_PER_PLAYER} 個までです。マップで自分のものを選んで消すと、また作れます`
       : 'うまくいきませんでした。少し待ってからもう一度試してください';
   hudActions.placeWarp = async () => {
     const placement = planWarpHere(observer, controls.forward(), worldNow(), systemAt);
     try {
       const w = await warpApi.place(placement);
       setWarps([...warps, w]);
-      showNotice(`ワープホール ${w.code} を置きました`, 4000);
+      showNotice(`ワープホール ${w.code} を作りました（ワープはマップから）`, 4000);
     } catch (e) {
       console.error(e);
       showNotice(describeError(e), 5000);
     }
   };
   hudActions.changeSpeed = (steps) => controls.changeSpeed(steps, true);
+  // 写真（要件 F61）：次に描いたすぐあとの画面を、そのまま画像にする（画面の表示・文字は入らない。宇宙だけが写る）。
+  // WebGPU・WebGL2 とも、描いた直後の同じ処理の中でないと、画面の中身を読めないため、ループの中で撮る
+  let photoRequested = false;
+  hudActions.takePhoto = () => {
+    photoRequested = true;
+  };
+  const capturePhoto = (date: Date) => {
+    const width = canvas.width;
+    const height = canvas.height;
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        showNotice('写真を撮れませんでした');
+        return;
+      }
+      const prev = hudStore.get().photo;
+      if (prev) URL.revokeObjectURL(prev.url);
+      // 名前は世界の時刻（UTC）。例：star-vessel-20261112-123456.png
+      const stamp = date.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+      const photo = { url: URL.createObjectURL(blob), blob, fileName: `star-vessel-${stamp}.png`, width, height };
+      hudStore.set({ photo, shutter: hudStore.get().shutter + 1 });
+      hudActions.setOverlay('photo');
+    }, 'image/png');
+  };
   hudActions.refreshWarps = () => {
     refreshWarps().catch((e: unknown) => console.error(e));
   };
@@ -512,9 +564,17 @@ async function main() {
     if (!w || findBody(w.anchor) === null) return;
     observer = arriveAt(w);
     lastRoomCheck = -Infinity;
+    controls.stop();
     // 輪の正面に出て、輪の方を向く
     controls.lookAt({ x: -w.facing.x, y: -w.facing.y, z: -w.facing.z }, controls.up());
+    hudStore.set({ selectedWarp: null });
     showNotice(`${w.code} へワープしました`);
+  };
+  hudActions.faceWarp = (id) => {
+    const w = warps.find((x) => x.id === id);
+    if (!w || findBody(w.anchor) === null) return;
+    const d = worldNow();
+    controls.lookAt(sub(warpPositionKm(w, d), absolutePositionKm(observer, d)), controls.up());
   };
   hudActions.removeWarp = async (id) => {
     const w = warps.find((x) => x.id === id && x.mine);
@@ -522,6 +582,7 @@ async function main() {
     try {
       await warpApi.remove(w.id);
       setWarps(warps.filter((x) => x.id !== w.id));
+      if (hudStore.get().selectedWarp === w.id) hudStore.set({ selectedWarp: null });
       showNotice(`ワープホール ${w.code} を消しました`);
     } catch (e) {
       console.error(e);
@@ -538,6 +599,7 @@ async function main() {
       teleportPc(p: { x: number; y: number; z: number }, lookAtPc = { x: 0, y: 0, z: 0 }) {
         observer = reanchor({ anchor: 'Sun', offsetKm: { x: p.x * KM_PER_PC, y: p.y * KM_PER_PC, z: p.z * KM_PER_PC } }, worldNow());
         lastRoomCheck = -Infinity;
+        controls.stop();
         controls.lookAt({ x: lookAtPc.x - p.x, y: lookAtPc.y - p.y, z: lookAtPc.z - p.z }, { x: 0, y: 0, z: 1 });
       },
       /** 天体（id）のそばへ行き、その天体の方を向く。distanceKm は中心からの距離（省略すると半径の 4 倍） */
@@ -551,6 +613,7 @@ async function main() {
         const p = add(center, scale(dir, distanceKm ?? info.radiusKm * 4));
         observer = reanchor({ anchor: 'Sun', offsetKm: p }, d);
         lastRoomCheck = -Infinity;
+        controls.stop();
         controls.lookAt(sub(center, p), { x: 0, y: 0, z: 1 });
       },
       /** 恒星系（例：H70666、E1WHADEK）の恒星の近くへ行く。distanceAu は恒星からの距離 */
@@ -561,6 +624,7 @@ async function main() {
         const p = add(center, scale(normalize(scale(host.positionPc, -1)), distanceAu * KM_PER_AU));
         observer = reanchor({ anchor: 'Sun', offsetKm: p }, worldNow());
         controls.lookAt(sub(center, p), { x: 0, y: 0, z: 1 });
+        controls.stop();
         lastRoomCheck = -Infinity;
       },
       /** 銀河中心の座標（kpc）で瞬間移動する */
@@ -662,17 +726,13 @@ async function main() {
     const others = shipSmoother.update(link.ships, date, dt);
     shipView.update(others, abs);
 
-    // 視点：宇宙船を作る画面を開いている間は、選んでいる船をゆっくり回して見せる
-    const builder = hudStore.get().shipBuilder;
-    const shownHull = builder?.hull ?? myDesign.hull;
-    const cam = builder ? previewCam : chase;
-    if (builder) previewCam.yaw += dt * 0.5;
-    cam.pose(controls.orientation, hullLengthKm(shownHull), camera.position, camera.quaternion);
+    const shownHull = myDesign.hull;
+    chase.pose(controls.orientation, hullLengthKm(shownHull), camera.position, camera.quaternion);
     const q = controls.orientation;
-    shipView.setOwn(cam.mode === 'third', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w });
+    shipView.setOwn(chase.mode !== 'first', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w });
     starCamera.quaternion.copy(camera.quaternion);
 
-    // スタンプの吹き出しを、船の少し上に置く。自分の船は、一人称のときは画面の下の方に出す
+    // チャットの吹き出しを、船の少し上に置く。自分の船は、一人称のときは画面の下の方に出す
     camera.updateMatrixWorld();
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -680,7 +740,7 @@ async function main() {
       let rel: { x: number; y: number; z: number };
       let size: number;
       if (id === SELF_BUBBLE) {
-        if (cam.mode === 'first') return { x: w / 2, y: h * 0.72 };
+        if (chase.mode === 'first') return { x: w / 2, y: h * 0.72 };
         rel = { x: 0, y: 0, z: 0 };
         size = hullLengthKm(shownHull);
       } else {
@@ -700,22 +760,42 @@ async function main() {
     nebulaView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, nowMs);
     constellationView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
 
-    info.updateMarker(w, h, builder !== null);
+    info.updateMarker(w, h, false);
 
     renderer.clear();
     renderer.render(starScene, starCamera);
     renderer.clearDepth();
     renderer.render(solar.scene, camera);
+    if (photoRequested) {
+      photoRequested = false;
+      capturePhoto(date);
+    }
 
     if (nowMs - lastHud > HUD_INTERVAL_MS) {
       lastHud = nowMs;
+      const mapRangeKm = hudStore.get().mapRangeKm;
+      const bodies = allBodies();
+      const bodyIds = new Set(bodies.map((b) => b.id));
       const targets: RadarTarget[] = [
-        // 天体が多いので、半径 200 km 以上か、1,000 万 km より近い天体だけを出す
+        // 天体が多いので、半径 200 km 以上か、1,000 万 km（マップの範囲が狭ければ、その範囲）より近い天体だけを出す
         // 探査機は小さいが、どこにいても探せるように出す
-        ...allBodies()
-          .map((b) => ({ kind: 'body' as const, id: b.id, label: b.nameJa, positionKm: heliocentricPositionKm(b.id, date), r: b.radiusKm, craft: b.kind === 'spacecraft' }))
-          .filter((t) => t.craft || t.r >= 200 || length(sub(t.positionKm, abs)) < (t.id.startsWith('N') ? 2_000 : 1e7))
+        ...bodies
+          .map((b) => ({
+            kind: 'body' as const,
+            layer: mapLayerOfBody(b.kind),
+            id: b.id,
+            label: b.nameJa,
+            positionKm: heliocentricPositionKm(b.id, date),
+            r: b.radiusKm,
+            craft: b.kind === 'spacecraft',
+          }))
+          .filter((t) => t.craft || t.r >= 200 || length(sub(t.positionKm, abs)) < (t.id.startsWith('N') ? 2_000 : Math.min(1e7, mapRangeKm)))
           .map(({ r: _r, craft: _c, ...t }) => t),
+        // 近くのほかの恒星（情報のカードで選べる 8 個。いる恒星系の恒星は、天体として上で出している）
+        ...info
+          .nearStars()
+          .filter((t) => !bodyIds.has(t.key))
+          .map((t) => ({ kind: 'star' as const, id: t.key, label: t.name, positionKm: t.positionKm })),
         ...others.map((o) => ({ kind: 'ship' as const, id: o.id, label: '', positionKm: o.positionKm })),
         // レーダーは狭いので、住所の恒星系から後ろだけを出す（例：SOL-3-0-001）
         ...warps.filter((w) => findBody(w.anchor) !== null).map((w) => ({
@@ -729,7 +809,7 @@ async function main() {
       {
         const f = new THREE.Vector3();
         camera.getWorldDirection(f);
-        info.updateHud(nowMs, abs, date, observer.anchor, inCluster, { x: f.x, y: f.y, z: f.z }, builder !== null);
+        info.updateHud(nowMs, abs, date, observer.anchor, inCluster, { x: f.x, y: f.y, z: f.z }, false);
         // 照準の先の星座（線を出しているときだけ）。明るくして、名前を照準の下に出す
         const aimedConstellation = constellationView.aim({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, { x: f.x, y: f.y, z: f.z });
         const aimName = aimedConstellation?.nameJa ?? null;
@@ -749,10 +829,10 @@ async function main() {
         })(),
         speedKmS: controls.speedKmS,
         nearbyShips: online ? (link.connected ? others.length : null) : null,
-        stampReady: online && link.connected,
+        chatReady: online && link.connected,
         fromEarthKm: sub(abs, heliocentricPositionKm('Earth', date)),
         region: inCluster ? `${inCluster.kind === 'globular' ? '球状星団' : '散開星団'}：${clusterLabel(inCluster)}` : null,
-        radar: radarBlips(abs, controls.orientation, targets),
+        radar: radarBlips(abs, controls.orientation, targets, radarRange(mapRangeKm)),
         // 基準の天体が分からないワープホール（読み込み前の星の惑星など）は、まだ出さない
         warps: warps.filter((w) => findBody(w.anchor) !== null).map((w) => ({
           id: w.id,

@@ -29,7 +29,7 @@ const ENTRIES: readonly Entry[] = [
   { what: '銀河', links: [{ text: 'Karachentsev ほか 2013（VizieR）', href: 'https://vizier.cfa.harvard.edu/' }] },
   { what: '星座の線', links: [{ text: 'd3-celestial', href: 'https://github.com/ofrohn/d3-celestial' }, { text: 'BSD 3-Clause', href: 'https://opensource.org/license/bsd-3-clause' }] },
   { what: '地球・天体の画像', links: [{ text: 'Solar System Scope', href: 'https://www.solarsystemscope.com/textures/' }, CC('BY', '4.0')] },
-  { what: '書体', links: [{ text: 'Monoton', href: 'https://fonts.google.com/specimen/Monoton' }, { text: 'Josefin Sans', href: 'https://fonts.google.com/specimen/Josefin+Sans' }, { text: 'OFL 1.1', href: 'https://openfontlicense.org/' }] },
+  { what: '書体', links: [{ text: 'Monoton', href: 'https://fonts.google.com/specimen/Monoton' }, { text: 'Josefin Sans', href: 'https://fonts.google.com/specimen/Josefin+Sans' }, { text: 'DotGothic16', href: 'https://fonts.google.com/specimen/DotGothic16' }, { text: 'OFL 1.1', href: 'https://openfontlicense.org/' }] },
 ];
 
 export function Credits() {

@@ -26,6 +26,18 @@ describe('三人称のカメラ', () => {
     expect(look.dot(pos.clone().negate().normalize())).toBeCloseTo(1, 6);
   });
 
+  it('切り替えは 一人称 → 後ろから → 前から → 一人称。前からは船の前にいて、船の方を向く', () => {
+    const c = new ChaseCamera();
+    expect([c.toggle(), c.toggle(), c.toggle()]).toEqual(['third', 'front', 'first']);
+    c.toggle();
+    c.toggle();
+    c.pose(ship, 0.04, pos, q);
+    const front = new Vector3(0, 0, -1).applyQuaternion(ship);
+    expect(pos.clone().normalize().dot(front)).toBeGreaterThan(0.9);
+    const look = new Vector3(0, 0, -1).applyQuaternion(q);
+    expect(look.dot(pos.clone().negate().normalize())).toBeCloseTo(1, 6);
+  });
+
   it('回り込むと横から見る。距離は上限と下限の間', () => {
     const c = new ChaseCamera();
     c.toggle();

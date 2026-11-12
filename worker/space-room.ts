@@ -21,7 +21,8 @@ import {
 import { nearestIndices, shipPositionKm } from '../src/world/ships';
 import { designOrNone } from '../src/world/ship-schema';
 import type { ShipDesign } from '../src/world/ship-design';
-import { isStampId, STAMP_MIN_INTERVAL_MS } from '../src/world/stamps';
+import { CHAT_MIN_INTERVAL_MS, cleanChatText } from '../src/world/chat';
+import { isUsername } from '../src/world/account';
 import { PRESENCE_REFRESH_MS, presenceStatement } from '../src/world/presence';
 
 const BROADCAST_MS = 1000 / SHIP_SEND_HZ;
@@ -38,8 +39,10 @@ interface Attachment {
   design?: ShipDesign;
   /** 状態を受け取った時刻（ms） */
   at: number;
-  /** 最後にスタンプを送った時刻（ms） */
-  stampAt?: number;
+  /** 宇宙船名（チャットに出す。サインアップしていない人は null） */
+  name?: string | null;
+  /** 最後にチャットを送った時刻（ms） */
+  chatAt?: number;
 }
 
 /**
@@ -70,6 +73,7 @@ export class SpaceRoom extends DurableObject<Env> {
       sid: crypto.randomUUID().slice(0, 8),
       room: request.headers.get('x-room') ?? '',
       hue: hueFromId(userId),
+      name: ((n) => (isUsername(n) ? n : null))(request.headers.get('x-user-name')),
       state: null,
       at: 0,
     };
@@ -92,9 +96,9 @@ export class SpaceRoom extends DurableObject<Env> {
     }
     // 人数は、つながったとき・切れたときのほか、前に書いてから 1 分たったら書き直す（切れたと知らせずに消えた部屋の行を、数えなくするため）
     if (now - this.lastPresence >= PRESENCE_REFRESH_MS) this.reportPresence(a.room, undefined, now);
-    const m = parsed as { t?: unknown; s?: unknown; d?: unknown; k?: unknown };
-    if (m.t === 'stamp') {
-      this.stamp(ws, a, m.k, now);
+    const m = parsed as { t?: unknown; s?: unknown; d?: unknown; text?: unknown };
+    if (m.t === 'chat') {
+      this.chat(ws, a, m.text, now);
       return;
     }
     if (now - a.at < SHIP_MIN_INTERVAL_MS) return;
@@ -152,14 +156,15 @@ export class SpaceRoom extends DurableObject<Env> {
   }
 
   /**
-   * スタンプ（要件 F6）。送った人の船が「近い順 MAX_SHIPS_SENT 隻」に入っている人（＝その船が見えている人）と、送った本人に届ける。
-   * 続けて送れるのは STAMP_MIN_INTERVAL_MS に 1 回まで。まだ自分の状態を送っていない人のスタンプは捨てる。
-   * 近さは、届いている最後の位置で決める（ふだんの配る処理と違い、古い位置の船も含める）
+   * チャット（要件 F6）。送った人の船が「近い順 MAX_SHIPS_SENT 隻」に入っている人（＝その船が見えている人）と、送った本人に届ける。
+   * 文は cleanChatText で確かめ、続けて送れるのは CHAT_MIN_INTERVAL_MS に 1 回まで。まだ自分の状態を送っていない人のものは捨てる。
+   * 近さは、届いている最後の位置で決める（ふだんの配る処理と違い、古い位置の船も含める）。文はサーバーに残さない（配るだけ）
    */
-  private stamp(ws: WebSocket, a: Attachment, k: unknown, now: number): void {
-    if (!isStampId(k) || !a.state) return;
-    if (a.stampAt !== undefined && now - a.stampAt < STAMP_MIN_INTERVAL_MS) return;
-    a.stampAt = now;
+  private chat(ws: WebSocket, a: Attachment, raw: unknown, now: number): void {
+    const text = cleanChatText(raw);
+    if (text === null || !a.state) return;
+    if (a.chatAt !== undefined && now - a.chatAt < CHAT_MIN_INTERVAL_MS) return;
+    a.chatAt = now;
     ws.serializeAttachment(a);
     const date = new Date(now);
     // 位置の古さは問わない（タブを一時的に裏に回した直後などでも届くように）。最後に受け取った位置で近さを決める
@@ -167,7 +172,7 @@ export class SpaceRoom extends DurableObject<Env> {
     const active = all.filter((e) => e.a.state);
     const positions = active.map((e) => roughPositionKm(e.a.state as ShipState, date));
     const senderIndex = active.findIndex((e) => e.a.sid === a.sid);
-    const msg = JSON.stringify({ t: 'stamp', now, from: a.sid, hue: a.hue, k } satisfies ServerMessage);
+    const msg = JSON.stringify({ t: 'chat', now, from: a.sid, hue: a.hue, name: a.name ?? null, text } satisfies ServerMessage);
     active.forEach((e, i) => {
       const sees = e.a.sid === a.sid || nearestIndices(positions[i], positions, MAX_SHIPS_SENT, i).includes(senderIndex);
       if (!sees) return;

@@ -1,0 +1,22 @@
+/*
+ * 操作の説明の図（KeyboardGuide）。ゲームメニューとタイトル画面の詳細の両方で使うので、色はここで決める
+ * （タイトル画面の --top-* と、世界の画面の --hud-* と同じ値）。使うキーはオレンジ、線は細い白
+ */
+.kb-guide { --kb-ink: #e8ecf4; --kb-orange: #ff8a1f; width: 100%; font-family: 'Josefin Sans', system-ui, -apple-system, 'Hiragino Sans', sans-serif; font-weight: 300; }
+/* 狭い画面では、図を小さくしすぎず、横にずらして見る */
+.kb-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.kb-figures { min-width: 720px; display: grid; grid-template-columns: 1010fr 420fr; align-items: start; gap: 8px; }
+.kb-figures svg { display: block; width: 100%; height: auto; overflow: visible; }
+.kb-key rect { fill: none; stroke: rgba(232, 236, 244, 0.2); stroke-width: 1; }
+.kb-key text { fill: rgba(232, 236, 244, 0.3); font-size: 11px; letter-spacing: 0.04em; }
+.kb-key.is-hot rect { stroke: var(--kb-orange); fill: rgba(255, 138, 31, 0.08); }
+.kb-key.is-hot text { fill: var(--kb-orange); font-size: 13px; font-weight: 400; }
+.kb-mouse-seam { stroke: rgba(255, 138, 31, 0.6); stroke-width: 1; }
+.kb-mouse-wheel { fill: rgba(255, 138, 31, 0.25); stroke: var(--kb-orange); stroke-width: 1; }
+/* 線：明るい背景の上でも見えるよう、暗いふちを付ける */
+.kb-line { fill: none; stroke: rgba(232, 236, 244, 0.6); stroke-width: 1; stroke-linejoin: round; paint-order: stroke; }
+.kb-dot { fill: var(--kb-orange); }
+.kb-text { fill: var(--kb-ink); font-size: 14px; letter-spacing: 0.04em; paint-order: stroke; stroke: rgba(2, 4, 10, 0.85); stroke-width: 3px; stroke-linejoin: round; }
+.kb-sub { font-size: 12px; fill: rgba(232, 236, 244, 0.65); }
+.kb-touch { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.9; color: rgba(232, 236, 244, 0.75); text-align: left; }
+.kb-touch-head { display: inline-block; min-width: 4.5em; margin-right: 10px; font-size: 11px; letter-spacing: 0.2em; color: var(--kb-orange); }
