@@ -5,24 +5,24 @@ import {
   radarRange,
   radarRingRadius,
   radarRings,
-  type MapLayer,
+  type RadarLayer,
   type RadarBlip,
 } from '../world/radar';
 
 /**
  * 名前を出すのは、ワープホール → 近い天体の順に、ほかの名前と重ならないものだけ、この数まで
- * （名前は小さく、レーダーの中だけ。docs/design/README.md）。大きくしたマップでは多く出す
+ * （名前は小さく、レーダーの中だけ。docs/design/README.md）。大きくしたレーダーでは多く出す
  */
 const MAX_LABELS = 5;
 const MAX_LABELS_LARGE = 18;
-/** 大きくしたマップでの、印と文字の大きさ（レーダーの座標の単位で、ふつうの何倍か）。画面の上で約 13px の文字になる */
+/** 大きくしたレーダーでの、印と文字の大きさ（レーダーの座標の単位で、ふつうの何倍か）。画面の上で約 13px の文字になる */
 const LARGE_SCALE = 0.55;
 
 const COLORS = { body: '#d9e2ff', star: '#ffd59a', warp: '#74e6ff', ship: '#8dffb0' } as const;
 
 /**
- * レーダー（マップ）。ふだんは画面の隅に小さく、押すと（M キーでも）画面の真ん中に大きく出す。
- * 範囲（ふちの距離）と出すものの種類は、マップで変えたものを、小さなレーダーでもそのまま使う（2026-11-12）。
+ * レーダー。ふだんは画面の隅に小さく、押すと（R キーでも）画面の真ん中に大きく出す。
+ * 範囲（ふちの距離）と出すものの種類は、大きくしたレーダーで変えたものを、小さなレーダーでもそのまま使う（2026-11-12）。
  * 大きくしたときは、名前を多く出し、天体・恒星の点を押すとその天体を選び、ワープホールの点を押すとそのワープホールを選ぶ
  */
 export function Radar({
@@ -37,7 +37,7 @@ export function Radar({
 }: {
   blips: RadarBlip[];
   rangeKm: number;
-  layers: Record<MapLayer, boolean>;
+  layers: Record<RadarLayer, boolean>;
   large?: boolean;
   selectedKey?: string | null;
   selectedWarp?: string | null;

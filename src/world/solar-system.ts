@@ -54,6 +54,8 @@ export type Spin =
 export interface BodyInfo {
   id: BodyId;
   nameJa: string;
+  /** 英語の名前（左上の表示など。2026-11-12）。無ければ id（太陽系の主な天体は id が英語の名前） */
+  name?: string;
   /** 平均半径（km）。出典は docs/tech/world-model.md の「天体の大きさ」 */
   radiusKm: number;
   kind: BodyKind;
@@ -187,8 +189,9 @@ const major = (id: string, nameJa: string, radiusKm: number, kind: BodyKind, par
   atmosphere: SOL_ATMOSPHERES[id],
 });
 
-const galilean = (id: string, nameJa: string, radiusKm: number, index: 0 | 1 | 2 | 3): BodyInfo => ({
+const galilean = (id: string, name: string, nameJa: string, radiusKm: number, index: 0 | 1 | 2 | 3): BodyInfo => ({
   id,
+  name,
   nameJa,
   radiusKm,
   kind: 'moon',
@@ -212,10 +215,10 @@ export const CORE_BODIES: readonly BodyInfo[] = [
   { ...major('Neptune', '海王星', 24_622, 'planet', 'Sun'), rings: NEPTUNE_RINGS, ringColor: DARK_RING_COLOR },
   major('Pluto', '冥王星', 1_188.3, 'dwarf', 'Sun'),
   // 木星の衛星（ガリレオ衛星）。id は住所の番号（木星＝5 の I〜IV）。半径は astronomy-engine の値
-  galilean('S5.1', 'イオ', IO_RADIUS_KM, 0),
-  galilean('S5.2', 'エウロパ', EUROPA_RADIUS_KM, 1),
-  galilean('S5.3', 'ガニメデ', GANYMEDE_RADIUS_KM, 2),
-  galilean('S5.4', 'カリスト', CALLISTO_RADIUS_KM, 3),
+  galilean('S5.1', 'Io', 'イオ', IO_RADIUS_KM, 0),
+  galilean('S5.2', 'Europa', 'エウロパ', EUROPA_RADIUS_KM, 1),
+  galilean('S5.3', 'Ganymede', 'ガニメデ', GANYMEDE_RADIUS_KM, 2),
+  galilean('S5.4', 'Callisto', 'カリスト', CALLISTO_RADIUS_KM, 3),
 ];
 
 const registry = new Map<BodyId, BodyInfo>(CORE_BODIES.map((b) => [b.id, b]));

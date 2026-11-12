@@ -30,11 +30,11 @@ const ROWS: KeyDef[][] = [
     ['F9', 'F9', 1], ['F10', 'F10', 1], ['F11', 'F11', 1], ['F12', 'F12', 1],
   ],
   [
-    ['`', '`', 1], ['1', '1', 1, true], ['2', '2', 1, true], ['3', '3', 1, true], ['4', '4', 1, true], ['5', '5', 1, true], ['6', '6', 1], ['7', '7', 1],
+    ['`', '`', 1], ['1', '1', 1, true], ['2', '2', 1, true], ['3', '3', 1, true], ['4', '4', 1, true], ['5', '5', 1, true], ['6', '6', 1, true], ['7', '7', 1],
     ['8', '8', 1], ['9', '9', 1], ['0', '0', 1], ['-', '−', 1, true], ['=', '＋', 1, true], ['Back', 'Delete', 2],
   ],
   [
-    ['Tab', 'Tab', 1.5], ['Q', 'Q', 1, true], ['W', 'W', 1, true], ['E', 'E', 1, true], ['R', 'R', 1], ['T', 'T', 1, true],
+    ['Tab', 'Tab', 1.5], ['Q', 'Q', 1, true], ['W', 'W', 1, true], ['E', 'E', 1, true], ['R', 'R', 1, true], ['T', 'T', 1, true],
     ['Y', 'Y', 1], ['U', 'U', 1], ['I', 'I', 1], ['O', 'O', 1], ['P', 'P', 1], ['[', '[', 1], [']', ']', 1], ['\\', '\\', 1.5],
   ],
   [
@@ -124,13 +124,13 @@ const CALLOUTS: Callout[] = [
   { lines: [upTo(key('F2'), TOP1 - 26, key('F2').cx - 18)], text: ['写真'], x: key('F2').cx - 18, y: TOP1 - 32, anchor: 'middle' },
   { lines: [upTo(key('F3'), TOP1 + 6, key('F3').cx + 12)], text: ['左上の表示'], x: key('F3').cx + 12, y: TOP1, anchor: 'middle' },
   { lines: [upTo(key('F5'), TOP1 + 6)], text: ['視点（V でも）'], x: key('F5').cx + 20, y: TOP1, anchor: 'middle' },
-  // 左：1〜5・Q・W・A・Shift・Ctrl
+  // 左：1〜6・Q・W・A・Shift・Ctrl
   {
     lines: [
-      toLeft(key('5'), gapAbove(1), 126),
-      ...(['1', '2', '3', '4'] as const).map((id): [number, number][] => [[key(id).cx, key(id).top], [key(id).cx, gapAbove(1)]]),
+      toLeft(key('6'), gapAbove(1), 126),
+      ...(['1', '2', '3', '4', '5'] as const).map((id): [number, number][] => [[key(id).cx, key(id).top], [key(id).cx, gapAbove(1)]]),
     ],
-    text: ['1〜5：下のボタン', 'コレクション・星の見え方', '星座・ワープを作る・写真'],
+    text: ['1〜6：下のボタン', 'コレクション・星の見え方', '星座・ワープホール', '写真・マップ'],
     x: LX,
     y: 130,
     anchor: 'end',
@@ -152,10 +152,10 @@ const CALLOUTS: Callout[] = [
   { lines: [toRight(key('D'), gapAbove(3), 236)], text: ['右へ'], x: RX, y: 240, anchor: 'start' },
   { lines: [[[key('Enter').right, key('Enter').cy], [RX - 6, 272]]], text: ['チャット（T でも）'], x: RX, y: 276, anchor: 'start' },
   { lines: [toRight(key('S'), gapBelow(3), 308)], text: ['後ろへ'], x: RX, y: 312, anchor: 'start' },
-  // 下：C・Space・M・Alt
+  // 下：C・Space・M・Alt。R（レーダー）は、線を通せるすき間が無い（上は 1〜6 の線、左右は Q・E・D の線）ので、M の説明に並べて書く
   { lines: [downVia(key('C'), gapBelow(4), key('Cmd').cx, BOTTOM1 - 16)], text: ['星座'], x: key('Cmd').cx, y: BOTTOM1, anchor: 'middle' },
   { lines: [[[key('Space').cx, key('Space').bottom], [key('Space').cx, BOTTOM1 - 16]]], text: ['上昇'], x: key('Space').cx, y: BOTTOM1, anchor: 'middle' },
-  { lines: [downVia(key('M'), gapBelow(4), key('Cmd2').cx, BOTTOM1 - 16)], text: ['マップ'], x: key('Cmd2').cx, y: BOTTOM1, anchor: 'middle' },
+  { lines: [downVia(key('M'), gapBelow(4), key('Cmd2').cx, BOTTOM1 - 16)], text: ['マップ', 'R：レーダー'], x: key('Cmd2').cx, y: BOTTOM1, anchor: 'middle' },
   { lines: [[[key('Alt').cx, key('Alt').bottom], [key('Alt').cx, BOTTOM2 - 16]]], text: ['＋ホイール：視点の距離'], x: key('Alt').cx, y: BOTTOM2, anchor: 'middle' },
 ];
 
@@ -227,11 +227,15 @@ export function KeyboardGuide() {
       <ul className="kb-touch">
         <li>
           <span className="kb-touch-head">スマホ</span>
-          ドラッグ：向きを変える ／ 左下の十字：前後左右（前を 2 回押しでダッシュ） ／ 右下：上昇・下降 ／ タップ：天体を選ぶ ／ マップを押す：大きくする
+          ドラッグ：向きを変える ／ 左下の十字：前後左右（前を 2 回押しでダッシュ） ／ 右下：上昇・下降 ／ タップ：天体を選ぶ ／ レーダーを押す：大きくする
+        </li>
+        <li>
+          <span className="kb-touch-head">レーダー</span>
+          上が進む方向 ／ ●自分より上 ○下 ／ ◆ワープホール ／ ▲ほかのプレイヤー ／ 大きくしたレーダーでは、点を押すとその天体・ワープホールを選べる
         </li>
         <li>
           <span className="kb-touch-head">マップ</span>
-          上が進む方向 ／ ●自分より上 ○下 ／ ◆ワープホール ／ ▲ほかのプレイヤー ／ 大きくしたマップでは、点を押すとその天体を選べる
+          訪れた場所だけが 3D で出る ／ ドラッグで回す ／ 二本指（ホイール）で寄る・離れる ／ 点を押すと、そこを真ん中にする
         </li>
       </ul>
     </div>

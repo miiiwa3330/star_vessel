@@ -142,6 +142,7 @@ export class SatelliteCatalog {
     let last: Vec3 = { x: this.positions[i * 3], y: this.positions[i * 3 + 1], z: this.positions[i * 3 + 2] };
     return {
       id: `N${r.id}`,
+      name: r.name,
       nameJa: satelliteNameJa(r.name),
       radiusKm: sizeKm / 2,
       kind: 'satellite',

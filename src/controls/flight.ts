@@ -3,7 +3,7 @@
  * 動き方の計算（慣性・ダッシュ）は src/controls/movement.ts。
  *
  * PC：画面をクリックすると、マウスのカーソルが消え（Pointer Lock）、マウスを動かすだけで向きが変わる。Esc でカーソルが戻り、
- *     ゲームメニューが出る（入ったばかりのときは出さず、クリックを待つ）。マップ（M）・チャット（Enter・T）・下のボタン（1〜4）を
+ *     ゲームメニューが出る（入ったばかりのときは出さず、クリックを待つ）。レーダー（R）・マップ（M）・チャット（Enter・T）・下のボタン（1〜6）を
  *     開くと、カーソルが出て、閉じると操縦に戻る。W/S で前後、A/D で左右（いま見ている視点の向きにそのまま進む）、
  *     Space で上昇、Shift で下降（いま見ている視点の上下に沿って動く）、
  *     W の 2 回押しか Ctrl でダッシュ、Q/E で傾き、ホイールか +/− で速さ（Ctrl か Shift を押しながら +/− で 10 倍ずつ・
@@ -53,9 +53,11 @@ export class FlightControls {
   onToggleStatus: () => void = () => {};
   /** チャットの入力欄を開く（Enter・T キー） */
   onOpenChat: () => void = () => {};
-  /** レーダーを大きくする・戻す（M キー） */
+  /** レーダーを大きくする・戻す（R キー。2026-11-12 に M から変えた。M は 3D のマップ） */
+  onToggleRadar: () => void = () => {};
+  /** 3D のマップを開く・閉じる（M キー） */
   onToggleMap: () => void = () => {};
-  /** 下のボタン（ホットバー）を押す（1〜5 キー。マインクラフトと同じく数字で選ぶ） */
+  /** 下のボタン（ホットバー）を押す（1〜6 キー。マインクラフトと同じく数字で選ぶ） */
   onHotbar: (n: number) => void = () => {};
   /** F2：写真を撮る（マインクラフトと同じキー） */
   onPhoto: () => void = () => {};
@@ -337,12 +339,16 @@ export class FlightControls {
       return;
     }
     const plain = !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey;
-    // マップ・下のボタンは、ほかの画面を開いている間も切り替えられる（ゲームメニューの間は main.ts が受け付けない）
+    // マップ・レーダー・下のボタンは、ほかの画面を開いている間も切り替えられる（ゲームメニューの間は main.ts が受け付けない）
     if (e.code === 'KeyM' && plain) {
       this.onToggleMap();
       return;
     }
-    const digit = /^(?:Digit|Numpad)([1-5])$/.exec(e.code);
+    if (e.code === 'KeyR' && plain) {
+      this.onToggleRadar();
+      return;
+    }
+    const digit = /^(?:Digit|Numpad)([1-6])$/.exec(e.code);
     if (digit && plain) {
       this.onHotbar(Number(digit[1]));
       return;

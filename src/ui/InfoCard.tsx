@@ -3,7 +3,7 @@ import { hudActions, type InfoCardState, type WarpListItem } from './hud-store';
 
 /**
  * 情報のカード（要件 F36・F37）。選んだ天体と、近づいた天体の情報を、画面の上の真ん中に出す（照準の先は AimLabel）。
- * 宇宙の中には文字を出さない（デザインの決まり）。docked：マップを開いている間（スマホでは、マップの下に置く）
+ * 宇宙の中には文字を出さない（デザインの決まり）。docked：レーダーを開いている間（スマホでは、レーダーの下に置く）
  */
 export function InfoCard({ card, docked = false }: { card: InfoCardState; docked?: boolean }) {
   return (
@@ -38,8 +38,8 @@ export function InfoCard({ card, docked = false }: { card: InfoCardState; docked
 }
 
 /**
- * マップで選んだワープホールのカード（2026-11-12）。TARGET のカードと同じ場所・同じ形で出す。
- * ワープはここから（マップを開いている間だけ出す）。自分のワープホールは、ここで消せる
+ * レーダーで選んだワープホールのカード（2026-11-12）。TARGET のカードと同じ場所・同じ形で出す。
+ * ワープはここから（レーダーを開いている間だけ出す）。消すのはここではなく、そのワープホールまで行って、下のワープホールのボタンで
  */
 export function WarpCard({ warp, docked = false }: { warp: WarpListItem; docked?: boolean }) {
   return (
@@ -67,11 +67,6 @@ export function WarpCard({ warp, docked = false }: { warp: WarpListItem; docked?
         <button type="button" className="hud-button hud-button-small" onClick={() => hudActions.faceWarp(warp.id)}>
           その方を向く
         </button>
-        {warp.mine && (
-          <button type="button" className="hud-button hud-button-small hud-button-quiet" onClick={() => hudActions.removeWarp(warp.id)}>
-            消す
-          </button>
-        )}
         <button type="button" className="hud-button hud-button-small hud-button-quiet" onClick={() => hudActions.selectWarp(null)}>
           選ぶのをやめる
         </button>

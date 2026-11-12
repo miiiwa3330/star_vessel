@@ -2,16 +2,17 @@ import { useSyncExternalStore } from 'react';
 import '@fontsource/monoton/400.css';
 import '@fontsource/josefin-sans/300.css';
 import '@fontsource/dotgothic16/400.css';
-import { formatCoordinates, formatDistance, formatSpeed } from './format';
+import { formatCoordinates, formatDistanceEn, formatSpeed } from './format';
 import { STAR_LIMIT_NAMES_JA } from '../world/stars';
 import { hudActions, hudStore } from './hud-store';
 import { Radar } from './Radar';
-import { MapPanel } from './MapPanel';
+import { RadarPanel } from './RadarPanel';
 import { PhotoView } from './PhotoView';
 import { MAX_WARPS_PER_PLAYER } from '../world/warp-schema';
 import { ChatBox } from './ChatBox';
 import { InfoCard, WarpCard } from './InfoCard';
 import { CollectionPanel } from './CollectionPanel';
+import { StarMap } from './StarMap';
 import { AimLabel } from './AimLabel';
 import { PauseMenu } from './PauseMenu';
 import { TouchPad } from './TouchPad';
@@ -21,56 +22,60 @@ export function Hud() {
   const s = useSyncExternalStore(hudStore.subscribe, hudStore.get);
   const utc = s.date.toISOString().replace('T', ' ').slice(0, 19);
   const o = s.overlay;
-  // マップ・コレクション・写真は、まわり（この下の見えない面）を押すと閉じる（× は置かない。2026-11-12）
-  const backdrop = o === 'map' || o === 'collection' || o === 'photo';
+  // レーダー・マップ・コレクション・写真は、まわり（この下の見えない面）を押すと閉じる（× は置かない。2026-11-12）
+  const backdrop = o === 'radar' || o === 'map' || o === 'collection' || o === 'photo';
+  // 画面を大きく使うもの（マップ・コレクション）の間は、情報のカードを出さない（重なるため）
+  const wide = o === 'map' || o === 'collection';
   const myWarps = s.warps.filter((w) => w.mine).length;
-  const selectedWarp = o === 'map' && s.selectedWarp ? (s.warps.find((w) => w.id === s.selectedWarp) ?? null) : null;
+  const selectedWarp = o === 'radar' && s.selectedWarp ? (s.warps.find((w) => w.id === s.selectedWarp) ?? null) : null;
   return (
     <>
       {/* ゲームメニュー：画面全体をすりガラスにし、メニューのボタンのほかは押せない */}
       {o === 'menu' && <PauseMenu />}
       {backdrop && <div className="hud-backdrop" aria-hidden="true" onClick={() => hudActions.setOverlay(null)} />}
-      <div className="hud-left">
+      <div className={`hud-left${wide ? ' is-over' : ''}`}>
         <header className="hud-brand">STAR VESSEL</header>
-        {s.statusVisible && (
-          <div className="hud-status">
+        {/* 左上の表示は英語（2026-11-12 にオーナーの指示） */}
+        {s.statusVisible && !wide && (
+          <div className="hud-status" lang="en">
             <div>UTC {utc}</div>
             <div>
-              {s.anchorName}の表面から {formatDistance(s.altitudeKm)}
+              {formatDistanceEn(s.altitudeKm)} above {s.anchorName}
             </div>
-            <div>{formatSpeed(s.speedKmS)}</div>
+            <div>Speed {formatSpeed(s.speedKmS)}</div>
             <Coordinates v={s.fromEarthKm} />
             {s.region && <div>{s.region}</div>}
             {s.deepRegion && <div>{s.deepRegion}</div>}
-            {s.nearbyShips !== null && <div>近くのプレイヤー：{s.nearbyShips} 人</div>}
-            <div className="hud-muted">描画：{s.backend}</div>
+            {s.nearbyShips !== null && <div>Players nearby: {s.nearbyShips}</div>}
+            <div className="hud-muted">Renderer: {s.backend}</div>
             {s.status && <div className="hud-warn">{s.status}</div>}
           </div>
         )}
         {/* 情報のカード：PC は画面の上の真ん中（position: fixed）、スマホはこの列の中（右上のレーダーに重ならないように） */}
-        {/* マップで選んだワープホールは、TARGET と同じ場所に、同じ形のカードで出す（どちらか一方） */}
-        {selectedWarp ? <WarpCard warp={selectedWarp} docked /> : s.infoCard && <InfoCard card={s.infoCard} docked={o === 'map'} />}
+        {/* レーダーで選んだワープホールは、TARGET と同じ場所に、同じ形のカードで出す（どちらか一方） */}
+        {wide ? null : selectedWarp ? <WarpCard warp={selectedWarp} docked /> : s.infoCard && <InfoCard card={s.infoCard} docked={o === 'radar'} />}
       </div>
       {s.notice && <div className="hud-panel hud-notice">{s.notice}</div>}
-      {/* レーダー（マップ）：押すと（M キーでも）画面の真ん中に大きく出す。範囲・出すものは、マップで変えたものをそのまま使う */}
-      {o !== 'map' && (
+      {/* レーダー：押すと（R キーでも）画面の真ん中に大きく出す。範囲・出すものは、大きくしたレーダーで変えたものをそのまま使う */}
+      {o !== 'radar' && (
         <div className="hud-dock">
           <button
             type="button"
             className="hud-radar-button"
-            aria-label="マップを大きくする（M）"
-            title="マップを大きくする（M）"
+            aria-label="レーダーを大きくする（R）"
+            title="レーダーを大きくする（R）"
             onClick={(e) => {
-              hudActions.setOverlay('map');
+              hudActions.setOverlay('radar');
               e.currentTarget.blur();
             }}
           >
-            <Radar blips={s.radar} rangeKm={s.mapRangeKm} layers={s.mapLayers} />
+            <Radar blips={s.radar} rangeKm={s.radarRangeKm} layers={s.radarLayers} />
           </button>
         </div>
       )}
-      {o === 'map' && <MapPanel blips={s.radar} rangeKm={s.mapRangeKm} layers={s.mapLayers} selectedKey={s.selectedKey} selectedWarp={s.selectedWarp} withCard={selectedWarp !== null || s.infoCard !== null} />}
-      <ChatBox ready={s.chatReady} log={s.chatLog} open={o === 'chat'} underMap={o === 'map'} />
+      {o === 'radar' && <RadarPanel blips={s.radar} rangeKm={s.radarRangeKm} layers={s.radarLayers} selectedKey={s.selectedKey} selectedWarp={s.selectedWarp} withCard={selectedWarp !== null || s.infoCard !== null} />}
+      <ChatBox ready={s.chatReady} log={s.chatLog} open={o === 'chat'} underPanel={o === 'radar' || o === 'photo' || wide} />
+      {o === 'map' && <StarMap points={s.mapPoints} selfKm={s.mapSelfKm} focusKey={s.mapFocus} />}
       {o === 'collection' && <CollectionPanel visits={s.visits} />}
       {o === 'photo' && s.photo && <PhotoView photo={s.photo} />}
       {/* シャッターの光（写真を撮るたびに作り直して、もう一度光らせる） */}
@@ -132,14 +137,19 @@ export function Hud() {
             <path d="M6.6 6.7 10.4 8.3M13.6 8.1 17.4 5.9M12.6 10.7 14.4 16.3" />
           </svg>
         </button>
+        {/* ワープホールのボタン：ふだんは作る。自分のワープホールのそばでは、消すボタンになる（2026-11-12） */}
         <button
           type="button"
-          className="hud-button hud-icon-button"
-          aria-label={`ここにワープホールを作る（${myWarps}/${MAX_WARPS_PER_PLAYER}）`}
-          title={`ここにワープホールを作る（${myWarps}/${MAX_WARPS_PER_PLAYER}）・4。ワープはマップから`}
+          className={`hud-button hud-icon-button${s.warpHere ? ' is-remove' : ''}`}
+          aria-label={s.warpHere ? `ここのワープホール ${s.warpHere.code} を消す` : `ここにワープホールを作る（${myWarps}/${MAX_WARPS_PER_PLAYER}）`}
+          title={
+            s.warpHere
+              ? `ここのワープホール ${s.warpHere.code} を消す・4`
+              : `ここにワープホールを作る（${myWarps}/${MAX_WARPS_PER_PLAYER}）・4。ワープはレーダーから`
+          }
           disabled={!s.warpsReady}
           onClick={(e) => {
-            hudActions.placeWarp();
+            hudActions.pressWarpButton();
             e.currentTarget.blur();
           }}
         >
@@ -147,7 +157,7 @@ export function Hud() {
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <ellipse cx="11" cy="13" rx="8" ry="4" transform="rotate(-25 11 13)" />
             <ellipse cx="11" cy="13" rx="4.2" ry="2" transform="rotate(-25 11 13)" />
-            <path d="M19 2.5v5M16.5 5h5" />
+            <path d={s.warpHere ? 'M16.5 5h5' : 'M19 2.5v5M16.5 5h5'} />
           </svg>
         </button>
         <button
@@ -164,6 +174,26 @@ export function Hud() {
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 8h3l1.6-2.5h6.8L17 8h3v11H4V8Z" />
             <circle cx="12" cy="13.2" r="3.4" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`hud-button hud-icon-button${o === 'map' ? ' is-selected' : ''}`}
+          aria-label="マップ"
+          title="マップ（訪れた場所）・6（M でも）"
+          aria-pressed={o === 'map'}
+          onClick={(e) => {
+            hudActions.toggleOverlay('map');
+            e.currentTarget.blur();
+          }}
+        >
+          <HotkeyNumber n={6} />
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <ellipse cx="12" cy="15" rx="9" ry="3.6" />
+            <path d="M12 15V6.5M7 13.6V9.5M17.5 14.2v-6" />
+            <circle cx="12" cy="5.5" r="1.4" fill="currentColor" />
+            <circle cx="7" cy="8.6" r="1.1" fill="currentColor" />
+            <circle cx="17.5" cy="7.2" r="1.1" fill="currentColor" />
           </svg>
         </button>
       </div>
@@ -195,7 +225,7 @@ function HotkeyNumber({ n }: { n: number }) {
 function Coordinates({ v }: { v: { x: number; y: number; z: number } }) {
   const c = formatCoordinates(v);
   return (
-    <div className="hud-coords" title="地球の中心を原点にした座標（X：春分点の方向、Z：天の北極の方向）">
+    <div className="hud-coords" title="Earth-centered coordinates (X: vernal equinox, Z: celestial north pole)">
       <span>X {c.x}</span> <span>Y {c.y}</span> <span>Z {c.z}</span> <span className="hud-muted">{c.unit}</span>
     </div>
   );

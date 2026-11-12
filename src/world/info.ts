@@ -47,6 +47,25 @@ export const INFO_KIND_NAMES_JA: Record<InfoKind, string> = {
   galaxy: '銀河',
 };
 
+/** 種類の英語の名前（左上の表示。2026-11-12） */
+export const INFO_KIND_NAMES_EN: Record<InfoKind, string> = {
+  star: 'Star',
+  'white-dwarf': 'White dwarf',
+  'neutron-star': 'Neutron star',
+  'black-hole': 'Black hole',
+  planet: 'Planet',
+  dwarf: 'Dwarf planet',
+  moon: 'Moon',
+  asteroid: 'Asteroid',
+  comet: 'Comet',
+  exoplanet: 'Exoplanet',
+  satellite: 'Satellite',
+  spacecraft: 'Spacecraft',
+  cluster: 'Star cluster',
+  nebula: 'Nebula',
+  galaxy: 'Galaxy',
+};
+
 /** 情報を出す相手 */
 export interface InfoTarget {
   /** 重ならない記号（天体は天体の id、恒星は「恒星系の記号.0」、星団は「C:名前」） */

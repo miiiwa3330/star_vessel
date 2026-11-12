@@ -21,7 +21,7 @@ const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
  * スタンプ（絵文字 8 つ）は常に並べ、押すとそのまま送る。入力欄の右の ☺ は、もっと多くの絵文字から選んで入力欄に足すとき用。
  * PC は Enter か T で入力欄を開き、Enter で送る・Esc でやめる（どちらも操縦に戻る）
  */
-export function ChatBox({ ready, log, open, underMap = false }: { ready: boolean; log: ChatLogItem[]; open: boolean; underMap?: boolean }) {
+export function ChatBox({ ready, log, open, underPanel = false }: { ready: boolean; log: ChatLogItem[]; open: boolean; underPanel?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
   const [picker, setPicker] = useState(false);
@@ -58,7 +58,7 @@ export function ChatBox({ ready, log, open, underMap = false }: { ready: boolean
   };
   const shown = open ? log : log.filter((l) => now - l.at < LINE_HIDE_MS).slice(0, SHOWN_LINES);
   return (
-    <div className={`hud-chat${open ? ' is-open' : ''}${underMap ? ' is-under-map' : ''}`}>
+    <div className={`hud-chat${open ? ' is-open' : ''}${underPanel ? ' is-under-panel' : ''}`}>
       {shown.length > 0 && (
         <ol className="hud-chat-log" aria-label="チャットの履歴" aria-live="polite">
           {[...shown].reverse().map((l) => (

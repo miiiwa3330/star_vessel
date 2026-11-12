@@ -139,6 +139,7 @@ export function cometBody(c: Comet): BodyInfo {
   const radiusKm = c.diameterKm ? c.diameterKm / 2 : DEFAULT_NUCLEUS_RADIUS_KM;
   return {
     id: c.code,
+    name: c.name,
     nameJa: cometNameJa(c),
     radiusKm,
     kind: 'comet',

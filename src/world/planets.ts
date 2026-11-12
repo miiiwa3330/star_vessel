@@ -366,6 +366,7 @@ export function systemBodies(host: HostStar, real: RealSystem | null): BodyInfo[
   const bodies: BodyInfo[] = [
     {
       id: starId,
+      name: real ? real.name : `Star ${host.system}`,
       nameJa: real ? real.name : `恒星 ${host.system}`,
       radiusKm: star.radiusSun * R_SUN_KM,
       kind: 'star',
@@ -384,6 +385,7 @@ export function systemBodies(host: HostStar, real: RealSystem | null): BodyInfo[
     const extra = real ? null : moonsAndRings(host.system, p, star, id, generation);
     bodies.push({
       id,
+      name: real ? p.nameJa : `${host.system} Planet ${p.n}`,
       nameJa: p.nameJa,
       radiusKm: p.radiusKm,
       kind: 'exoplanet',
@@ -513,6 +515,7 @@ function moonsAndRings(system: string, p: PlanetSpec, star: StarModel, planetId:
       if (m === 1) firstMoonAKm = aKm;
       moons.push({
         id: exoplanetId(system, p.n, generation, m),
+        name: `${system} Planet ${p.n} Moon ${m}`,
         nameJa: `${p.nameJa}の第${m}衛星`,
         radiusKm,
         kind: 'moon',

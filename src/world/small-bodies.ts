@@ -104,6 +104,7 @@ export function moonBodies(records: readonly MoonRecord[], facts: PlanetFacts): 
     out.push({
       // 仮符号の衛星（番号が 0）は、JPL の 5 桁の番号で区別する。住所の衛星の番号は 0（src/world/address.ts）
       id: r.number > 0 ? `S${r.planet}.${r.number}` : `S${r.planet}p${r.code}`,
+      name: r.name,
       nameJa: r.nameJa ?? r.name,
       radiusKm: r.radius,
       kind: 'moon',
@@ -140,6 +141,7 @@ export function smallAsteroidBody(a: NearbyAsteroid): BodyInfo {
   const radiusKm = diameterFromH(a.H) / 2;
   return {
     id: `A${a.number}`,
+    name: `(${a.number})`,
     nameJa: `小惑星 (${a.number})`,
     radiusKm,
     kind: 'asteroid',
@@ -204,6 +206,7 @@ export function largeAsteroidBodies(list: readonly LargeAsteroid[]): BodyInfo[] 
         : { kind: 'rocky', colors: [[70, 66, 62], [120, 114, 108], [170, 164, 156]], craters: 0.5 };
     return {
       id: `A${a.number}`,
+      name: a.name ?? `(${a.number})`,
       nameJa: a.nameJa ?? a.name ?? `(${a.number})`,
       radiusKm,
       kind,

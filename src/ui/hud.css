@@ -299,7 +299,7 @@
  * 大きくしたマップ（画面の真ん中。2026-11-12）。上にレーダー、その下に出すものの切り替え。
  * アカウントの箱と同じく、枠の無い、ふんわり暗い面
  */
-.hud-map {
+.hud-radar-panel {
   position: fixed;
   /* 上の真ん中の情報のカード（選んだ天体・ワープホール）の下に出す。下のアイコンバーにも重ねない */
   top: 200px;
@@ -318,15 +318,15 @@
   text-align: center;
 }
 /* レーダー：二本指で範囲を変えるので、ブラウザの拡大・スクロールに使わせない */
-.hud-map-radar {
+.hud-radar-box {
   width: min(520px, calc(100vh - 380px), calc(100vw - 64px));
   min-width: 240px;
   touch-action: none;
 }
-.hud-map-head { display: flex; justify-content: center; align-items: baseline; gap: 14px; min-height: 24px; }
-.hud-map-range { font-size: 11px; letter-spacing: 0.08em; color: var(--hud-faint); font-variant-numeric: tabular-nums; }
-.hud-map .hud-map-layers { margin: 0; max-width: min(560px, calc(100vw - 64px)); }
-.hud-radar.is-large { width: 100%; height: auto; aspect-ratio: 1; background: none; }
+.hud-radar-head { display: flex; justify-content: center; align-items: baseline; gap: 14px; min-height: 24px; }
+.hud-radar-range { font-size: 11px; letter-spacing: 0.08em; color: var(--hud-faint); font-variant-numeric: tabular-nums; }
+.hud-radar-panel .hud-radar-layers { margin: 0; max-width: min(560px, calc(100vw - 64px)); }
+.hud-radar.is-large { width: 100%; height: auto; aspect-ratio: 1; background: radial-gradient(circle closest-side, rgba(2, 4, 10, 0.55) 86%, rgba(2, 4, 10, 0) 100%); }
 .hud-radar-pick { cursor: pointer; }
 /* 押せる範囲（見えない、少し大きな丸） */
 .hud-radar-hit { fill: transparent; stroke: none; }
@@ -477,7 +477,7 @@
   .hud-dock { top: 16px; bottom: auto; width: 130px; }
   /* スマホ：マップは画面の上から（情報のカードは左の列の中なので、上の場所は空いている）。
      レーダーの下に、出すものの切り替えとワープホールの一覧を並べ、下のアイコンバー（下から約 214px）に重ねない */
-  .hud-map {
+  .hud-radar-panel {
     top: calc(16px + env(safe-area-inset-top));
     width: calc(100vw - 32px);
     max-height: calc(100svh - 246px - env(safe-area-inset-top));
@@ -485,14 +485,14 @@
     padding: 8px 10px 12px;
     border-radius: 22px;
   }
-  .hud-map-radar { width: min(100%, calc(100svh - 360px)); min-width: 0; }
+  .hud-radar-box { width: min(100%, calc(100svh - 360px)); min-width: 0; }
   /* スマホでマップを開いている間は、選んだ天体・ワープホールのカードを、マップの下（下のアイコンバーの上）に置く。
      カードの場所を空けるため、レーダーを小さくする */
-  .hud-map.is-with-card .hud-map-radar { width: min(100%, calc(100svh - 570px)); }
+  .hud-radar-panel.is-with-card .hud-radar-box { width: min(100%, calc(100svh - 570px)); }
   .hud-left .hud-info-card.is-docked { position: fixed; left: 16px; right: 16px; bottom: 222px; width: auto; max-width: none; }
   .hud-info-card.is-warp .hud-title { font-size: 14px; letter-spacing: 0.04em; }
-  /* マップの間は、チャットを隠す（マップの下のカードと重なるため。マップの間はチャットを使えない） */
-  .hud-chat.is-under-map { display: none; }
+  /* レーダー・マップ・コレクション・写真の間は、チャットを隠す（面やカードと重なるため。その間はチャットを使えない） */
+  .hud-chat.is-under-panel { display: none; }
   .hud-photo { top: calc(16px + env(safe-area-inset-top)); }
   .hud-photo-image { max-height: calc(100svh - 360px); }
   /* スマホ：画面の上から出し、下のアイコンバー（下から約 214px）に重ねない */
@@ -662,4 +662,227 @@
   .hud-left { max-width: calc(100vw - 32px - 138px); }
   .hud-brand { font-size: 18px; }
   .hud-left .hud-status { font-size: 13px; line-height: 1.45; }
+}
+
+/*
+ * ---- すりガラスの面（2026-11-12 にオーナーの指示）：レーダー・マップ・コレクション・写真も、チャットと同じすりガラス・角は角 ----
+ * （ふんわり暗いにじみ〈--hud-scrim〉の代わり。ここはファイルの最後に置き、上の面の背景を上書きする）
+ */
+.hud-glass-panel {
+  background: var(--hud-glass);
+  -webkit-backdrop-filter: var(--hud-glass-blur);
+  backdrop-filter: var(--hud-glass-blur);
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* 画面を大きく使う面（マップ・コレクション）は、後ろの天体の模様で中身が読みにくくならないよう、ぼかしだけ強める（色の濃さはチャットと同じ） */
+.hud-collection.hud-glass-panel, .hud-starmap.hud-glass-panel {
+  -webkit-backdrop-filter: blur(22px) saturate(1.1);
+  backdrop-filter: blur(22px) saturate(1.1);
+}
+/* マップ・コレクションの間は、左上の状態を消し、STAR VESSEL だけを面の上に出す（すりガラスの下で崩れて見えないように） */
+.hud-left.is-over { z-index: 6; }
+
+/* 下のワープホールのボタンが、消すボタンになっているとき（自分のワープホールのそば） */
+.hud-icon-button.is-remove { color: var(--hud-orange); border-color: rgba(255, 138, 31, 0.7); }
+
+/*
+ * ---- コレクション（図鑑。要件 F38）：画面を大きく使う。一覧は横 5・縦 3、詳細は左に天体・右に説明（2026-11-12） ----
+ */
+.hud-collection {
+  position: fixed;
+  z-index: 5;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  /* 下のアイコンバー（下から約 70px）に重ねない */
+  width: min(1080px, calc(100vw - 48px));
+  height: min(720px, calc(100vh - 104px));
+  padding: 16px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  text-align: center;
+  overflow: hidden;
+}
+.hud-collection-head { display: flex; justify-content: center; align-items: center; min-height: 28px; }
+.hud-collection .hud-chips { flex: none; }
+.hud-collection-grid {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.hud-collection-cell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  font: inherit;
+  color: var(--hud-ink);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+@media (hover: hover) {
+  .hud-collection-cell:hover { border-color: rgba(232, 236, 244, 0.28); background: rgba(255, 255, 255, 0.04); }
+}
+.hud-collection-cell:active { background: rgba(255, 255, 255, 0.08); }
+.hud-collection-cell:focus-visible { outline: 1px solid var(--hud-accent); outline-offset: -2px; }
+.hud-collection-no { font-size: 10px; letter-spacing: 0.16em; color: var(--hud-quiet); font-variant-numeric: tabular-nums; }
+.hud-collection-name { max-width: 100%; font-size: 12px; letter-spacing: 0.06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud-collection-pager { flex: none; display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 8px; }
+.hud-collection-pager .hud-button { min-width: 44px; font-size: 16px; padding: 0 12px; }
+.hud-collection-page { font-size: 11px; letter-spacing: 0.16em; color: var(--hud-faint); font-variant-numeric: tabular-nums; }
+/* 詳細：左に天体、右に説明 */
+.hud-collection-detail {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 32px;
+  text-align: left;
+}
+.hud-collection-figure { display: flex; justify-content: center; align-items: center; }
+.hud-collection-text { overflow-y: auto; max-height: 100%; padding-right: 8px; }
+.hud-collection-kind { margin: 0; font-size: 11px; letter-spacing: 0.2em; color: var(--hud-orange); }
+.hud-collection-title { margin: 6px 0 0; font-size: 26px; font-weight: 300; letter-spacing: 0.08em; line-height: 1.4; }
+.hud-collection-en { margin: 0; font-size: 13px; letter-spacing: 0.12em; color: var(--hud-faint); }
+.hud-collection-facts { list-style: none; margin: 16px 0 0; padding: 0; font-size: 13px; line-height: 1.9; }
+.hud-collection-facts li { padding: 4px 0; border-top: 1px solid var(--hud-rule); }
+.hud-collection-facts li:last-child { border-bottom: 1px solid var(--hud-rule); }
+.hud-collection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+
+/* ---- 天体の絵（BodyGlobe）：CSS だけで描く ---- */
+.cg { position: relative; display: flex; align-items: center; justify-content: center; flex: none; }
+.cg-sphere {
+  position: relative;
+  z-index: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background-size: auto 100%;
+  background-repeat: repeat-x;
+  background-position: 0 0;
+  background-color: #333;
+}
+.cg-globe.is-spin .cg-sphere { animation: cg-spin 40s linear infinite; }
+@keyframes cg-spin { to { background-position: calc(var(--cg-d) * -2) 0; } }
+/* 光の当たり方（左上から光が来る） */
+.cg-shade {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.1) 0%, rgba(0, 0, 0, 0) 38%, rgba(0, 0, 0, 0.5) 74%, rgba(0, 0, 0, 0.88) 100%);
+  box-shadow: inset -3px -3px 10px rgba(0, 0, 0, 0.5);
+}
+.cg-ring-wrap { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.cg-ring-wrap.is-back { z-index: 0; }
+.cg-ring-wrap.is-front { z-index: 2; }
+.cg-ring { position: absolute; left: 0; top: 0; border-radius: 50%; }
+/* 傾ける前の向きで、上半分（奥）と下半分（手前）に分ける */
+.cg-ring-wrap.is-back .cg-ring { clip-path: inset(0 0 50% 0); }
+.cg-ring-wrap.is-front .cg-ring { clip-path: inset(50% 0 0 0); }
+.cg-star::before {
+  content: '';
+  width: 92%;
+  height: 92%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 12%, var(--cg-color) 24%, color-mix(in srgb, var(--cg-color) 35%, transparent) 42%, transparent 70%);
+}
+.cg-black-hole::before {
+  content: '';
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #000 0 30%, rgba(255, 170, 80, 0.95) 33%, rgba(255, 110, 30, 0.35) 46%, transparent 68%);
+}
+.cg-nebula::before {
+  content: '';
+  width: 86%;
+  height: 86%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 42%, rgba(255, 120, 190, 0.75), transparent 46%),
+    radial-gradient(circle at 64% 58%, rgba(110, 210, 255, 0.6), transparent 48%),
+    radial-gradient(circle at 50% 50%, rgba(190, 140, 255, 0.45), transparent 70%);
+  filter: blur(2px);
+}
+.cg-galaxy::before {
+  content: '';
+  width: 92%;
+  height: 92%;
+  border-radius: 50%;
+  transform: rotate(-24deg) scaleY(0.42);
+  background: radial-gradient(circle, #fff6e4 0 8%, rgba(255, 226, 180, 0.85) 18%, rgba(150, 180, 255, 0.5) 42%, transparent 70%);
+}
+.cg-comet::before {
+  content: '';
+  width: 90%;
+  height: 22%;
+  transform: rotate(-30deg);
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fff 0 9%, rgba(180, 220, 255, 0.7) 14%, rgba(150, 200, 255, 0) 100%);
+}
+.cg-craft { color: rgba(220, 230, 245, 0.85); }
+@media (prefers-reduced-motion: reduce) {
+  .cg-globe.is-spin .cg-sphere { animation: none; }
+}
+
+/*
+ * ---- 3D のマップ（要件 F62。2026-11-12）：訪れた場所だけが出る。画面を大きく使う ----
+ */
+.hud-starmap {
+  position: fixed;
+  z-index: 5;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1180px, calc(100vw - 48px));
+  height: calc(100vh - 104px);
+  padding: 14px 18px 12px;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+.hud-starmap-head { flex: none; display: flex; justify-content: center; min-height: 24px; }
+.hud-starmap-canvas { flex: 1; min-height: 0; width: 100%; display: block; touch-action: none; cursor: grab; }
+.hud-starmap-canvas:active { cursor: grabbing; }
+.hud-starmap-foot { flex: none; display: flex; justify-content: center; align-items: center; gap: 14px; min-height: 40px; }
+.hud-starmap-info { display: flex; flex-direction: column; align-items: center; line-height: 1.5; }
+.hud-starmap-name { font-size: 15px; letter-spacing: 0.08em; }
+
+@media (max-width: 720px), (pointer: coarse) {
+  /* スマホ：ボタンが 6 つになったので、さらに詰め、少し左へ寄せる（右の速さのボタン〈左の端 約 310px〉に重ねない） */
+  .hud-hotbar { gap: 4px; left: calc(50% - 22px); }
+  /* マップ・コレクションは画面の上から出すので、STAR VESSEL も隠す（見出しと重なるため） */
+  .hud-left.is-over { display: none; }
+  .hud-hotbar .hud-icon-button { width: 36px; height: 36px; }
+  /* コレクション・マップは、下のアイコンバー（下から約 214px）の上まで */
+  .hud-collection, .hud-starmap {
+    top: calc(16px + env(safe-area-inset-top));
+    width: calc(100vw - 32px);
+    height: calc(100svh - 230px - env(safe-area-inset-top));
+    padding: 10px 10px 12px;
+  }
+  .hud-collection-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 2px; }
+  .hud-collection-cell { padding: 2px; gap: 2px; }
+  .hud-collection-name { font-size: 11px; }
+  /* 詳細：上に天体、下に説明 */
+  .hud-collection-detail { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 12px; align-items: start; overflow-y: auto; }
+  .hud-collection-title { font-size: 20px; }
+  .hud-collection-text { max-height: none; overflow: visible; }
 }

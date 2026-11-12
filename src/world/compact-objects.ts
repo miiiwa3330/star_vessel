@@ -127,6 +127,7 @@ export function compactBody(
   if (kind === 'white-dwarf') {
     return {
       ...base,
+      name: opts.real ? name : `White dwarf ${code}`,
       nameJa: opts.real ? `白色矮星 ${name}` : `白色矮星 ${code}`,
       radiusKm: WHITE_DWARF_RADIUS_KM,
       kind: 'star',
@@ -139,6 +140,7 @@ export function compactBody(
     const period = opts.periodS ?? 0.1 + rand();
     return {
       ...base,
+      name: opts.real ? name : `Neutron star ${code}`,
       nameJa: opts.real ? name : `中性子星 ${code}`,
       radiusKm: NEUTRON_STAR_RADIUS_KM,
       kind: 'star',
@@ -150,6 +152,7 @@ export function compactBody(
   const mass = opts.massSun ?? (opts.real ? BLACK_HOLE_MASS : 5 + 15 * rand());
   return {
     ...base,
+    name: opts.real ? name : `Black hole ${code}`,
     nameJa: opts.real ? name : `ブラックホール ${code}`,
     radiusKm: schwarzschildKm(mass),
     kind: 'blackhole',
