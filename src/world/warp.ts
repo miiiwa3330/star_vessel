@@ -51,3 +51,28 @@ export const arriveAt = (w: Placed): Observer => ({
   anchor: w.anchor,
   offsetKm: add(w.offsetKm, scale(w.facing, WARP_STANDOFF_KM)),
 });
+
+/**
+ * その場で消せる距離（km）。ワープすると輪の正面 WARP_STANDOFF_KM に出るので、その数倍（2026-11-12）。
+ * 消すのはマップからではなく、そのワープホールまで行って、下のボタン（4）を押す
+ */
+export const WARP_REMOVE_RANGE_KM = 5 * WARP_STANDOFF_KM;
+
+/** いる場所から消せる自分のワープホール（いちばん近いもの）。無ければ null。positionKm は太陽中心 */
+export function removableWarpHere<T extends { mine: boolean; positionKm: Vec3 }>(
+  warps: readonly T[],
+  selfKm: Vec3,
+  rangeKm = WARP_REMOVE_RANGE_KM,
+): T | null {
+  let best: T | null = null;
+  let bestD = rangeKm;
+  for (const w of warps) {
+    if (!w.mine) continue;
+    const d = Math.hypot(w.positionKm.x - selfKm.x, w.positionKm.y - selfKm.y, w.positionKm.z - selfKm.z);
+    if (d <= bestD) {
+      best = w;
+      bestD = d;
+    }
+  }
+  return best;
+}

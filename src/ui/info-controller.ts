@@ -33,6 +33,16 @@ import { visitApi } from '../net/visit-repository';
 import { formatDistance } from './format';
 import { hudActions, hudStore, type InfoCardState } from './hud-store';
 import { TargetMarker } from './target-marker';
+import { bodyAddress } from '../world/address';
+import { bodyLook, kindLook, type CollectionLook } from './collection-look';
+
+/** コレクションの詳細に出すもの（要件 F38） */
+export interface CollectionEntry {
+  details: string[];
+  look: CollectionLook;
+  /** 英語の名前（日本語の名前と同じなら null） */
+  nameEn: string | null;
+}
 
 /** 近づいたときのカードを出しておく時間 */
 const NEAR_CARD_MS = 8_000;
@@ -140,7 +150,9 @@ export class InfoController {
       const neb = insideOf(this.deps.nebulae, pc);
       const gal = insideOf(this.deps.galaxies, pc);
       this.inside = neb ? this.nebulaTarget(neb) : gal ? this.galaxyTarget(gal) : null;
-      hudStore.set({ deepRegion: this.inside ? `${INFO_KIND_NAMES_JA[this.inside.kind]}：${this.inside.name}` : null });
+      // 左上の表示は英語（星雲・銀河の英語の名前はカタログの名前）
+      const insideEn = neb ? `Nebula: ${neb.name.replace(/^NAME /, '')}` : gal ? `Galaxy: ${gal.name}` : null;
+      hudStore.set({ deepRegion: insideEn });
     }
     const bodies = allBodies()
       // 恒星は、恒星の一覧（far）の方で出す。太陽系の外の恒星の天体は同じ記号なので、天体の方を優先する
@@ -194,7 +206,65 @@ export class InfoController {
     if (Object.keys(patch).length > 0) hudStore.set(patch);
   }
 
-  /** 近くの恒星（白色矮星などの燃えかすも。マップに出す。FAR_SEARCH_MS ごとに探し直したもの） */
+  /** 訪れた場所の天体を、記号から引く（太陽系の天体・ほかの恒星系の天体） */
+  private bodyOf(key: string): BodyInfo | null {
+    return findBody(key) ?? this.deps.systems.findBody(key);
+  }
+
+  private deepOf(key: string): InfoTarget | null {
+    if (key.startsWith('C:')) {
+      const c = this.deps.clusters.find((x) => clusterKey(x) === key);
+      return c ? this.clusterTarget(c) : null;
+    }
+    if (key.startsWith('N:')) {
+      const n = this.deps.nebulae.find((x) => nebulaKey(x) === key);
+      return n ? this.nebulaTarget(n) : null;
+    }
+    if (key.startsWith('Y:')) {
+      const g = this.deps.galaxies.find((x) => galaxyKey(x) === key);
+      return g ? this.galaxyTarget(g) : null;
+    }
+    return null;
+  }
+
+  /**
+   * 訪れた場所の、いまの位置（太陽中心 km。3D のマップ・要件 F62）。分からなければ null
+   * （いまは近くにない小さな小惑星・彗星など。天体の一覧に入っていないため）。
+   * ほかの恒星系の惑星・衛星は、その恒星の位置にする（マップの上では、恒星系の中の違いは見分けられないほど小さい）
+   */
+  locate(key: string, date: Date): Vec3 | null {
+    if (key === 'Sun') return { x: 0, y: 0, z: 0 };
+    const deep = this.deepOf(key);
+    if (deep) return deep.positionKm;
+    if (key.endsWith('.0')) return this.starTarget(key.slice(0, -2))?.positionKm ?? null;
+    if (findBody(key)) return heliocentricPositionKm(key, date);
+    const system = bodyAddress(key)?.system;
+    if (system && system !== 'SOL') return this.starTarget(system)?.positionKm ?? null;
+    return null;
+  }
+
+  /** コレクションの詳細（説明と絵） */
+  entry(key: string, kind: Visit['kind'], name: string): CollectionEntry {
+    const deep = this.deepOf(key);
+    if (deep) return { details: deep.details(), look: kindLook(kind, key), nameEn: deep.name === name ? null : deep.name };
+    if (key.endsWith('.0') || key === 'Sun') {
+      const star = this.starTarget(key === 'Sun' ? 'SOL' : key.slice(0, -2));
+      const body = this.bodyOf(key);
+      const en = body?.name ?? (key === 'Sun' ? 'Sun' : null);
+      return {
+        details: star?.details() ?? [],
+        look: body ? bodyLook(body, kind) : kindLook(kind, key),
+        nameEn: en && en !== name ? en : null,
+      };
+    }
+    const b = this.bodyOf(key);
+    if (!b) return { details: [INFO_KIND_NAMES_JA[kind]], look: kindLook(kind, key), nameEn: null };
+    const parent = b.parent ? this.bodyOf(b.parent) : null;
+    const en = b.name ?? b.id;
+    return { details: describeBody(b, parent?.nameJa ?? null), look: bodyLook(b, kind), nameEn: en !== name ? en : null };
+  }
+
+  /** 近くの恒星（白色矮星などの燃えかすも。レーダーに出す。FAR_SEARCH_MS ごとに探し直したもの） */
   nearStars(): readonly { key: string; name: string; positionKm: Vec3 }[] {
     return this.far.filter((t) => t.kind !== 'cluster' && t.kind !== 'nebula' && t.kind !== 'galaxy');
   }

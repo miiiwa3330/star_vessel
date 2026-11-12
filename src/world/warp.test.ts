@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arriveAt, planWarpHere, warpPositionKm, WARP_STANDOFF_KM } from './warp';
+import { arriveAt, planWarpHere, removableWarpHere, warpPositionKm, WARP_REMOVE_RANGE_KM, WARP_STANDOFF_KM } from './warp';
 import { isWarpHole, isWarpPlacement } from './warp-schema';
 import { absolutePositionKm, type Observer } from './observer';
 import { heliocentricPositionKm } from './solar-system';
@@ -88,5 +88,17 @@ describe('系外惑星のそばに置くワープホール', () => {
     expect(isWarpPlacement({ ...base, anchor: 'Sun', system: 'E1WHADEK' })).toBe(true);
     expect(isWarpPlacement({ ...base, anchor: 'S6.6', system: 'SOL' })).toBe(true);
     expect(isWarpPlacement({ ...base, anchor: 'S6.6', system: 'H70666' })).toBe(false);
+  });
+});
+
+describe('removableWarpHere（その場で消せる自分のワープホール）', () => {
+  const at = (x: number, mine = true, id = String(x)) => ({ id, mine, positionKm: { x, y: 0, z: 0 } });
+  it('範囲の中の、自分のものだけ。いちばん近いもの', () => {
+    expect(removableWarpHere([at(3_000), at(1_000), at(500, false)], { x: 0, y: 0, z: 0 })?.id).toBe('1000');
+    expect(removableWarpHere([at(WARP_REMOVE_RANGE_KM + 1)], { x: 0, y: 0, z: 0 })).toBeNull();
+    expect(removableWarpHere([at(10, false)], { x: 0, y: 0, z: 0 })).toBeNull();
+  });
+  it('ワープして着いた場所（輪の正面）からは消せる', () => {
+    expect(WARP_REMOVE_RANGE_KM).toBeGreaterThan(WARP_STANDOFF_KM);
   });
 });

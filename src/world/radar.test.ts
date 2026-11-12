@@ -3,7 +3,7 @@ import {
   chooseRadarLabels,
   clampRadarMaxKm,
   formatRingKm,
-  mapLayerOfBody,
+  radarLayerOfBody,
   placeBlips,
   radarBlips,
   radarRange,
@@ -146,9 +146,9 @@ describe('マップの範囲（二本指・ホイールで変える）', () => {
 
 describe('マップに出すものの種類', () => {
   it('天体の種類から決め、指定が無い点は形から決める', () => {
-    expect(mapLayerOfBody('moon')).toBe('planets');
-    expect(mapLayerOfBody('comet')).toBe('small');
-    expect(mapLayerOfBody('spacecraft')).toBe('craft');
+    expect(radarLayerOfBody('moon')).toBe('planets');
+    expect(radarLayerOfBody('comet')).toBe('small');
+    expect(radarLayerOfBody('spacecraft')).toBe('craft');
     const [w, s, st] = radarBlips(origin, identity, [
       { kind: 'warp', id: 'w', label: '', positionKm: { x: 1, y: 0, z: 0 } },
       { kind: 'ship', id: 's', label: '', positionKm: { x: 1, y: 0, z: 0 } },

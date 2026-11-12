@@ -42,10 +42,33 @@ export function spacecraftPositionKm(s: SpacecraftRecord, date: Date): Vec3 {
   return { x: v(0), y: v(1), z: v(2) };
 }
 
+/** 探査機の英語の名前（左上の表示。データには日本語の名前しか無いので、ここに持つ。無ければ日本語の名前） */
+const SPACECRAFT_NAMES: Readonly<Record<string, string>> = {
+  V31: 'Voyager 1',
+  V32: 'Voyager 2',
+  V23: 'Pioneer 10',
+  V24: 'Pioneer 11',
+  V98: 'New Horizons',
+  V170: 'James Webb Space Telescope',
+  V680: 'Euclid',
+  V139479: 'Gaia',
+  V96: 'Parker Solar Probe',
+  V144: 'Solar Orbiter',
+  V49: 'Lucy',
+  V255: 'Psyche',
+  V159: 'Europa Clipper',
+  V28: 'JUICE',
+  V121: 'BepiColombo',
+  V91: 'Hera',
+  V64: 'OSIRIS-APEX',
+  V37: 'Hayabusa2',
+};
+
 export function spacecraftBody(s: SpacecraftRecord): BodyInfo {
   const radiusKm = s.sizeM / 2 / 1000;
   return {
     id: s.id,
+    name: SPACECRAFT_NAMES[s.id] ?? s.nameJa,
     nameJa: s.nameJa,
     radiusKm,
     kind: 'spacecraft',

@@ -21,11 +21,11 @@ import { GalaxyView } from './render/galaxy-view';
 import { galactoToEqjPc } from './world/galaxy';
 import { Hud } from './ui/Hud';
 import { InfoController } from './ui/info-controller';
-import { hudActions, hudStore, showNotice } from './ui/hud-store';
+import { hudActions, hudStore, showNotice, type MapPoint } from './ui/hud-store';
 import { worldNow } from './world/clock';
 import { keepOutsideBodies } from './world/collision';
 import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/observer';
-import { mapLayerOfBody, radarBlips, radarRange, type RadarTarget } from './world/radar';
+import { radarLayerOfBody, radarBlips, radarRange, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
 import { ShipSmoother } from './world/ship-smoothing';
 import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, unregisterBodies, type BodyInfo, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
@@ -45,7 +45,7 @@ import { decodeNebulae, type Nebula } from './world/nebulae';
 import { decodeGalaxies, type Galaxy } from './world/galaxies';
 import { spacecraftBody, type SpacecraftRecord } from './world/spacecraft';
 import { decodeCompact, type CompactObject } from './world/compact-objects';
-import { clusterAt, clusterLabel, decodeClusters, type Cluster } from './world/clusters';
+import { clusterAt, decodeClusters, type Cluster } from './world/clusters';
 import { StarSystems } from './world/star-systems';
 import { starBodyId } from './world/planets';
 import { createExtraStarfield } from './render/starfield';
@@ -53,8 +53,8 @@ import { applyStarMotion, decodeStars, DEFAULT_STAR_LIMIT, STAR_LIMIT_NAMES_JA, 
 import { starLimitMag } from './render/star-sprites';
 import { nearestSystem, readAddress, setAddressNameLookup, SYSTEM_SOL } from './world/address';
 import { KM_PER_AU, KM_PER_PC } from './world/units';
-import { add, length, mulVec, normalize, scale, sub } from './world/vec';
-import { arriveAt, planWarpHere, warpPositionKm } from './world/warp';
+import { add, length, mulVec, normalize, scale, sub, type Vec3 } from './world/vec';
+import { arriveAt, planWarpHere, removableWarpHere, warpPositionKm } from './world/warp';
 import { MAX_WARPS_PER_PLAYER, type WarpHole } from './world/warp-schema';
 
 /** 星の見え方を覚えておく場所（localStorage） */
@@ -341,7 +341,7 @@ async function main() {
     if (saved) myDesign = saved;
   } catch (e) {
     console.error(e);
-    hudStore.set({ status: 'サーバーにつながらないため、ワープホールは使えません' });
+    hudStore.set({ status: 'Offline: warp holes are unavailable' });
   }
 
   let observer = startObserver(worldNow());
@@ -361,6 +361,18 @@ async function main() {
   });
   controls.onTap = (x, y) => info.tap(x, y, window.innerWidth, window.innerHeight);
   if (online) void info.connect();
+  // コレクションの詳細（要件 F38）と、3D のマップの、訪れた場所のいまの位置（要件 F62）
+  hudActions.describeVisit = (v) => info.entry(v.key, v.kind, v.name);
+  const updateMapPoints = () => {
+    const d = worldNow();
+    const points: MapPoint[] = [];
+    for (const v of hudStore.get().visits) {
+      const positionKm = info.locate(v.key, d);
+      if (positionKm) points.push({ key: v.key, name: v.name, kind: v.kind, positionKm });
+    }
+    hudStore.set({ mapPoints: points, mapSelfKm: absolutePositionKm(observer, d) });
+  };
+  let lastMapUpdate = 0;
 
   // 視点（要件 F28）と自分の宇宙船（要件 F27）
   const chase = new ChaseCamera();
@@ -374,16 +386,19 @@ async function main() {
   };
   controls.onToggleView = () => hudActions.toggleView();
   controls.onToggleStatus = () => hudActions.toggleStatus();
-  // 開いている画面（ゲームメニュー・マップ・チャット・コレクション・ワープ）。どれか 1 つだけ。
+  // 開いている画面（ゲームメニュー・レーダー・マップ・チャット・コレクション・写真）。どれか 1 つだけ。
   // PC では、開くとカーソルを出し、閉じると操縦に戻る（カーソルを消す）。入ったばかりのときは何も開かず、クリックを待つ
   controls.isBlocked = () => hudStore.get().overlay !== null;
   hudActions.setOverlay = (overlay) => {
     const prev = hudStore.get();
     if (overlay === prev.overlay) return;
-    // ワープはマップから（2026-11-12）。開くたびに、全員のワープホールを取り直す
-    if (overlay === 'map') hudActions.refreshWarps();
-    // ワープはマップからだけ。マップを閉じたら、選んだワープホールのカードも消す
-    if (prev.overlay === 'map' && prev.selectedWarp) hudStore.set({ selectedWarp: null });
+    // ワープはレーダーから（2026-11-12）。開くたびに、全員のワープホールを取り直す
+    if (overlay === 'radar') hudActions.refreshWarps();
+    // ワープはレーダーからだけ。レーダーを閉じたら、選んだワープホールのカードも消す
+    if (prev.overlay === 'radar' && prev.selectedWarp) hudStore.set({ selectedWarp: null });
+    // 3D のマップ（要件 F62）：開くときに、訪れた場所の位置を入れる（開いている間は 1 秒ごとに入れ直す）
+    if (overlay === 'map') updateMapPoints();
+    if (prev.overlay === 'map' && prev.mapFocus) hudStore.set({ mapFocus: null });
     // 写真の画面を閉じたら、写真はブラウザから消す（保存・共有していなければ残らない）
     if (prev.overlay === 'photo' && prev.photo) {
       URL.revokeObjectURL(prev.photo.url);
@@ -393,18 +408,20 @@ async function main() {
     if (overlay === null) controls.requestLock();
     else controls.exitLock();
   };
-  // ゲームメニューの間は、メニューのボタンのほかは受け付けない（M・1〜4 で別の画面に切り替えない）
+  // ゲームメニューの間は、メニューのボタンのほかは受け付けない（R・M・1〜6 で別の画面に切り替えない）
   const unlessMenu = (f: () => void) => () => {
     if (hudStore.get().overlay !== 'menu') f();
   };
+  controls.onToggleRadar = unlessMenu(() => hudActions.toggleOverlay('radar'));
   controls.onToggleMap = unlessMenu(() => hudActions.toggleOverlay('map'));
   controls.onHotbar = (n) =>
     unlessMenu(() => {
       if (n === 1) hudActions.toggleOverlay('collection');
       else if (n === 2) hudActions.cycleStarLimit();
       else if (n === 3) hudActions.toggleConstellations();
-      else if (n === 4 && hudStore.get().warpsReady) hudActions.placeWarp();
+      else if (n === 4 && hudStore.get().warpsReady) hudActions.pressWarpButton();
       else if (n === 5) hudActions.takePhoto();
+      else if (n === 6) hudActions.toggleOverlay('map');
     })();
   controls.onPhoto = unlessMenu(() => hudActions.takePhoto());
   controls.onEscape = () => hudActions.setOverlay(hudStore.get().overlay === null ? 'menu' : null);
@@ -519,18 +536,44 @@ async function main() {
 
   const describeError = (e: unknown) =>
     e instanceof WarpApiError && e.kind === 'limit'
-      ? `ワープホールを作れるのは ${MAX_WARPS_PER_PLAYER} 個までです。マップで自分のものを選んで消すと、また作れます`
+      ? `ワープホールを作れるのは ${MAX_WARPS_PER_PLAYER} 個までです。自分のワープホールまで行って、ワープホールのボタンで消すと、また作れます`
       : 'うまくいきませんでした。少し待ってからもう一度試してください';
-  hudActions.placeWarp = async () => {
+  const placeWarp = async () => {
     const placement = planWarpHere(observer, controls.forward(), worldNow(), systemAt);
     try {
       const w = await warpApi.place(placement);
       setWarps([...warps, w]);
-      showNotice(`ワープホール ${w.code} を作りました（ワープはマップから）`, 4000);
+      showNotice(`ワープホール ${w.code} を作りました（ワープはレーダーから）`, 4000);
     } catch (e) {
       console.error(e);
       showNotice(describeError(e), 5000);
     }
+  };
+  /** いる場所で消せる自分のワープホール（1 秒に 10 回、画面の値と一緒に探す） */
+  const findWarpHere = (date: Date, abs: Vec3) =>
+    removableWarpHere(
+      warps.filter((w) => w.mine && findBody(w.anchor) !== null).map((w) => ({ w, mine: true, positionKm: warpPositionKm(w, date) })),
+      abs,
+    )?.w ?? null;
+  /** 消す前の確かめ：もう一度押すと消す（押し間違いで、全員と共有しているワープホールを消さないように。仮） */
+  let removeArmed: { id: string; until: number } | null = null;
+  const REMOVE_CONFIRM_MS = 3_000;
+  hudActions.pressWarpButton = () => {
+    const d = worldNow();
+    const here = findWarpHere(d, absolutePositionKm(observer, d));
+    if (!here) {
+      removeArmed = null;
+      void placeWarp();
+      return;
+    }
+    const now = performance.now();
+    if (removeArmed && removeArmed.id === here.id && now < removeArmed.until) {
+      removeArmed = null;
+      void removeWarp(here.id);
+      return;
+    }
+    removeArmed = { id: here.id, until: now + REMOVE_CONFIRM_MS };
+    showNotice(`もう一度押すと、ワープホール ${here.code} を消します`, REMOVE_CONFIRM_MS);
   };
   hudActions.changeSpeed = (steps) => controls.changeSpeed(steps, true);
   // 写真（要件 F61）：次に描いたすぐあとの画面を、そのまま画像にする（画面の表示・文字は入らない。宇宙だけが写る）。
@@ -542,7 +585,18 @@ async function main() {
   const capturePhoto = (date: Date) => {
     const width = canvas.width;
     const height = canvas.height;
-    canvas.toBlob((blob) => {
+    // 描いた画面は、宇宙の暗いところが透明（アルファ 0）のことがあるので、黒の上に重ねてから画像にする
+    // （そのままだと、保存した画像の背景が透け、写真の画面でも後ろのすりガラスが透けて見える。2026-11-12）
+    const flat = document.createElement('canvas');
+    flat.width = width;
+    flat.height = height;
+    const fctx = flat.getContext('2d');
+    if (fctx) {
+      fctx.fillStyle = '#000';
+      fctx.fillRect(0, 0, width, height);
+      fctx.drawImage(canvas, 0, 0);
+    }
+    (fctx ? flat : canvas).toBlob((blob) => {
       if (!blob) {
         showNotice('写真を撮れませんでした');
         return;
@@ -576,7 +630,7 @@ async function main() {
     const d = worldNow();
     controls.lookAt(sub(warpPositionKm(w, d), absolutePositionKm(observer, d)), controls.up());
   };
-  hudActions.removeWarp = async (id) => {
+  const removeWarp = async (id: string) => {
     const w = warps.find((x) => x.id === id && x.mine);
     if (!w) return;
     try {
@@ -773,23 +827,33 @@ async function main() {
 
     if (nowMs - lastHud > HUD_INTERVAL_MS) {
       lastHud = nowMs;
-      const mapRangeKm = hudStore.get().mapRangeKm;
+      if (hudStore.get().overlay === 'map' && nowMs - lastMapUpdate > 1000) {
+        lastMapUpdate = nowMs;
+        updateMapPoints();
+      }
+      {
+        // 自分のワープホールのそばでは、下のワープホールのボタンが消すボタンになる
+        const here = findWarpHere(date, abs);
+        const prev = hudStore.get().warpHere;
+        if (prev?.id !== here?.id) hudStore.set({ warpHere: here ? { id: here.id, code: here.code } : null });
+      }
+      const radarRangeKm = hudStore.get().radarRangeKm;
       const bodies = allBodies();
       const bodyIds = new Set(bodies.map((b) => b.id));
       const targets: RadarTarget[] = [
-        // 天体が多いので、半径 200 km 以上か、1,000 万 km（マップの範囲が狭ければ、その範囲）より近い天体だけを出す
+        // 天体が多いので、半径 200 km 以上か、1,000 万 km（レーダーの範囲が狭ければ、その範囲）より近い天体だけを出す
         // 探査機は小さいが、どこにいても探せるように出す
         ...bodies
           .map((b) => ({
             kind: 'body' as const,
-            layer: mapLayerOfBody(b.kind),
+            layer: radarLayerOfBody(b.kind),
             id: b.id,
             label: b.nameJa,
             positionKm: heliocentricPositionKm(b.id, date),
             r: b.radiusKm,
             craft: b.kind === 'spacecraft',
           }))
-          .filter((t) => t.craft || t.r >= 200 || length(sub(t.positionKm, abs)) < (t.id.startsWith('N') ? 2_000 : Math.min(1e7, mapRangeKm)))
+          .filter((t) => t.craft || t.r >= 200 || length(sub(t.positionKm, abs)) < (t.id.startsWith('N') ? 2_000 : Math.min(1e7, radarRangeKm)))
           .map(({ r: _r, craft: _c, ...t }) => t),
         // 近くのほかの恒星（情報のカードで選べる 8 個。いる恒星系の恒星は、天体として上で出している）
         ...info
@@ -823,7 +887,7 @@ async function main() {
             observer.anchor === 'Sun' && systems.currentSystem !== SYSTEM_SOL ? starBodyId(systems.currentSystem) : observer.anchor;
           const info = findBody(ref) ?? bodyInfo('Sun');
           return {
-            anchorName: info.nameJa,
+            anchorName: info.name ?? info.id,
             altitudeKm: length(sub(abs, heliocentricPositionKm(info.id, date))) - info.radiusKm,
           };
         })(),
@@ -831,8 +895,8 @@ async function main() {
         nearbyShips: online ? (link.connected ? others.length : null) : null,
         chatReady: online && link.connected,
         fromEarthKm: sub(abs, heliocentricPositionKm('Earth', date)),
-        region: inCluster ? `${inCluster.kind === 'globular' ? '球状星団' : '散開星団'}：${clusterLabel(inCluster)}` : null,
-        radar: radarBlips(abs, controls.orientation, targets, radarRange(mapRangeKm)),
+        region: inCluster ? `${inCluster.kind === 'globular' ? 'Globular cluster' : 'Open cluster'}: ${inCluster.name}` : null,
+        radar: radarBlips(abs, controls.orientation, targets, radarRange(radarRangeKm)),
         // 基準の天体が分からないワープホール（読み込み前の星の惑星など）は、まだ出さない
         warps: warps.filter((w) => findBody(w.anchor) !== null).map((w) => ({
           id: w.id,
@@ -848,5 +912,5 @@ async function main() {
 
 main().catch((e: unknown) => {
   console.error(e);
-  hudStore.set({ status: `起動に失敗しました：${e instanceof Error ? e.message : String(e)}` });
+  hudStore.set({ status: `Failed to start: ${e instanceof Error ? e.message : String(e)}` });
 });

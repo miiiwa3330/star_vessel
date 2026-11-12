@@ -13,11 +13,11 @@ import { length, sub, type Vec3 } from './vec';
 export type RadarKind = 'body' | 'star' | 'warp' | 'ship';
 
 /**
- * マップに出すものの種類（2026-11-12。マップで切り替えられる。閉じたあとの小さなレーダーも同じものを出す）。
+ * レーダーに出すものの種類（2026-11-12。大きくしたレーダーで切り替えられる。閉じたあとの小さなレーダーも同じものを出す）。
  * planets：恒星・惑星・準惑星・衛星、small：小惑星・彗星、craft：探査機・人工衛星、stars：近くのほかの恒星、ships：ほかのプレイヤー、warps：ワープホール
  */
-export type MapLayer = 'planets' | 'small' | 'craft' | 'stars' | 'ships' | 'warps';
-export const MAP_LAYERS: readonly { id: MapLayer; nameJa: string }[] = [
+export type RadarLayer = 'planets' | 'small' | 'craft' | 'stars' | 'ships' | 'warps';
+export const RADAR_LAYERS: readonly { id: RadarLayer; nameJa: string }[] = [
   { id: 'planets', nameJa: '惑星・衛星' },
   { id: 'small', nameJa: '小惑星・彗星' },
   { id: 'craft', nameJa: '探査機・人工衛星' },
@@ -25,7 +25,7 @@ export const MAP_LAYERS: readonly { id: MapLayer; nameJa: string }[] = [
   { id: 'ships', nameJa: 'プレイヤー' },
   { id: 'warps', nameJa: 'ワープホール' },
 ];
-export const DEFAULT_MAP_LAYERS: Readonly<Record<MapLayer, boolean>> = {
+export const DEFAULT_RADAR_LAYERS: Readonly<Record<RadarLayer, boolean>> = {
   planets: true,
   small: true,
   craft: true,
@@ -34,8 +34,8 @@ export const DEFAULT_MAP_LAYERS: Readonly<Record<MapLayer, boolean>> = {
   warps: true,
 };
 
-/** 天体の種類から、マップの種類へ */
-export function mapLayerOfBody(kind: BodyKind): MapLayer {
+/** 天体の種類から、レーダーの種類へ */
+export function radarLayerOfBody(kind: BodyKind): RadarLayer {
   if (kind === 'asteroid' || kind === 'comet') return 'small';
   if (kind === 'satellite' || kind === 'spacecraft') return 'craft';
   return 'planets';
@@ -43,8 +43,8 @@ export function mapLayerOfBody(kind: BodyKind): MapLayer {
 
 export interface RadarTarget {
   kind: RadarKind;
-  /** マップで切り替える種類（省略すると、kind から決める：star → stars、warp → warps、ship → ships、body → planets） */
-  layer?: MapLayer;
+  /** レーダーで切り替える種類（省略すると、kind から決める：star → stars、warp → warps、ship → ships、body → planets） */
+  layer?: RadarLayer;
   id: string;
   label: string;
   /** 太陽中心・EQJ・km */
@@ -53,7 +53,7 @@ export interface RadarTarget {
 
 export interface RadarBlip {
   kind: RadarKind;
-  layer: MapLayer;
+  layer: RadarLayer;
   id: string;
   label: string;
   /** 円の中の位置。中心が (0, 0)、半径 1。y は上が正 */
@@ -74,12 +74,12 @@ export interface RadarRange {
   maxKm: number;
 }
 
-/** 中心から 1,000 km 〜 ふちで 100 億 km（海王星の外まで）。マップの範囲を変えないときの値 */
+/** 中心から 1,000 km 〜 ふちで 100 億 km（海王星の外まで）。レーダーの範囲を変えないときの値 */
 export const RADAR_RANGE: RadarRange = { minKm: 1e3, maxKm: 1e10 };
 /** 中心からふちまでの桁の数（範囲を変えても同じ。範囲を変えると、対数の目盛りがそのままずれる） */
 const RADAR_DECADES = 7;
 /**
- * マップの範囲（ふちの距離）の、変えられる幅（2026-11-12。二本指・ホイールで変える）。
+ * レーダーの範囲（ふちの距離）の、変えられる幅（2026-11-12。二本指・ホイールで変える）。
  * 1 万 km（人工衛星・月のまわり）〜 1,000 兆 km（約 106 光年。近くの恒星まで）
  */
 export const RADAR_MAX_KM_LIMITS = { min: 1e4, max: 1e15 } as const;
@@ -136,7 +136,7 @@ export function formatRingKm(km: number): string {
   return `${rest > 3 ? String(10 ** rest) : head}${unit}km`;
 }
 
-const defaultLayer = (kind: RadarKind): MapLayer =>
+const defaultLayer = (kind: RadarKind): RadarLayer =>
   kind === 'star' ? 'stars' : kind === 'warp' ? 'warps' : kind === 'ship' ? 'ships' : 'planets';
 
 export function radarBlips(
@@ -169,7 +169,7 @@ export function radarBlips(
   });
 }
 
-/** 点を、別の範囲で置き直す（マップの範囲を変えている間、世界の更新を待たずに描くため） */
+/** 点を、別の範囲で置き直す（レーダーの範囲を変えている間、世界の更新を待たずに描くため） */
 export function placeBlips(blips: readonly RadarBlip[], range: RadarRange): RadarBlip[] {
   return blips.map((b) => ({ ...b, ...radarPoint(b.distanceKm, b.dirX, b.dirY, range) }));
 }

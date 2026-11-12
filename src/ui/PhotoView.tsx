@@ -2,20 +2,20 @@ import { useMemo } from 'react';
 import type { Photo } from './hud-store';
 
 /**
- * 撮った写真（要件 F61。2026-11-12）。画面の真ん中に大きく見せ、「保存する」で端末に保存し、
- * 共有できる端末（スマホなど）では「共有する」で、ほかのアプリへ渡す。写真はサーバーに送らない。
+ * 撮った写真（要件 F61。2026-11-12）。画面の真ん中に大きく見せ、「Download」で端末に保存し、
+ * 共有できる端末（スマホなど）では「Share」で、ほかのアプリへ渡す（ボタンの名前は 2026-11-12 にオーナーの指示で英語に）。写真はサーバーに送らない。
  * 閉じるのは、まわりを押すか Esc（× は置かない）。閉じると写真はブラウザから消える
  */
 export function PhotoView({ photo }: { photo: Photo }) {
   const file = useMemo(() => new File([photo.blob], photo.fileName, { type: photo.blob.type || 'image/png' }), [photo]);
   const canShare = typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] });
   return (
-    <div className="hud-panel hud-modal hud-photo" role="dialog" aria-label="写真">
+    <div className="hud-panel hud-modal hud-glass-panel hud-photo" role="dialog" aria-label="写真">
       <p className="hud-eyebrow">PHOTO</p>
       <img className="hud-photo-image" src={photo.url} alt="撮った写真" width={photo.width} height={photo.height} />
       <div className="hud-photo-actions">
         <a className="hud-button" href={photo.url} download={photo.fileName}>
-          保存する
+          Download
         </a>
         {canShare && (
           <button
@@ -28,7 +28,7 @@ export function PhotoView({ photo }: { photo: Photo }) {
               });
             }}
           >
-            共有する
+            Share
           </button>
         )}
       </div>

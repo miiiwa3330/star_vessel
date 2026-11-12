@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { MAP_LAYERS, type MapLayer, type RadarBlip } from '../world/radar';
+import { RADAR_LAYERS, type RadarLayer, type RadarBlip } from '../world/radar';
 import { formatDistance } from './format';
 import { hudActions, hudStore } from './hud-store';
 import { Radar } from './Radar';
@@ -14,14 +14,15 @@ const PINCH_WHEEL_RATE = 0.03;
 const PINCH_GAIN = 3;
 
 /**
- * 大きくしたマップ（M。2026-11-12）。画面の真ん中にレーダー、その下に出すものの切り替え。
+ * 大きくしたレーダー（R。2026-11-12。前の名前は「マップ」で、同じ日にオーナーの指示でレーダーと呼ぶことにした。
+ * マップは、訪れた場所の 3D のマップ〈StarMap.tsx〉）。画面の真ん中にレーダー、その下に出すものの切り替え。
  * - 範囲（ふちの距離）は、二本指で広げる・つまむ（PC はホイール・トラックパッドのピンチ）。閉じたあとの小さなレーダーも同じ範囲
  * - 出すものの種類も、閉じたあとの小さなレーダーにそのまま残る（この端末に覚えておく）
  * - 天体・恒星の点を押すとその天体を選び、ワープホールの点を押すとそのワープホールを選ぶ（どちらも上の真ん中にカード。
- *   ワープはワープホールのカードの「ワープ」から。下のボタンは、ワープホールを作るボタン）
- * 閉じるのは、まわりを押すか、M・Esc（× は置かない）
+ *   ワープはワープホールのカードの「ワープ」から。下のボタンは、ワープホールを作る・そのそばで消すボタン）
+ * 閉じるのは、まわりを押すか、R・Esc（× は置かない）
  */
-export function MapPanel({
+export function RadarPanel({
   blips,
   rangeKm,
   layers,
@@ -31,7 +32,7 @@ export function MapPanel({
 }: {
   blips: RadarBlip[];
   rangeKm: number;
-  layers: Record<MapLayer, boolean>;
+  layers: Record<RadarLayer, boolean>;
   selectedKey: string | null;
   selectedWarp: string | null;
   /** 選んだ天体・ワープホールのカードが出ている（スマホでは、カードの場所を空けるためにレーダーを小さくする） */
@@ -40,11 +41,11 @@ export function MapPanel({
   const radarBox = useRef<HTMLDivElement>(null);
   usePinchZoom(radarBox);
   return (
-    <div className={`hud-panel hud-map${withCard ? ' is-with-card' : ''}`} role="dialog" aria-label="マップ">
-      <div className="hud-map-radar" ref={radarBox}>
-        <div className="hud-map-head">
-          <p className="hud-eyebrow">MAP</p>
-          <span className="hud-map-range">半径 {formatDistance(rangeKm)}</span>
+    <div className={`hud-panel hud-glass-panel hud-radar-panel${withCard ? ' is-with-card' : ''}`} role="dialog" aria-label="レーダー">
+      <div className="hud-radar-box" ref={radarBox}>
+        <div className="hud-radar-head">
+          <p className="hud-eyebrow">RADAR</p>
+          <span className="hud-radar-range">半径 {formatDistance(rangeKm)}</span>
         </div>
         <Radar
           blips={blips}
@@ -57,14 +58,14 @@ export function MapPanel({
           onPickWarp={(id) => hudActions.selectWarp(id === selectedWarp ? null : id)}
         />
       </div>
-      <div className="hud-chips hud-map-layers" role="group" aria-label="マップに出すもの">
-        {MAP_LAYERS.map((l) => (
+      <div className="hud-chips hud-radar-layers" role="group" aria-label="レーダーに出すもの">
+        {RADAR_LAYERS.map((l) => (
           <button
             key={l.id}
             type="button"
             className={`hud-chip${layers[l.id] ? ' is-selected' : ''}`}
             aria-pressed={layers[l.id]}
-            onClick={() => hudActions.toggleMapLayer(l.id)}
+            onClick={() => hudActions.toggleRadarLayer(l.id)}
           >
             {l.nameJa}
           </button>
@@ -93,7 +94,7 @@ function usePinchZoom(box: React.RefObject<HTMLDivElement | null>) {
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'mouse') return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointers.size === 2) start = { dist: Math.max(spread(), 1), rangeKm: hudStore.get().mapRangeKm };
+      if (pointers.size === 2) start = { dist: Math.max(spread(), 1), rangeKm: hudStore.get().radarRangeKm };
     };
     const move = (e: PointerEvent) => {
       if (!pointers.has(e.pointerId)) return;
@@ -101,7 +102,7 @@ function usePinchZoom(box: React.RefObject<HTMLDivElement | null>) {
       if (start && pointers.size >= 2) {
         e.preventDefault();
         pinchedAt = performance.now();
-        hudActions.setMapRange(start.rangeKm * (start.dist / Math.max(spread(), 1)) ** PINCH_GAIN);
+        hudActions.setRadarRange(start.rangeKm * (start.dist / Math.max(spread(), 1)) ** PINCH_GAIN);
       }
     };
     const up = (e: PointerEvent) => {
@@ -117,7 +118,7 @@ function usePinchZoom(box: React.RefObject<HTMLDivElement | null>) {
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-      hudActions.setMapRange(hudStore.get().mapRangeKm * Math.exp(dy * (e.ctrlKey ? PINCH_WHEEL_RATE : WHEEL_RATE)));
+      hudActions.setRadarRange(hudStore.get().radarRangeKm * Math.exp(dy * (e.ctrlKey ? PINCH_WHEEL_RATE : WHEEL_RATE)));
     };
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
