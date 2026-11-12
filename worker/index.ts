@@ -61,6 +61,11 @@ app.get('/api/space/:system', async (c) => {
   if (!session) return c.json({ error: 'unauthorized' }, 401);
   const headers = new Headers(c.req.raw.headers);
   headers.set('x-user-id', session.user.id);
+  // チャットに出す宇宙船名（要件 F6）。サインアップしていない（匿名の）人は無し。ブラウザから来た x-user-name は使わない
+  const u = session.user as { username?: string | null; displayUsername?: string | null; isAnonymous?: boolean | null };
+  const name = u.displayUsername || u.username;
+  if (name && !u.isAnonymous) headers.set('x-user-name', name);
+  else headers.delete('x-user-name');
   headers.set('x-room', system);
   const room = c.env.SPACE.get(c.env.SPACE.idFromName(system));
   return room.fetch(new Request(c.req.raw, { headers }));

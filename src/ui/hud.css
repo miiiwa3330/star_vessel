@@ -1,14 +1,47 @@
+/*
+ * 世界の画面（/play）の表示。見た目の決まりは docs/design/README.md。
+ * 2026-11-12 に、タイトル画面・アカウントの箱（src/top/top.css）と同じ作りにした：
+ * 枠・背景の面なし、Josefin Sans の 300、字間を広げる、細い線の丸いボタン（ふだんは薄く、ホバーで白）、オレンジの英字の見出し。
+ * 宇宙の明るい天体の上でも読めるよう、面の代わりに、ふちの無い暗いにじみ（--hud-scrim）を後ろに敷く。
+ * 左上の STAR VESSEL（Monoton）と、緑のピクセル調の状態の表示（DotGothic16）は、そのまま
+ */
+#ui {
+  --hud-ink: #e8ecf4;
+  --hud-faint: rgba(232, 236, 244, 0.62);
+  --hud-quiet: rgba(232, 236, 244, 0.5);
+  --hud-line: rgba(232, 236, 244, 0.34);
+  --hud-rule: rgba(160, 190, 255, 0.18);
+  --hud-orange: #ff8a1f;
+  --hud-accent: #74e6ff;
+  --hud-warn-color: #ffd38a;
+  --hud-ok: #5fe08a;
+  --hud-scrim: rgba(2, 4, 10, 0.5);
+  --hud-scrim-strong: rgba(2, 4, 10, 0.78);
+  /* すりガラス（チャット・ゲームメニューの後ろ。2026-11-12） */
+  --hud-glass: rgba(12, 16, 28, 0.22);
+  --hud-glass-blur: blur(8px) saturate(1.15);
+  font-family: 'Josefin Sans', system-ui, -apple-system, 'Hiragino Sans', sans-serif;
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  color: var(--hud-ink);
+}
+
+/*
+ * 面：枠も背景の面も無い。後ろの暗いにじみは、同じ色の背景と box-shadow（ぼかし＋広がり）で作るので、ふちが見えない。
+ * スクロールする一覧でも、にじみは中身と一緒に動かない
+ */
 .hud-panel {
   position: absolute;
   padding: 10px 14px;
-  background: rgba(8, 12, 24, 0.55);
-  border: 1px solid rgba(160, 190, 255, 0.18);
-  border-radius: 10px;
+  background: var(--hud-scrim);
+  border: 0;
+  border-radius: 18px;
+  box-shadow: 0 0 36px 18px var(--hud-scrim);
   font-size: 13px;
-  line-height: 1.6;
-  backdrop-filter: blur(6px);
+  line-height: 1.75;
   box-sizing: border-box;
   max-width: calc(100vw - 32px);
+  text-shadow: 0 0 4px rgba(2, 4, 10, 0.8);
 }
 /* 左上の STAR VESSEL ヘッダー：タイトル画面と同じ Monoton・オレンジの光のにじみ */
 .hud-brand {
@@ -18,13 +51,14 @@
   line-height: 1.15;
   letter-spacing: 0.03em;
   word-spacing: 0.18em;
-  color: #ff8a1f;
+  color: var(--hud-orange);
   filter: drop-shadow(0 0 6px rgba(255, 138, 31, 0.55)) drop-shadow(0 0 26px rgba(255, 110, 20, 0.4));
   pointer-events: none;
 }
 /* 左上の表示：カードの枠も影も持たず、緑色のピクセル調の文字（DotGothic16）で描く（F3 で表示・非表示） */
 .hud-status {
   font-family: 'DotGothic16', ui-monospace, 'SF Mono', Menlo, monospace;
+  font-weight: 400;
   color: #5eff72;
   font-size: 16px;
   line-height: 1.45;
@@ -32,12 +66,22 @@
   pointer-events: none;
 }
 /* 左上の列：状態とスタンプ（重ならないよう縦に並べる） */
-.hud-left { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.hud-left .hud-panel { position: static; }
-.hud-title { font-weight: 600; letter-spacing: 0.08em; }
+.hud-left { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.hud-left .hud-panel { position: relative; }
+/* 小さなオレンジの英字の見出し（MENU・WARP など）。タイトル画面の ABOUT・ACCOUNT と同じ */
+.hud-eyebrow {
+  margin: 0;
+  font-family: 'Josefin Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.4em;
+  color: var(--hud-orange);
+}
+.hud-count { margin-left: 0.3em; letter-spacing: 0.1em; color: var(--hud-faint); }
+.hud-title { font-size: 16px; font-weight: 300; letter-spacing: 0.08em; }
 .hud-muted { opacity: 0.6; }
-.hud-warn { color: #ffd38a; }
-.hud-help { font-size: 12px; opacity: 0.85; text-align: left; }
+.hud-warn { color: var(--hud-warn-color); }
+.hud-help { font-size: 12px; line-height: 1.9; text-align: center; }
 .hud-touch-only { display: none; }
 
 .hud-speed-buttons { position: absolute; left: 16px; flex-direction: column; gap: 6px; }
@@ -50,56 +94,137 @@
   .hud-speed-buttons.hud-touch-only { display: flex; left: auto; right: 16px; bottom: 16px; }
 }
 
-/* ゲームメニュー（PC で Esc。要件 F60）。後ろを少し暗くするだけで、クリックは通す（画面をクリックすると戻る・まわりのボタンを押せる） */
-.hud-pause { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); pointer-events: none; }
+/* ---- ボタン：タイトル画面の .top-button と同じ。細い線の丸いボタン、ふだんは薄く、ホバーで白 ---- */
+.hud-button {
+  pointer-events: auto;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--hud-faint);
+  background: none;
+  border: 1px solid var(--hud-line);
+  border-radius: 999px;
+  padding: 8px 18px;
+  cursor: pointer;
+  min-height: 36px;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease, border-color 0.25s ease;
+  filter: drop-shadow(0 0 3px rgba(2, 4, 10, 0.6));
+}
+/* ホバーは、マウスのように「触れずに指せる」端末だけ（スマホでは、タップした場所に色が残るため） */
+@media (hover: hover) {
+  .hud-button:hover:not(:disabled) { color: #fff; border-color: #fff; }
+}
+.hud-button:active:not(:disabled) { color: #fff; border-color: #fff; }
+.hud-button:focus-visible { outline: 1px solid var(--hud-accent); outline-offset: 3px; }
+.hud-button:disabled { opacity: 0.4; cursor: default; }
+.hud-button.is-selected { color: #fff; border-color: rgba(255, 255, 255, 0.85); }
+.hud-button-small { min-height: 30px; padding: 4px 14px; font-size: 11px; }
+/* 枠の無いボタン（消す・やめる など） */
+.hud-button-quiet { border-color: transparent; color: var(--hud-quiet); }
+.hud-small { font-size: 11px; }
+
+/*
+ * ---- ゲームメニュー（PC で Esc。要件 F60）。2026-11-12：後ろは画面全体をすりガラスにし、メニューのボタンのほかは押せない
+ * （この面がクリックを受け止める。まわりのボタン・チャット・情報のカードもこの下になる） ----
+ */
+.hud-pause {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(2, 4, 10, 0.2);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  backdrop-filter: blur(8px) saturate(1.1);
+  pointer-events: auto;
+  animation: hud-fade-in 0.2s ease;
+}
+@keyframes hud-fade-in { from { opacity: 0; } }
 .hud-pause-menu {
+  position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(320px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: stretch;
+  gap: 12px;
   text-align: center;
+  font-size: 13px;
+  line-height: 1.8;
   pointer-events: auto;
+  filter: drop-shadow(0 0 4px rgba(2, 4, 10, 0.7));
 }
-.hud-pause-button { font-size: 14px; padding: 10px 12px; }
-/* ワープホールの一覧・コレクション（画面の真ん中）を開いている間は、ゲームメニューを隠す（重なるため） */
-#ui:has(.hud-warp-list, .hud-collection-modal) .hud-pause-menu { display: none; }
+.hud-pause-menu .hud-eyebrow { margin-bottom: 6px; }
+.hud-pause-button { font-size: 13px; padding: 10px 18px; min-height: 42px; }
+.hud-pause-note { font-size: 11px; opacity: 0.55; }
+/* 操作の説明を開いたときは、キーボードの図が入るよう広げる（ボタンの幅は変えない） */
+.hud-pause-menu.is-help { width: min(1080px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; align-items: center; }
+.hud-pause-menu.is-help > .hud-button { width: min(320px, 100%); }
+.hud-pause-menu.is-help .hud-help { width: 100%; padding: 4px 0 6px; }
+/*
+ * マップ・コレクション・写真の後ろの、見えない面。押すと閉じる（× は置かない。2026-11-12）。
+ * 下のアイコンバーと情報のカードは、この上に出して押せるようにする（別の画面に切り替える・選んだ天体の方を向く）
+ */
+.hud-backdrop { position: fixed; inset: 0; z-index: 4; pointer-events: auto; }
+/* PC で、入ったばかり・カーソルを消せなかったとき。照準の下に出す（すぐ消えるときにちらつかないよう、少し遅れて出す） */
+.hud-lock-hint {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 64px);
+  transform: translateX(-50%);
+  font-size: 13px;
+  letter-spacing: 0.24em;
+  color: var(--hud-faint);
+  text-shadow: 0 0 4px rgba(2, 4, 10, 0.95), 0 0 12px rgba(2, 4, 10, 0.8);
+  pointer-events: none;
+  white-space: nowrap;
+  opacity: 0;
+  animation: hud-fade-in-late 0.4s ease 0.3s forwards;
+}
+@keyframes hud-fade-in-late { to { opacity: 1; } }
 
-/* 画面中央下のアイコンバー（コレクション・星の見え方・星座・ワープ） */
+/* 画面中央下のアイコンバー（コレクション・星の見え方・星座・ワープホールを作る・写真）：右下のアイコンと同じ、細い線の丸 */
 .hud-hotbar {
   position: absolute;
   left: 50%;
   bottom: 16px;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: 10px;
   pointer-events: auto;
+  z-index: 6;
 }
 .hud-icon-button {
+  position: relative;
   width: 42px;
   height: 42px;
+  min-height: 0;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
+/* 下のボタンの数字（PC だけ。1〜5 キーで押せる） */
+.hud-hotkey { position: absolute; right: -3px; bottom: -5px; font-size: 10px; line-height: 1; letter-spacing: 0; color: var(--hud-quiet); text-shadow: 0 0 3px rgba(2, 4, 10, 0.95); }
+
 /* スマホの操縦のボタン（要件 F60。マインクラフト統合版の形）。左下に十字、右下に上昇・下降 */
 .hud-touchpad { display: none; }
 .hud-pad-button {
   width: 46px;
   height: 46px;
+  min-height: 0;
   padding: 0;
-  font-size: 16px;
+  font-size: 14px;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-  background: rgba(30, 60, 90, 0.45);
+  /* 明るい天体の上でも形が分かるよう、ごく薄く暗くする */
+  background: rgba(2, 4, 10, 0.22);
 }
-.hud-pad-button:active { background: rgba(60, 120, 170, 0.75); }
+.hud-pad-button:active { color: #fff; border-color: #fff; background: rgba(255, 255, 255, 0.12); }
 .hud-dpad {
   position: absolute;
   left: 16px;
@@ -117,12 +242,14 @@
 .hud-lift .is-lift { width: 64px; font-size: 12px; }
 @media (max-width: 720px), (pointer: coarse) {
   .hud-touchpad { display: block; }
-  /* 十字のボタン（高さ 146px）の上にアイコンバー、上昇・下降（96px）の上に速さのボタンを置く */
-  .hud-hotbar { bottom: 172px; }
+  /* 十字のボタン（高さ 146px）の上にアイコンバー、上昇・下降（96px）の上に速さのボタンを置く。
+     ボタンが 5 つになったので（2026-11-12）、右の速さのボタンに重ならないよう、少し小さく詰める */
+  .hud-hotbar { bottom: 172px; gap: 6px; }
+  .hud-hotbar .hud-icon-button { width: 38px; height: 38px; }
   .hud-speed-buttons.hud-touch-only { bottom: 120px; }
 }
 
-/* 右の列：レーダーとワープの操作 */
+/* ---- 右の列：レーダー。面は無く、細い線の円だけ（中はうっすら暗く） ---- */
 .hud-dock {
   position: absolute;
   right: 16px;
@@ -136,298 +263,396 @@
 .hud-radar {
   width: 200px;
   height: 200px;
-  background: rgba(8, 12, 24, 0.55);
   border-radius: 50%;
-  border: 1px solid rgba(160, 190, 255, 0.18);
-  backdrop-filter: blur(6px);
+  background: radial-gradient(circle closest-side, rgba(2, 4, 10, 0.5) 80%, rgba(2, 4, 10, 0) 100%);
 }
-.hud-radar-edge { fill: none; stroke: rgba(160, 190, 255, 0.35); stroke-width: 0.012; }
-.hud-radar-ring { fill: none; stroke: rgba(160, 190, 255, 0.15); stroke-width: 0.008; }
-.hud-radar-ring-label { fill: rgba(200, 215, 255, 0.4); font-size: 0.07px; }
-.hud-radar-label { font-size: 0.09px; paint-order: stroke; stroke: rgba(8, 12, 24, 0.9); stroke-width: 0.025px; }
-.hud-warp-buttons { display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
-.hud-button {
-  pointer-events: auto;
-  font: inherit;
-  font-size: 12px;
-  color: #e8ecf4;
-  background: rgba(30, 60, 90, 0.7);
-  border: 1px solid rgba(116, 230, 255, 0.45);
-  border-radius: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-  min-height: 36px;
-}
-.hud-button:hover { background: rgba(40, 90, 130, 0.8); }
-.hud-button:focus-visible { outline: 2px solid #74e6ff; outline-offset: 2px; }
-.hud-button-small { min-height: 28px; padding: 4px 8px; font-size: 11px; }
-.hud-small { font-size: 11px; }
-.hud-notice { top: 16px; left: 50%; transform: translateX(-50%); color: #74e6ff; }
-.hud-warp-list {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(360px, calc(100vw - 32px));
-  max-height: min(60vh, 480px);
-  overflow-y: auto;
-  pointer-events: auto;
-  background: rgba(8, 12, 24, 0.88);
-}
-.hud-warp-list-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.hud-warp-place { display: flex; flex-direction: column; margin-bottom: 6px; }
-.hud-collection-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(360px, calc(100vw - 32px));
-  max-height: min(60vh, 480px);
-}
-.hud-warp-list ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.hud-warp-list li { display: flex; gap: 6px; align-items: center; }
-.hud-warp-item {
-  flex: 1;
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font: inherit;
+.hud-radar-edge { fill: none; stroke: rgba(94, 255, 114, 0.42); stroke-width: 0.008; }
+.hud-radar-ring { fill: none; stroke: rgba(94, 255, 114, 0.16); stroke-width: 0.006; }
+.hud-radar-ring-label { fill: rgba(140, 255, 160, 0.5); }
+/* 回る緑の光（2026-11-12）：4 秒で 1 周、時計回り。中心（座標の 0, 0）のまわりに回す */
+.hud-radar-sweep { pointer-events: none; transform-origin: 0 0; animation: hud-radar-sweep 4s linear infinite; }
+.hud-radar-sweep-line { stroke: #5eff72; stroke-width: 0.008; opacity: 0.75; filter: drop-shadow(0 0 0.02px #5eff72); }
+@keyframes hud-radar-sweep { to { transform: rotate(360deg); } }
+/* 文字の影・字間は、まわりから受け継ぐとレーダーの座標の単位（1 = 半径）で効いてしまうので、消す */
+.hud-radar text { text-shadow: none; letter-spacing: 0; }
+.hud-radar-label { paint-order: stroke; stroke: rgba(2, 4, 10, 0.9); }
+/* 押すと大きくなる（ふだんのレーダー全体がボタン） */
+.hud-radar-button {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
   color: inherit;
-  text-align: left;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(160, 190, 255, 0.18);
-  border-radius: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-  min-height: 40px;
+  cursor: zoom-in;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.2s ease;
 }
-.hud-warp-item:hover { background: rgba(116, 230, 255, 0.12); }
-.hud-warp-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.hud-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: 0.04em; color: #74e6ff; }
-.hud-button:disabled { opacity: 0.4; cursor: default; }
-
-@media (max-width: 720px), (pointer: coarse) {
-  .hud-dock { top: 16px; bottom: auto; width: 130px; }
-  .hud-radar { width: 130px; height: 130px; }
-  /* 十字のボタンと「？ 操作」の上に出す（要件 F60 で左下に十字のボタンを置いた） */
-  .hud-notice { top: auto; bottom: 210px; left: 16px; right: 16px; transform: none; max-width: none; }
+.hud-radar-button .hud-radar { display: block; }
+@media (hover: hover) {
+  .hud-radar-button:hover .hud-radar-edge { stroke: rgba(255, 255, 255, 0.8); }
 }
-
-.hud-view-buttons { display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
-.hud-view-buttons .hud-touch-only { display: none; }
-.hud-ship-builder {
+.hud-radar-button:active { transform: scale(0.97); }
+.hud-radar-button:focus-visible { outline: 1px solid var(--hud-accent); outline-offset: 3px; }
+/*
+ * 大きくしたマップ（画面の真ん中。2026-11-12）。上にレーダー、その下に出すものの切り替え。
+ * アカウントの箱と同じく、枠の無い、ふんわり暗い面
+ */
+.hud-map {
+  position: fixed;
+  /* 上の真ん中の情報のカード（選んだ天体・ワープホール）の下に出す。下のアイコンバーにも重ねない */
+  top: 200px;
   left: 50%;
-  bottom: 24px;
   transform: translateX(-50%);
-  width: min(560px, calc(100vw - 32px));
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px 14px;
   pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  background: var(--hud-scrim-strong);
+  box-shadow: 0 0 60px 40px var(--hud-scrim-strong);
+  border-radius: 28px;
+  text-align: center;
 }
-.hud-ship-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.hud-ship-option {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(160, 190, 255, 0.25);
-  background: rgba(20, 40, 70, 0.5);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+/* レーダー：二本指で範囲を変えるので、ブラウザの拡大・スクロールに使わせない */
+.hud-map-radar {
+  width: min(520px, calc(100vh - 380px), calc(100vw - 64px));
+  min-width: 240px;
+  touch-action: none;
 }
-.hud-ship-option.is-selected { border-color: #74e6ff; background: rgba(40, 90, 130, 0.7); }
-.hud-ship-option:focus-visible { outline: 2px solid #74e6ff; outline-offset: 2px; }
-.hud-ship-option-name { font-weight: 600; }
-.hud-ship-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.hud-map-head { display: flex; justify-content: center; align-items: baseline; gap: 14px; min-height: 24px; }
+.hud-map-range { font-size: 11px; letter-spacing: 0.08em; color: var(--hud-faint); font-variant-numeric: tabular-nums; }
+.hud-map .hud-map-layers { margin: 0; max-width: min(560px, calc(100vw - 64px)); }
+.hud-radar.is-large { width: 100%; height: auto; aspect-ratio: 1; background: none; }
+.hud-radar-pick { cursor: pointer; }
+/* 押せる範囲（見えない、少し大きな丸） */
+.hud-radar-hit { fill: transparent; stroke: none; }
+@media (hover: hover) {
+  .hud-radar-pick:hover :not(.hud-radar-hit) { stroke: #fff; }
+}
+.hud-radar-selected { fill: none; stroke: var(--hud-orange); stroke-width: 0.008; filter: drop-shadow(0 0 0.01px rgba(255, 138, 31, 0.8)); }
 
-@media (max-width: 720px), (pointer: coarse) {
-  .hud-view-buttons .hud-touch-only { display: block; }
-  .hud-ship-options { grid-template-columns: 1fr; }
-  .hud-ship-builder { bottom: 12px; }
-}
+/* お知らせ：面の無い白い文字（ゲームメニューのすりガラスより手前） */
+.hud-notice { z-index: 30; pointer-events: none; top: 64px; left: 50%; transform: translateX(-50%); font-size: 13px; letter-spacing: 0.08em; text-align: center; }
 
-/* 高さの低い画面（スマホの横向きなど）：右の列が下の説明に重ならないよう、視点・宇宙船のボタンを横に並べ、説明を隠す */
-@media (max-width: 720px), (pointer: coarse) {
-  .hud-view-buttons { flex-direction: row; flex-wrap: wrap; }
-  .hud-view-buttons .hud-button { flex: 1 1 60px; min-width: 0; padding-left: 6px; padding-right: 6px; }
-}
-
-/* スタンプ（要件 F6）：左の列。履歴の下に、選ぶパネルとボタン */
-.hud-stamps {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+/* ---- 画面の真ん中の一覧（コレクション・写真）：アカウントの箱と同じく、枠の無い、ふんわり暗い面 ---- */
+.hud-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(64vh, 520px);
+  overflow-y: auto;
+  padding: 18px 18px 20px;
   pointer-events: auto;
-  max-width: 260px;
+  background: var(--hud-scrim-strong);
+  box-shadow: 0 0 60px 40px var(--hud-scrim-strong);
+  border-radius: 24px;
+  text-align: center;
+  /* 左の列の一覧（z-index 2）より手前に出す */
+  z-index: 5;
 }
-.hud-stamps .hud-panel { position: static; }
-.hud-stamp-log { list-style: none; margin: 0; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; }
-.hud-stamp-log li { display: flex; align-items: center; gap: 6px; }
-.hud-stamp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.hud-stamp-palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; }
-.hud-stamp-button {
-  min-width: 40px;
-  min-height: 40px;
-  font-size: 22px;
-  border-radius: 8px;
-  border: 1px solid rgba(160, 190, 255, 0.25);
-  background: rgba(20, 40, 70, 0.5);
-  color: inherit;
-  cursor: pointer;
+.hud-modal-head { position: relative; display: flex; justify-content: center; align-items: center; min-height: 36px; margin-bottom: 8px; }
+.hud-modal-note { margin: 4px 0 0; font-size: 11px; line-height: 1.9; opacity: 0.55; }
+.hud-modal ul { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; text-align: left; }
+/* 写真（要件 F61）：撮った画面を大きく見せる */
+.hud-photo { width: min(760px, calc(100vw - 32px)); max-height: none; overflow: visible; }
+/* 縦横の比はそのまま、面に収まる大きさに（枠は写真のふちに付ける） */
+.hud-photo-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 230px);
+  margin: 6px auto 14px;
+  border: 1px solid var(--hud-line);
+  box-sizing: border-box;
 }
-.hud-stamp-button.is-phrase { grid-column: span 2; font-size: 13px; }
-.hud-stamp-button:hover:not(:disabled) { background: rgba(40, 90, 130, 0.8); }
-.hud-stamp-button:disabled { opacity: 0.4; cursor: default; }
-.hud-stamp-button:focus-visible { outline: 2px solid #74e6ff; outline-offset: 2px; }
+.hud-photo-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+.hud-photo-actions a.hud-button { display: inline-flex; align-items: center; box-sizing: border-box; text-decoration: none; }
+/* シャッターの光：撮った瞬間に、画面全体を白く光らせて消す */
+.hud-shutter {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: #fff;
+  opacity: 0;
+  animation: hud-shutter 0.45s ease-out;
+}
+@keyframes hud-shutter { from { opacity: 0.55; } to { opacity: 0; } }
+.hud-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 400; letter-spacing: 0.08em; color: var(--hud-accent); }
 
 /* 船の上の吹き出し */
-.stamp-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.stamp-bubble {
+.chat-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.chat-bubble {
   position: absolute;
   left: 0;
   top: 0;
   padding: 4px 10px 6px;
   border-radius: 14px;
-  background: rgba(8, 12, 24, 0.75);
-  border: 2px solid hsl(var(--hue, 200) 75% 60%);
+  background: rgba(2, 4, 10, 0.72);
+  border: 1px solid hsl(var(--hue, 200) 75% 60%);
   font-size: 26px;
   line-height: 1.2;
   white-space: nowrap;
   will-change: transform;
 }
-.stamp-bubble.is-phrase { font-size: 14px; padding: 6px 12px; }
-.stamp-bubble::after {
+.chat-bubble.is-phrase { font-size: 14px; line-height: 1.5; padding: 6px 12px; letter-spacing: 0.06em; white-space: normal; width: max-content; max-width: 240px; overflow-wrap: anywhere; }
+.chat-bubble::after {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: -8px;
+  bottom: -7px;
   margin-left: -6px;
   border: 6px solid transparent;
   border-top-color: hsl(var(--hue, 200) 75% 60%);
   border-bottom: 0;
 }
-.stamp-bubble.is-pop { animation: stamp-pop 0.25s ease-out; }
-@keyframes stamp-pop { from { opacity: 0; margin-top: 8px; } to { opacity: 1; margin-top: 0; } }
-@media (prefers-reduced-motion: reduce) { .stamp-bubble.is-pop { animation: none; } }
+.chat-bubble.is-pop { animation: chat-pop 0.25s ease-out; }
+@keyframes chat-pop { from { opacity: 0; margin-top: 8px; } to { opacity: 1; margin-top: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .chat-bubble.is-pop { animation: none; }
+  .hud-shutter { animation: none; }
+  .hud-radar-sweep { animation: none; display: none; }
+  .hud-button, .hud-chip, .hud-radar-button { transition: none; }
+}
 
-@media (max-width: 720px), (pointer: coarse) {
-  .hud-stamps { max-width: calc(100vw - 180px); }
-  .hud-stamp-palette { grid-template-columns: repeat(4, 40px); }
-}
-@media (max-height: 500px) {
-  .hud-stamp-log { display: none; }
-}
 
 .hud-coords { font-variant-numeric: tabular-nums; display: flex; gap: 6px; flex-wrap: wrap; }
 
-/* 左の列のパネルの切り替え（スタンプ・近く・コレクション） */
-.hud-tabs { display: flex; gap: 4px; pointer-events: auto; }
-.hud-button.is-selected { border-color: #74e6ff; background: rgba(40, 90, 130, 0.85); }
-
-/* 近くの天体・コレクションの一覧（要件 F35・F38） */
-.hud-list-panel {
-  pointer-events: auto;
-  width: 280px;
-  max-height: min(48vh, 420px);
-  overflow-y: auto;
-  padding: 8px 10px;
-  /* 下のクレジットに重なっても読めるように、濃くして手前に出す */
-  background: rgba(8, 12, 24, 0.88);
-}
-.hud-left .hud-list-panel { position: relative; z-index: 2; }
-.hud-list-panel ul { list-style: none; margin: 0 0 6px; padding: 0; }
-.hud-list-title { margin-top: 4px; }
-.hud-list-item {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 4px 6px;
-  cursor: pointer;
-  min-height: 36px;
-}
-.hud-list-item:hover { background: rgba(40, 90, 130, 0.5); }
-.hud-list-item.is-selected { border-color: #74e6ff; background: rgba(40, 90, 130, 0.6); }
-.hud-list-item:focus-visible { outline: 2px solid #74e6ff; outline-offset: 1px; }
-.hud-list-row { display: flex; flex-direction: column; padding: 3px 6px; }
+/* コレクションの一覧（要件 F38） */
+.hud-list-row { display: flex; flex-direction: column; padding: 6px 4px; border-top: 1px solid var(--hud-rule); }
+.hud-list-row:last-child { border-bottom: 1px solid var(--hud-rule); }
 .hud-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hud-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+/* 種類で絞る：細い線の小さな丸いボタン */
+.hud-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 6px 0; }
 .hud-chip {
   font: inherit;
   font-size: 11px;
-  color: inherit;
-  background: rgba(20, 40, 70, 0.5);
-  border: 1px solid rgba(160, 190, 255, 0.25);
+  letter-spacing: 0.08em;
+  color: var(--hud-quiet);
+  background: none;
+  border: 1px solid var(--hud-line);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease, border-color 0.25s ease;
 }
-.hud-chip.is-selected { border-color: #74e6ff; background: rgba(40, 90, 130, 0.7); }
+@media (hover: hover) {
+  .hud-chip:hover { color: #fff; }
+}
+.hud-chip.is-selected { color: #fff; border-color: rgba(255, 255, 255, 0.85); }
+.hud-chip:focus-visible { outline: 1px solid var(--hud-accent); outline-offset: 2px; }
 
 /* 情報のカード（要件 F36・F37）：画面の上の真ん中。宇宙の中には文字を出さない */
 .hud-left .hud-info-card { position: fixed; }
 .hud-info-card {
+  /* マップの後ろの見えない面（z-index 4）より手前（マップで選んだ天体の「その方を向く」を押せるように） */
+  z-index: 6;
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
   /* 左上の状態（約 270px）と右上のレーダー（200px）の間に収める */
   width: clamp(200px, calc(100vw - 560px), 300px);
   pointer-events: auto;
+  text-align: center;
 }
-.hud-notice { top: 64px; }
-.hud-info-card.is-near { border-color: rgba(116, 230, 255, 0.6); }
-.hud-info-head { display: flex; justify-content: space-between; gap: 8px; }
-.hud-info-new { font-size: 11px; color: #ffd38a; }
-.hud-info-lines { list-style: none; margin: 4px 0 0; padding: 0; }
-.hud-info-actions { display: flex; gap: 6px; margin-top: 6px; }
+.hud-info-head { display: flex; justify-content: center; align-items: baseline; gap: 10px; }
+.hud-info-new { font-size: 11px; letter-spacing: 0.08em; color: var(--hud-ok); }
+.hud-info-card .hud-title { margin-top: 2px; font-size: 17px; letter-spacing: 0.06em; }
+.hud-info-lines { list-style: none; margin: 4px 0 0; padding: 0; opacity: 0.85; }
+.hud-info-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 @media (max-width: 720px), (pointer: coarse) {
-  /* スマホ：お知らせは画面の下に出す（上の .hud-notice の top を消さないと、上下に伸びて画面を覆う） */
-  .hud-notice { top: auto; }
-  /* スマホ：左上の状態の下に重ならないよう、カードは右上に小さく */
-  .hud-left .hud-info-card { position: static; transform: none; width: min(230px, calc(100vw - 32px)); font-size: 12px; line-height: 1.5; }
-  .hud-left .hud-list-panel { width: calc(100vw - 32px - 138px); max-height: 36vh; }
+  /* スマホ：照準の少し上に出す（下は十字のボタン・アイコンバー・チャットで埋まっている） */
+  .hud-notice { top: calc(50% - 110px); bottom: auto; left: 16px; right: 16px; transform: none; max-width: none; }
+  /* スマホ：左上の状態の下に重ならないよう、カードは左の列の中に小さく */
+  .hud-left .hud-info-card { position: relative; top: auto; left: auto; transform: none; width: min(230px, calc(100vw - 32px)); font-size: 12px; line-height: 1.6; text-align: left; }
+  .hud-left .hud-info-card .hud-info-head, .hud-left .hud-info-card .hud-info-actions { justify-content: flex-start; }
+  .hud-dock { top: 16px; bottom: auto; width: 130px; }
+  /* スマホ：マップは画面の上から（情報のカードは左の列の中なので、上の場所は空いている）。
+     レーダーの下に、出すものの切り替えとワープホールの一覧を並べ、下のアイコンバー（下から約 214px）に重ねない */
+  .hud-map {
+    top: calc(16px + env(safe-area-inset-top));
+    width: calc(100vw - 32px);
+    max-height: calc(100svh - 246px - env(safe-area-inset-top));
+    overflow-y: auto;
+    padding: 8px 10px 12px;
+    border-radius: 22px;
+  }
+  .hud-map-radar { width: min(100%, calc(100svh - 360px)); min-width: 0; }
+  /* スマホでマップを開いている間は、選んだ天体・ワープホールのカードを、マップの下（下のアイコンバーの上）に置く。
+     カードの場所を空けるため、レーダーを小さくする */
+  .hud-map.is-with-card .hud-map-radar { width: min(100%, calc(100svh - 570px)); }
+  .hud-left .hud-info-card.is-docked { position: fixed; left: 16px; right: 16px; bottom: 222px; width: auto; max-width: none; }
+  .hud-info-card.is-warp .hud-title { font-size: 14px; letter-spacing: 0.04em; }
+  /* マップの間は、チャットを隠す（マップの下のカードと重なるため。マップの間はチャットを使えない） */
+  .hud-chat.is-under-map { display: none; }
+  .hud-photo { top: calc(16px + env(safe-area-inset-top)); }
+  .hud-photo-image { max-height: calc(100svh - 360px); }
+  /* スマホ：画面の上から出し、下のアイコンバー（下から約 214px）に重ねない */
+  .hud-modal { top: calc(16px + env(safe-area-inset-top)); transform: translateX(-50%); max-height: calc(100svh - 280px); }
+  .hud-radar { width: 130px; height: 130px; }
 }
 
-/* 選んだ天体の印 */
+/*
+ * ---- チャット（要件 F6）：画面の左下。1 枚のすりガラスの面で、角は角（2026-11-12）。
+ * 上に履歴、細い線で分けて、下にスタンプ（常に出す）と入力欄。ふだんの履歴は、しばらくすると薄くなって消え、面もその分縮む。
+ * 入力欄を使っている間は、履歴を全部出す ----
+ */
+.hud-chat {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  width: min(420px, calc(100vw - 32px - 220px));
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  /* 照準の下の名前より手前（スマホで重なるため）。マップなどの後ろの見えない面（4）より奥 */
+  z-index: 3;
+  background: var(--hud-glass);
+  -webkit-backdrop-filter: var(--hud-glass-blur);
+  backdrop-filter: var(--hud-glass-blur);
+  border-radius: 0;
+}
+.hud-chat-log {
+  list-style: none;
+  margin: 0;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 3px rgba(2, 4, 10, 0.8);
+}
+.hud-chat.is-open .hud-chat-log { max-height: min(40vh, 320px); overflow-y: auto; pointer-events: auto; }
+.hud-chat-line { transition: opacity 1.2s ease; }
+.hud-chat-line.is-fading { opacity: 0; }
+.hud-chat-name { margin-right: 0.6em; font-size: 12px; letter-spacing: 0.08em; }
+.hud-chat-name::after { content: '：'; opacity: 0.6; }
+.hud-chat-text { color: var(--hud-ink); }
+/* 履歴と、スタンプ・入力欄の間の細い線 */
+.hud-chat-log + .hud-chat-compose { border-top: 1px solid rgba(232, 236, 244, 0.18); }
+.hud-chat-compose { display: flex; flex-direction: column; pointer-events: auto; }
+.hud-chat-stamps { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 6px 0; }
+.hud-chat-form { display: flex; align-items: center; gap: 4px; padding: 0 4px 2px 10px; }
+/* 入力：タイトル画面の入力と同じ、下の細い線だけ（入力中だけ線を出す） */
+.hud-chat-input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  /* 16px 未満だと、iPhone の Safari が入力のたびに拡大する */
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  padding: 6px 2px;
+  min-height: 36px;
+  outline: none;
+  text-shadow: 0 0 3px rgba(2, 4, 10, 0.8);
+  transition: border-color 0.25s ease;
+}
+.hud-chat-input::placeholder { color: rgba(232, 236, 244, 0.45); font-size: 12px; letter-spacing: 0.12em; }
+.hud-chat-input:focus { border-bottom-color: rgba(255, 255, 255, 0.5); }
+.hud-chat-input:disabled { opacity: 0.5; }
+/* 絵文字のボタン（スタンプと、☺ の一覧で共通）：枠の無い四角、ホバーでうっすら白 */
+.hud-chat-emoji {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font: inherit;
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+.hud-chat-emoji:disabled { opacity: 0.4; cursor: default; }
+.hud-chat-emoji:active:not(:disabled) { background: rgba(255, 255, 255, 0.2); transform: scale(0.92); }
+/* ☺：もっと多くの絵文字から選ぶ（選ぶと入力欄に足す） */
+.hud-chat-picker-toggle {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--hud-faint);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.25s ease;
+}
+.hud-chat-picker-toggle.is-selected { color: var(--hud-orange); }
+.hud-chat-picker-toggle:disabled { opacity: 0.4; cursor: default; }
+.hud-chat-picker-toggle:focus-visible, .hud-chat-emoji:focus-visible { outline: 1px solid var(--hud-accent); outline-offset: -2px; }
+.hud-chat-picker { max-height: min(34vh, 220px); overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 6px; border-bottom: 1px solid rgba(232, 236, 244, 0.18); }
+.hud-chat-picker-name { padding: 4px 4px 0; font-size: 10px; letter-spacing: 0.2em; color: var(--hud-orange); }
+.hud-chat-emoji-grid { display: flex; flex-wrap: wrap; gap: 2px; }
+@media (hover: hover) {
+  .hud-chat-picker-toggle:hover:not(:disabled) { color: #fff; }
+  .hud-chat-emoji:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-chat-line, .hud-chat-emoji { transition: none; }
+  .hud-pause, .hud-lock-hint { animation-duration: 0.01s; animation-delay: 0s; }
+}
+@media (max-width: 720px), (pointer: coarse) {
+  /* スマホ：十字のボタン・アイコンバーの上。右の速さのボタン（幅 約 64px）には重ねない */
+  .hud-chat { bottom: 226px; width: auto; right: 96px; }
+  .hud-chat-log { font-size: 12px; }
+  /* 8 つのスタンプが 1 列に入る大きさ */
+  .hud-chat-emoji { width: 31px; height: 31px; font-size: 18px; }
+  .hud-chat-stamps { gap: 1px; padding: 3px 4px 0; }
+}
+
+/* 選んだ天体の印：オレンジ（タイトル画面の差し色） */
 .target-ring, .target-arrow { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; }
 .target-ring {
   width: 28px;
   height: 28px;
-  border: 2px solid #74e6ff;
+  border: 1.5px solid var(--hud-orange);
   border-radius: 50%;
-  box-shadow: 0 0 6px rgba(116, 230, 255, 0.6);
+  box-shadow: 0 0 8px rgba(255, 138, 31, 0.55);
 }
 .target-arrow {
   width: 0;
   height: 0;
   border-top: 9px solid transparent;
   border-bottom: 9px solid transparent;
-  border-left: 16px solid #74e6ff;
+  border-left: 16px solid var(--hud-orange);
+  filter: drop-shadow(0 0 4px rgba(255, 138, 31, 0.55));
 }
 
-/* 照準と、照準の先の天体の名前（要件 F36）。画面の真ん中に固定 */
+/* 照準と、照準の先の天体の名前（要件 F36）。画面の真ん中に固定。面は無く、文字の影だけ */
 .hud-aim { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; display: flex; flex-direction: column; align-items: center; }
-.hud-aim-mark { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(200, 220, 255, 0.25); }
-.hud-aim-mark.is-on { border-color: rgba(116, 230, 255, 0.7); }
+.hud-aim-mark { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(232, 236, 244, 0.25); }
+.hud-aim-mark.is-on { border-color: rgba(255, 255, 255, 0.85); }
 .hud-aim-label {
   position: absolute;
   top: 22px;
   white-space: nowrap;
   font-size: 12px;
+  letter-spacing: 0.08em;
   padding: 1px 8px;
-  border-radius: 6px;
-  background: rgba(8, 12, 24, 0.45);
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 4px rgba(2, 4, 10, 0.95), 0 0 10px rgba(2, 4, 10, 0.8);
 }
 /* 照準の先の天体の下に、星座の名前を出す */
 .hud-aim-second { top: 44px; }

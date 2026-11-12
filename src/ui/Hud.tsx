@@ -1,14 +1,16 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import '@fontsource/monoton/400.css';
+import '@fontsource/josefin-sans/300.css';
 import '@fontsource/dotgothic16/400.css';
 import { formatCoordinates, formatDistance, formatSpeed } from './format';
 import { STAR_LIMIT_NAMES_JA } from '../world/stars';
 import { hudActions, hudStore } from './hud-store';
 import { Radar } from './Radar';
-import { WarpPanel } from './WarpPanel';
-import { StampPanel } from './StampPanel';
-import { InfoCard } from './InfoCard';
-import { NearbyPanel } from './NearbyPanel';
+import { MapPanel } from './MapPanel';
+import { PhotoView } from './PhotoView';
+import { MAX_WARPS_PER_PLAYER } from '../world/warp-schema';
+import { ChatBox } from './ChatBox';
+import { InfoCard, WarpCard } from './InfoCard';
 import { CollectionPanel } from './CollectionPanel';
 import { AimLabel } from './AimLabel';
 import { PauseMenu } from './PauseMenu';
@@ -17,23 +19,17 @@ import './hud.css';
 
 export function Hud() {
   const s = useSyncExternalStore(hudStore.subscribe, hudStore.get);
-  const [warpOpen, setWarpOpen] = useState(false);
   const utc = s.date.toISOString().replace('T', ' ').slice(0, 19);
-  const toggleCollection = () => {
-    if (s.leftPanel !== 'collection') setWarpOpen(false);
-    hudActions.toggleLeftPanel('collection');
-  };
-  const toggleWarp = () => {
-    if (!warpOpen) {
-      if (s.leftPanel === 'collection') hudActions.toggleLeftPanel('collection');
-      hudActions.refreshWarps();
-    }
-    setWarpOpen((v) => !v);
-  };
+  const o = s.overlay;
+  // マップ・コレクション・写真は、まわり（この下の見えない面）を押すと閉じる（× は置かない。2026-11-12）
+  const backdrop = o === 'map' || o === 'collection' || o === 'photo';
+  const myWarps = s.warps.filter((w) => w.mine).length;
+  const selectedWarp = o === 'map' && s.selectedWarp ? (s.warps.find((w) => w.id === s.selectedWarp) ?? null) : null;
   return (
     <>
-      {/* ゲームメニューは一番先に置き、後ろを暗くする。まわりのボタンは、この上に重なって押せる */}
-      {s.paused && <PauseMenu />}
+      {/* ゲームメニュー：画面全体をすりガラスにし、メニューのボタンのほかは押せない */}
+      {o === 'menu' && <PauseMenu />}
+      {backdrop && <div className="hud-backdrop" aria-hidden="true" onClick={() => hudActions.setOverlay(null)} />}
       <div className="hud-left">
         <header className="hud-brand">STAR VESSEL</header>
         {s.statusVisible && (
@@ -51,50 +47,49 @@ export function Hud() {
             {s.status && <div className="hud-warn">{s.status}</div>}
           </div>
         )}
-        <div className="hud-tabs" role="group" aria-label="パネル">
-          {(
-            [
-              ['stamps', 'スタンプ'],
-              ['nearby', '近く'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`hud-button hud-button-small${s.leftPanel === id ? ' is-selected' : ''}`}
-              aria-pressed={s.leftPanel === id}
-              onClick={(e) => {
-                hudActions.toggleLeftPanel(id);
-                e.currentTarget.blur();
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
         {/* 情報のカード：PC は画面の上の真ん中（position: fixed）、スマホはこの列の中（右上のレーダーに重ならないように） */}
-        {s.infoCard && <InfoCard card={s.infoCard} />}
-        <StampPanel ready={s.stampReady} log={s.stampLog} open={s.leftPanel === 'stamps'} />
-        {s.leftPanel === 'nearby' && <NearbyPanel sections={s.nearby} selectedKey={s.selectedKey} />}
+        {/* マップで選んだワープホールは、TARGET と同じ場所に、同じ形のカードで出す（どちらか一方） */}
+        {selectedWarp ? <WarpCard warp={selectedWarp} docked /> : s.infoCard && <InfoCard card={s.infoCard} docked={o === 'map'} />}
       </div>
       {s.notice && <div className="hud-panel hud-notice">{s.notice}</div>}
-      <div className="hud-dock">
-        <Radar blips={s.radar} />
-      </div>
-      {s.leftPanel === 'collection' && <CollectionPanel visits={s.visits} />}
-      {warpOpen && <WarpPanel warps={s.warps} ready={s.warpsReady} onClose={() => setWarpOpen(false)} />}
+      {/* レーダー（マップ）：押すと（M キーでも）画面の真ん中に大きく出す。範囲・出すものは、マップで変えたものをそのまま使う */}
+      {o !== 'map' && (
+        <div className="hud-dock">
+          <button
+            type="button"
+            className="hud-radar-button"
+            aria-label="マップを大きくする（M）"
+            title="マップを大きくする（M）"
+            onClick={(e) => {
+              hudActions.setOverlay('map');
+              e.currentTarget.blur();
+            }}
+          >
+            <Radar blips={s.radar} rangeKm={s.mapRangeKm} layers={s.mapLayers} />
+          </button>
+        </div>
+      )}
+      {o === 'map' && <MapPanel blips={s.radar} rangeKm={s.mapRangeKm} layers={s.mapLayers} selectedKey={s.selectedKey} selectedWarp={s.selectedWarp} withCard={selectedWarp !== null || s.infoCard !== null} />}
+      <ChatBox ready={s.chatReady} log={s.chatLog} open={o === 'chat'} underMap={o === 'map'} />
+      {o === 'collection' && <CollectionPanel visits={s.visits} />}
+      {o === 'photo' && s.photo && <PhotoView photo={s.photo} />}
+      {/* シャッターの光（写真を撮るたびに作り直して、もう一度光らせる） */}
+      {s.shutter > 0 && <div key={s.shutter} className="hud-shutter" aria-hidden="true" />}
+      {/* PC で、入ったばかり・カーソルを消せなかったとき（ゲームメニューは出さず、クリックを待つ） */}
+      {s.pointerLock && !s.locked && o === null && <div className="hud-lock-hint">クリックで操縦をはじめる</div>}
       <div className="hud-hotbar" role="toolbar" aria-label="メニュー">
         <button
           type="button"
-          className={`hud-button hud-icon-button${s.leftPanel === 'collection' ? ' is-selected' : ''}`}
+          className={`hud-button hud-icon-button${o === 'collection' ? ' is-selected' : ''}`}
           aria-label={`コレクション（${s.visits.length}）`}
-          title={`コレクション（${s.visits.length}）`}
-          aria-pressed={s.leftPanel === 'collection'}
+          title={`コレクション（${s.visits.length}）・1`}
+          aria-pressed={o === 'collection'}
           onClick={(e) => {
-            toggleCollection();
+            hudActions.toggleOverlay('collection');
             e.currentTarget.blur();
           }}
         >
+          <HotkeyNumber n={1} />
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5V5.5Z" />
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H19" />
@@ -105,12 +100,13 @@ export function Hud() {
           type="button"
           className="hud-button hud-icon-button"
           aria-label={`星の見え方：${STAR_LIMIT_NAMES_JA[s.starLimit]}`}
-          title={`星の見え方：${STAR_LIMIT_NAMES_JA[s.starLimit]}`}
+          title={`星の見え方：${STAR_LIMIT_NAMES_JA[s.starLimit]}・2`}
           onClick={(e) => {
             hudActions.cycleStarLimit();
             e.currentTarget.blur();
           }}
         >
+          <HotkeyNumber n={2} />
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2L12 3Z" />
             <path d="M19 3v3M20.5 4.5h-3M5 17v2M6 18H4" />
@@ -120,13 +116,14 @@ export function Hud() {
           type="button"
           className={`hud-button hud-icon-button${s.constellations ? ' is-selected' : ''}`}
           aria-label={`星座：${s.constellations ? '表示中' : '非表示'}`}
-          title={`星座：${s.constellations ? '表示中' : '非表示'}`}
+          title={`星座：${s.constellations ? '表示中' : '非表示'}・3`}
           aria-pressed={s.constellations}
           onClick={(e) => {
             hudActions.toggleConstellations();
             e.currentTarget.blur();
           }}
         >
+          <HotkeyNumber n={3} />
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="5" cy="6" r="1.8" fill="currentColor" />
             <circle cx="12" cy="9" r="1.8" fill="currentColor" />
@@ -137,20 +134,36 @@ export function Hud() {
         </button>
         <button
           type="button"
-          className={`hud-button hud-icon-button${warpOpen ? ' is-selected' : ''}`}
-          aria-label={`ワープ（${s.warps.length}）`}
-          title={`ワープ（${s.warps.length}）`}
-          aria-expanded={warpOpen}
+          className="hud-button hud-icon-button"
+          aria-label={`ここにワープホールを作る（${myWarps}/${MAX_WARPS_PER_PLAYER}）`}
+          title={`ここにワープホールを作る（${myWarps}/${MAX_WARPS_PER_PLAYER}）・4。ワープはマップから`}
           disabled={!s.warpsReady}
           onClick={(e) => {
-            toggleWarp();
+            hudActions.placeWarp();
             e.currentTarget.blur();
           }}
         >
+          <HotkeyNumber n={4} />
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <ellipse cx="12" cy="12" rx="9" ry="4.5" transform="rotate(-25 12 12)" />
-            <ellipse cx="12" cy="12" rx="5" ry="2.4" transform="rotate(-25 12 12)" />
-            <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+            <ellipse cx="11" cy="13" rx="8" ry="4" transform="rotate(-25 11 13)" />
+            <ellipse cx="11" cy="13" rx="4.2" ry="2" transform="rotate(-25 11 13)" />
+            <path d="M19 2.5v5M16.5 5h5" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="hud-button hud-icon-button"
+          aria-label="写真を撮る"
+          title="写真を撮る・5（F2 でも）"
+          onClick={(e) => {
+            hudActions.takePhoto();
+            e.currentTarget.blur();
+          }}
+        >
+          <HotkeyNumber n={5} />
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 8h3l1.6-2.5h6.8L17 8h3v11H4V8Z" />
+            <circle cx="12" cy="13.2" r="3.4" />
           </svg>
         </button>
       </div>
@@ -164,8 +177,17 @@ export function Hud() {
         </button>
       </div>
       <TouchPad hidden={false} />
-      {!s.paused && <AimLabel aim={s.aimLabel} constellation={s.aimConstellation} />}
+      {o !== 'menu' && <AimLabel aim={s.aimLabel} constellation={s.aimConstellation} />}
     </>
+  );
+}
+
+/** 下のボタンの数字（PC だけ。マインクラフトのホットバーと同じく、数字のキーで押せる） */
+function HotkeyNumber({ n }: { n: number }) {
+  return (
+    <span className="hud-hotkey hud-keyboard-only" aria-hidden="true">
+      {n}
+    </span>
   );
 }
 

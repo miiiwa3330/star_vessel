@@ -3,8 +3,8 @@
  * 自分の状態を送り、近くの船の状態を受け取る。切れたら、間をあけてつなぎ直す。
  */
 import { reportServerTime } from '../world/clock';
-import type { ServerMessage, ShipSnapshot, ShipState, StampMessage, StateMessage } from '../world/ship-schema';
-import { isStampId, type StampId } from '../world/stamps';
+import type { ChatMessage, ServerMessage, ShipSnapshot, ShipState, StateMessage } from '../world/ship-schema';
+import { cleanChatText } from '../world/chat';
 import type { ShipDesign } from '../world/ship-design';
 
 const MAX_RETRY_MS = 10_000;
@@ -14,10 +14,10 @@ export class SpaceLink {
   ships: ShipSnapshot[] = [];
   /** 自分の色相（サーバーが決める） */
   hue: number | null = null;
-  /** 自分の船の短い ID（サーバーが決める。届いたスタンプが自分のものか見分ける） */
+  /** 自分の船の短い ID（サーバーが決める。届いたチャットが自分のものか見分ける） */
   selfId: string | null = null;
-  /** スタンプが届いたとき（要件 F6）。main.ts が入れる */
-  onStamp: (s: { from: string; hue: number; k: StampId }) => void = () => {};
+  /** チャットが届いたとき（要件 F6）。main.ts が入れる */
+  onChat: (c: { from: string; hue: number; name: string | null; text: string }) => void = () => {};
   private ws: WebSocket | null = null;
   private room: string | null = null;
   private retryMs = 1_000;
@@ -44,10 +44,11 @@ export class SpaceLink {
     this.ws?.send(JSON.stringify(msg));
   }
 
-  /** スタンプを送る。届いたかどうかは、自分にも返ってくる stamp で分かる */
-  sendStamp(k: StampId): boolean {
-    if (!this.connected) return false;
-    const msg: StampMessage = { t: 'stamp', k };
+  /** チャットを送る。届いたかどうかは、自分にも返ってくる chat で分かる。送れる形でなければ false */
+  sendChat(raw: string): boolean {
+    const text = cleanChatText(raw);
+    if (!this.connected || text === null) return false;
+    const msg: ChatMessage = { t: 'chat', text };
     this.ws?.send(JSON.stringify(msg));
     return true;
   }
@@ -72,8 +73,11 @@ export class SpaceLink {
         this.retryMs = 1_000;
       } else if (m.t === 'ships' && Array.isArray(m.ships)) {
         this.ships = m.ships;
-      } else if (m.t === 'stamp' && isStampId(m.k)) {
-        this.onStamp({ from: m.from, hue: m.hue, k: m.k });
+      } else if (m.t === 'chat') {
+        const text = cleanChatText(m.text);
+        if (text !== null && typeof m.from === 'string' && typeof m.hue === 'number') {
+          this.onChat({ from: m.from, hue: m.hue, name: typeof m.name === 'string' ? m.name : null, text });
+        }
       }
     };
     ws.onclose = () => {

@@ -1,11 +1,14 @@
 import { KM_PER_AU, KM_PER_LY } from '../world/units';
 
+/** 3 桁で丸める。1,000 以上は 2.45e+3 ではなく 2,450 と書く */
+const three = (n: number): string => (Math.abs(n) < 1000 ? n.toPrecision(3) : Number(n.toPrecision(3)).toLocaleString('ja-JP'));
+
 /** 距離を、大きさに合った単位で表す */
 export function formatDistance(km: number): string {
   const a = Math.abs(km);
   if (a < 1e6) return `${Math.round(km).toLocaleString('ja-JP')} km`;
-  if (a < 0.1 * KM_PER_LY) return `${(km / KM_PER_AU).toPrecision(3)} 天文単位`;
-  return `${(km / KM_PER_LY).toPrecision(3)} 光年`;
+  if (a < 0.1 * KM_PER_LY) return `${three(km / KM_PER_AU)} 天文単位`;
+  return `${three(km / KM_PER_LY)} 光年`;
 }
 
 /** 速さを、大きさに合った単位で表す（1 秒あたり） */

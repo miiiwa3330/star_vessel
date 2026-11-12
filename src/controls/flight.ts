@@ -3,7 +3,8 @@
  * 動き方の計算（慣性・ダッシュ）は src/controls/movement.ts。
  *
  * PC：画面をクリックすると、マウスのカーソルが消え（Pointer Lock）、マウスを動かすだけで向きが変わる。Esc でカーソルが戻り、
- *     ゲームメニュー（一時停止の画面）が出る。W/S で前後、A/D で左右（いま見ている視点の向きにそのまま進む）、
+ *     ゲームメニューが出る（入ったばかりのときは出さず、クリックを待つ）。マップ（M）・チャット（Enter・T）・下のボタン（1〜4）を
+ *     開くと、カーソルが出て、閉じると操縦に戻る。W/S で前後、A/D で左右（いま見ている視点の向きにそのまま進む）、
  *     Space で上昇、Shift で下降（いま見ている視点の上下に沿って動く）、
  *     W の 2 回押しか Ctrl でダッシュ、Q/E で傾き、ホイールか +/− で速さ（Ctrl か Shift を押しながら +/− で 10 倍ずつ・
  *     Ctrl＋ホイールで 10 倍ずつ）、クリックで照準の先の天体を選ぶ
@@ -50,18 +51,33 @@ export class FlightControls {
   onToggleConstellations: () => void = () => {};
   /** 左上の表示（座標など）を出す・消す（F3 キー） */
   onToggleStatus: () => void = () => {};
+  /** チャットの入力欄を開く（Enter・T キー） */
+  onOpenChat: () => void = () => {};
+  /** レーダーを大きくする・戻す（M キー） */
+  onToggleMap: () => void = () => {};
+  /** 下のボタン（ホットバー）を押す（1〜5 キー。マインクラフトと同じく数字で選ぶ） */
+  onHotbar: (n: number) => void = () => {};
+  /** F2：写真を撮る（マインクラフトと同じキー） */
+  onPhoto: () => void = () => {};
+  /** カーソルが出ているときに Esc を押した（開いている画面を閉じる・ゲームメニューを出す） */
+  onEscape: () => void = () => {};
   /** ほとんど動かさずに離した（クリック・タップ）。画面の座標（CSS ピクセル）。main.ts が入れる */
   onTap: (x: number, y: number) => void = () => {};
-  /** ゲームメニュー（一時停止）を出す・消す。PC だけ（スマホはカーソルが無いので、止めない） */
-  onPauseChange: (paused: boolean) => void = () => {};
+  /** 操縦しているときに、Esc でカーソルが戻った（自分で exitLock したときは呼ばない）。ゲームメニューを出す。PC だけ */
+  onUserUnlock: () => void = () => {};
+  /** カーソルを消した・戻した。usesLock はカーソルを消して操縦する端末か（タッチすると false になる） */
+  onLockState: (locked: boolean, usesLock: boolean) => void = () => {};
   /** カーソルを消せなかった（Esc のすぐ後など） */
   onLockError: () => void = () => {};
-  /** いまカーソルを消してよいか（宇宙船を作る画面を開いている間は消さない）。main.ts が入れる */
-  canLock: () => boolean = () => true;
+  /** 画面（ゲームメニュー・マップ・チャットなど）が開いているか。開いている間は操縦せず、カーソルも消さない。main.ts が入れる */
+  isBlocked: () => boolean = () => false;
   /** マウスのカーソルを消して操縦するか（PC）。スマホ・Pointer Lock が使えないブラウザでは false で、ドラッグで向きを変える */
   private usesLock: boolean;
   private locked = false;
-  private paused: boolean;
+  /** exitLock で自分からカーソルを戻したところか（ゲームメニューを出さない） */
+  private quietUnlock = false;
+  /** 最後にカーソルが戻った時刻。Esc でカーソルが戻ったのと同じ Esc のキーを、もう一度数えないため */
+  private unlockedAt = -Infinity;
   /** 押した位置と、そこから動いた量（タップか、ドラッグかを見分ける） */
   private press: { x: number; y: number; moved: number; button: number } | null = null;
   private readonly keys = new Set<string>();
@@ -77,7 +93,6 @@ export class FlightControls {
 
   constructor(private readonly element: HTMLElement) {
     this.usesLock = 'requestPointerLock' in element && window.matchMedia('(pointer: fine)').matches;
-    this.paused = this.usesLock;
     element.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
@@ -99,14 +114,14 @@ export class FlightControls {
     element.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  /** ゲームメニューを出しているか */
-  get isPaused(): boolean {
-    return this.paused;
+  /** マウスのカーソルを消して操縦する端末か（PC） */
+  get usesPointerLock(): boolean {
+    return this.usesLock;
   }
 
-  /** カーソルを消して操縦に戻る（ゲームメニューの「ゲームに戻る」。押したときの処理の中で呼ぶ） */
+  /** カーソルを消して操縦に戻る（ゲームメニューの「ゲームに戻る」など。押したときの処理の中で呼ぶ） */
   requestLock(): void {
-    if (!this.usesLock || this.locked || !this.canLock()) return;
+    if (!this.usesLock || this.locked || this.isBlocked()) return;
     try {
       // 古い Safari は Promise を返さない
       const r = this.element.requestPointerLock() as unknown as Promise<void> | undefined;
@@ -116,9 +131,11 @@ export class FlightControls {
     }
   }
 
-  /** カーソルを戻す（宇宙船を作る画面を開くときなど） */
+  /** カーソルを戻す（マップ・チャットなどを開くとき）。ゲームメニューは出さない */
   exitLock(): void {
-    if (this.locked) document.exitPointerLock();
+    if (!this.locked) return;
+    this.quietUnlock = true;
+    document.exitPointerLock();
   }
 
   /** target の方を、up を上にして向く（target・up は EQJ） */
@@ -213,22 +230,27 @@ export class FlightControls {
     this.press = null;
   }
 
-  private setPaused(paused: boolean) {
-    if (this.paused === paused) return;
-    this.paused = paused;
-    this.onPauseChange(paused);
-  }
-
   private onLockChange = () => {
+    const was = this.locked;
     this.locked = document.pointerLockElement === this.element;
     this.releaseAll();
-    if (this.usesLock) this.setPaused(!this.locked);
+    if (was && !this.locked) {
+      this.unlockedAt = performance.now();
+      if (!this.quietUnlock && this.usesLock) this.onUserUnlock();
+    }
+    this.quietUnlock = false;
+    this.onLockState(this.locked, this.usesLock);
   };
+
+  /** 操縦のキー・マウスを受け付けるか（画面が開いておらず、PC ではカーソルを消している） */
+  private get flying(): boolean {
+    return !this.isBlocked() && (this.locked || !this.usesLock);
+  }
 
   private onPointerDown = (e: PointerEvent) => {
     if (this.usesLock && e.pointerType === 'mouse') {
       if (!this.locked) {
-        // ゲームメニューの間に画面をクリックすると、操縦に戻る
+        // カーソルが出ているときに画面をクリックすると、操縦をはじめる（画面が開いている間は、その画面がクリックを受ける）
         if (e.button === 0) this.requestLock();
         return;
       }
@@ -239,7 +261,7 @@ export class FlightControls {
     // マウスとタッチの両方がある端末で、タッチしたら、カーソルを消す操縦をやめる（ドラッグで向きを変える）
     if (this.usesLock && e.pointerType !== 'mouse') {
       this.usesLock = false;
-      this.setPaused(false);
+      this.onLockState(this.locked, false);
     }
     if (this.dragging) return;
     this.dragging = { id: e.pointerId, x: e.clientX, y: e.clientY, orbit: e.button === 2 || this.dragMode === 'orbit' };
@@ -274,7 +296,7 @@ export class FlightControls {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    if (this.paused) return;
+    if (!this.flying) return;
     if (e.altKey) this.onZoom(e.deltaY < 0 ? 1 : -1);
     // Shift はいま下降なので、10 倍ずつは Ctrl（Shift＋ホイールも残す。Mac では横のスクロールになるので deltaX も見る）
     else {
@@ -294,13 +316,48 @@ export class FlightControls {
   };
 
   private onKeyDown = (e: KeyboardEvent) => {
+    // 文字を入れている間（チャットの入力欄）は、キーを操縦に使わない
+    if (isTyping(e.target)) return;
+    if (e.code === 'F2') {
+      e.preventDefault();
+      if (!e.repeat) this.onPhoto();
+      return;
+    }
     if (e.code === 'F3') {
       e.preventDefault(); // ブラウザの検索を出さない
       if (!e.repeat) this.onToggleStatus();
       return;
     }
-    // ゲームメニューの間は操縦しない（ボタンを Tab と Space で押せるように、ブラウザに任せる）
-    if (this.paused) return;
+    // 操縦中の Esc はブラウザがカーソルを戻すのに使う（ページには届かないことがある）。カーソルが出ているときの Esc だけ使う
+    if (e.code === 'Escape') {
+      if (!this.locked && performance.now() - this.unlockedAt > 300) {
+        e.preventDefault();
+        this.onEscape();
+      }
+      return;
+    }
+    const plain = !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey;
+    // マップ・下のボタンは、ほかの画面を開いている間も切り替えられる（ゲームメニューの間は main.ts が受け付けない）
+    if (e.code === 'KeyM' && plain) {
+      this.onToggleMap();
+      return;
+    }
+    const digit = /^(?:Digit|Numpad)([1-5])$/.exec(e.code);
+    if (digit && plain) {
+      this.onHotbar(Number(digit[1]));
+      return;
+    }
+    // 画面が開いている間は操縦しない（ボタンを Tab と Space で押せるように、ブラウザに任せる）
+    if (this.isBlocked()) return;
+    // カーソルが出ていても（入ったばかり・カーソルを消せなかったとき）、チャットは開ける
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyT') && plain) {
+      // 押した文字が、開いた入力欄に入らないように
+      e.preventDefault();
+      this.releaseAll();
+      this.onOpenChat();
+      return;
+    }
+    if (!this.flying) return;
     if (e.code === 'Space') {
       // Tab で選んだボタンの上では、ふつうにそのボタンを押す
       if (e.target instanceof HTMLElement && e.target.tagName === 'BUTTON') return;
@@ -324,4 +381,9 @@ export class FlightControls {
   private onKeyUp = (e: KeyboardEvent) => {
     this.keys.delete(e.code);
   };
+}
+
+/** 文字を入れる欄の中のキーか */
+function isTyping(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
 }

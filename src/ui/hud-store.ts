@@ -3,8 +3,8 @@
  * 世界のループが 1 秒に 10 回だけ値を書き、React が読む。
  * 毎フレーム React を動かさないため（docs/tech/stack.md「2. 3D と画面の部品のつなぎ方」）。
  */
-import type { RadarBlip } from '../world/radar';
-import type { StampId } from '../world/stamps';
+import { clampRadarMaxKm, type MapLayer, type RadarBlip } from '../world/radar';
+import { loadMapPrefs, saveMapPrefs } from './map-prefs';
 import { DEFAULT_STAR_LIMIT, type StarLimitMode } from '../world/stars';
 import type { ViewMode } from '../controls/chase-camera';
 import type { Visit } from '../world/visits';
@@ -25,27 +25,33 @@ export interface InfoCardState {
   firstVisit: boolean;
 }
 
-/** 近くの天体の一覧の 1 行 */
-export interface NearbyItem {
-  key: string;
-  name: string;
-  kindJa: string;
-  distance: string;
-}
-export interface NearbySection {
-  title: string;
-  items: NearbyItem[];
+/**
+ * 開いている画面（どれか 1 つだけ。2026-11-12）。PC では、どれかが開いている間はカーソルを出し、閉じると操縦に戻る（カーソルを消す）。
+ * menu：ゲームメニュー（Esc）・map：大きくしたマップ（M。ワープもここから）・chat：チャットの入力（Enter・T）・
+ * collection：コレクション（1）・photo：撮った写真（5・F2）
+ */
+export type Overlay = 'menu' | 'map' | 'chat' | 'collection' | 'photo' | null;
+
+/** 撮った写真（要件 F61。ブラウザの中だけに置き、保存・共有するまでどこにも送らない） */
+export interface Photo {
+  /** URL.createObjectURL の URL（閉じたら消す） */
+  url: string;
+  blob: Blob;
+  fileName: string;
+  width: number;
+  height: number;
 }
 
-/** 左の列で開いているパネル */
-export type LeftPanel = 'stamps' | 'nearby' | 'collection' | null;
-
-/** スタンプの履歴の 1 行 */
-export interface StampLogItem {
+/** チャットの履歴の 1 行（要件 F6） */
+export interface ChatLogItem {
   key: number;
   hue: number;
+  /** 宇宙船名（サインアップしていない人は null） */
+  name: string | null;
   text: string;
   mine: boolean;
+  /** 受け取った時刻（Date.now()。ふだんの表示で、しばらくたった行を消すため） */
+  at: number;
 }
 
 export interface WarpListItem {
@@ -72,20 +78,29 @@ export interface HudState {
   /** 一時的なお知らせ（ワープホールを置いた、など） */
   notice: string | null;
   radar: RadarBlip[];
+  /** マップ（小さなレーダーも）のふちの距離（km）。二本指・ホイールで変える */
+  mapRangeKm: number;
+  /** マップ（小さなレーダーも）に出すものの種類 */
+  mapLayers: Record<MapLayer, boolean>;
   warps: WarpListItem[];
   /** ワープホールが使えるか（サーバーにつながらないときは false） */
   warpsReady: boolean;
   /** 一人称・後ろから・前から */
   viewMode: ViewMode;
-  /** ゲームメニュー（一時停止）を出しているか。PC で Esc を押してカーソルを出したとき（要件 F60） */
-  paused: boolean;
+  /** 開いている画面（ゲームメニュー・マップ・チャットの入力・コレクション・ワープ） */
+  overlay: Overlay;
+  /** マウスのカーソルを消して操縦する端末か（PC）。スマホは false */
+  pointerLock: boolean;
+  /** いまカーソルを消して操縦しているか（PC） */
+  locked: boolean;
   /** 左上の表示（座標など）を出しているか（F3 キーで切り替え） */
   statusVisible: boolean;
   /** スマホの三人称で、1 本指のドラッグでカメラを回すか */
   orbitDrag: boolean;
-  /** スタンプを送れるか（宇宙の部屋につながっているか） */
-  stampReady: boolean;
-  stampLog: StampLogItem[];
+  /** チャットを送れるか（宇宙の部屋につながっているか） */
+  chatReady: boolean;
+  /** チャットの履歴（新しい順） */
+  chatLog: ChatLogItem[];
   /** いる場所の目印（星団の中なら、その名前） */
   region: string | null;
   /** 中にいる星雲・銀河の名前 */
@@ -103,11 +118,17 @@ export interface HudState {
   aimLabel: { name: string; distance: string } | null;
   /** 選んだ天体（印を付ける） */
   selectedKey: string | null;
-  leftPanel: LeftPanel;
-  nearby: NearbySection[];
+  /** マップで選んだワープホール（TARGET と同じ場所にカードを出す。選んだ天体とはどちらか一方。マップを閉じるとやめる） */
+  selectedWarp: string | null;
   /** 訪れた天体（古い順） */
   visits: Visit[];
+  /** 撮った写真（写真の画面を開いている間） */
+  photo: Photo | null;
+  /** 写真を撮った回数（シャッターの光を出すため） */
+  shutter: number;
 }
+
+const mapPrefs = loadMapPrefs();
 
 let state: HudState = {
   date: new Date(),
@@ -119,14 +140,18 @@ let state: HudState = {
   status: '読み込み中…',
   notice: null,
   radar: [],
+  mapRangeKm: mapPrefs.rangeKm,
+  mapLayers: mapPrefs.layers,
   warps: [],
   warpsReady: false,
   viewMode: 'first',
-  paused: false,
+  overlay: null,
+  pointerLock: false,
+  locked: false,
   statusVisible: true,
   orbitDrag: false,
-  stampReady: false,
-  stampLog: [],
+  chatReady: false,
+  chatLog: [],
   region: null,
   deepRegion: null,
   fromEarthKm: { x: 0, y: 0, z: 0 },
@@ -136,9 +161,10 @@ let state: HudState = {
   infoCard: null,
   aimLabel: null,
   selectedKey: null,
-  leftPanel: null,
-  nearby: [],
+  selectedWarp: null,
   visits: [],
+  photo: null,
+  shutter: 0,
 };
 const listeners = new Set<() => void>();
 
@@ -156,17 +182,51 @@ export const hudStore = {
 
 /** 画面から世界への操作。main.ts が中身を入れる */
 export const hudActions = {
+  /** いまの場所にワープホールを作る（下のボタン・4 キー） */
   placeWarp: (): void => {},
+  /** ワープする（マップで選んだワープホールのカードから） */
   warpTo: (_id: string): void => {},
+  /** ワープホールを選ぶ（null でやめる）。選ぶと、選んでいた天体はやめる */
+  selectWarp: (id: string | null): void => {
+    if (id !== null && hudStore.get().selectedKey !== null) hudActions.selectTarget(null);
+    hudStore.set({ selectedWarp: id });
+  },
+  /** 選んだワープホールの方を向く */
+  faceWarp: (_id: string): void => {},
   removeWarp: (_id: string): void => {},
-  /** 一覧を開いたときに、全員のワープホールを取り直す */
+  /** マップを開いたときに、全員のワープホールを取り直す */
   refreshWarps: (): void => {},
+  /** 写真を撮る（下のボタン・5・F2）。main.ts が中身を入れる */
+  takePhoto: (): void => {},
+  /** マップの範囲（ふちの距離 km）を変える。この端末に覚えておく */
+  setMapRange: (km: number): void => {
+    const rangeKm = clampRadarMaxKm(km);
+    if (rangeKm === hudStore.get().mapRangeKm) return;
+    hudStore.set({ mapRangeKm: rangeKm });
+    saveMapPrefs({ rangeKm, layers: hudStore.get().mapLayers });
+  },
+  /** マップに出すものの種類を、出す・出さないと切り替える。この端末に覚えておく */
+  toggleMapLayer: (layer: MapLayer): void => {
+    const cur = hudStore.get();
+    const layers = { ...cur.mapLayers, [layer]: !cur.mapLayers[layer] };
+    hudStore.set({ mapLayers: layers });
+    saveMapPrefs({ rangeKm: cur.mapRangeKm, layers });
+  },
   /** 速さを変える（スマホのボタン用） */
   changeSpeed: (_steps: number): void => {},
   /** 一人称 → 後ろから → 前から と切り替える */
   toggleView: (): void => {},
-  /** ゲームメニューから操縦に戻る（カーソルを消す。押したときの処理の中で呼ぶ） */
-  resume: (): void => {},
+  /**
+   * 画面を開く・閉じる（null で閉じて操縦に戻る）。PC では、開くとカーソルを出し、閉じるとカーソルを消す
+   * （カーソルを消すのは、押したときの処理の中でしかできないので、クリック・キーの処理の中で呼ぶ）。main.ts が中身を入れる
+   */
+  setOverlay: (overlay: Overlay): void => {
+    hudStore.set({ overlay });
+  },
+  /** 同じ画面が開いていれば閉じ、そうでなければ開く */
+  toggleOverlay: (overlay: Exclude<Overlay, null>): void => {
+    hudActions.setOverlay(hudStore.get().overlay === overlay ? null : overlay);
+  },
   /** スマホの十字のボタン・上昇・下降のボタンで、キーを押す・離す（code は KeyboardEvent.code） */
   setMoveKey: (_code: MoveKeyCode, _down: boolean): void => {},
   /** スマホの三人称で、ドラッグを「船の向き」と「カメラを回す」で切り替える */
@@ -175,16 +235,12 @@ export const hudActions = {
   cycleStarLimit: (): void => {},
   /** 星座の線を出す・消す（要件 F40） */
   toggleConstellations: (): void => {},
-  /** スタンプを送る（要件 F6） */
-  sendStamp: (_id: StampId): void => {},
+  /** チャットを送る（要件 F6）。送れたら true */
+  sendChat: (_text: string): boolean => false,
   /** 天体を選ぶ（null で選ぶのをやめる。要件 F35） */
   selectTarget: (_key: string | null): void => {},
   /** 選んだ天体の方を向く */
   faceTarget: (): void => {},
-  /** 左の列のパネルを開く・閉じる（同じものを押すと閉じる） */
-  toggleLeftPanel: (panel: Exclude<LeftPanel, null>): void => {
-    hudStore.set({ leftPanel: hudStore.get().leftPanel === panel ? null : panel });
-  },
   /** 左上の表示（座標など）を出す・消す（F3 キー） */
   toggleStatus: (): void => {
     hudStore.set({ statusVisible: !hudStore.get().statusVisible });

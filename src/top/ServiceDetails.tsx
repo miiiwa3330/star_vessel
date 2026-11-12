@@ -1,4 +1,5 @@
 import { Credits } from './Credits';
+import { KeyboardGuide } from '../ui/KeyboardGuide';
 
 /**
  * サービスの詳細（タイトル画面の、スクロールした先の画面）。書いてあることは、docs/concept/README.md（体験の核・世界観）と、
@@ -8,7 +9,7 @@ import { Credits } from './Credits';
 const CORES = [
   { no: '01', title: '一人称で宇宙を進む', body: '操縦席から見た宇宙を、自分で動かして進みます。近くは速さを自由に変えて自分で操縦し、遠くはワープホールで一気に飛べます。' },
   { no: '02', title: '本物の宇宙が、いま動いている', body: '惑星の位置・公転・自転は、現実のいまの時刻と同じです。地球の昼と夜も、現実と一致しています。' },
-  { no: '03', title: 'ひとりじゃない', body: 'いま同時に遊んでいる世界中のプレイヤーが、宇宙船として同じ宇宙に見えます。スタンプで、あいさつもできます。' },
+  { no: '03', title: 'ひとりじゃない', body: 'いま同時に遊んでいる世界中のプレイヤーが、宇宙船として同じ宇宙に見えます。近くの船とは、チャットで話せます。' },
   { no: '04', title: 'みんな地球から始まる', body: '出発点は、全員同じ地球です。そこから、天の川銀河の外まで、遠くへ行けます。' },
 ] as const;
 
@@ -70,6 +71,13 @@ export function ServiceDetails() {
             </div>
           ))}
         </dl>
+
+        <p className="top-eyebrow">CONTROLS</p>
+        <h2 className="top-details-title">操作</h2>
+        <p className="top-details-lead">PC は画面をクリックすると操縦が始まり、マウスで向きを変えます。Esc でメニューと、この図が出ます。</p>
+        <div className="top-controls">
+          <KeyboardGuide />
+        </div>
 
         <p className="top-eyebrow">ACCOUNT</p>
         <h2 className="top-details-title">サインアップしなくても、始められます</h2>

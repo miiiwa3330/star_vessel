@@ -275,6 +275,8 @@
 .top-data dt { font-size: 20px; font-weight: 300; letter-spacing: 0.04em; }
 .top-data dd { margin: 0; font-size: 13px; font-weight: 300; line-height: 1.9; opacity: 0.78; }
 .top-play dt { font-size: 15px; font-weight: 400; }
+/* 操作の図（src/ui/KeyboardGuide.tsx）。詳細の幅いっぱいに。狭い画面では、図だけ横にずらして見る */
+.top-controls { margin-top: 28px; }
 /* クレジット（詳細のいちばん下） */
 .top-credits { margin-top: 72px; padding-top: 8px; }
 .top-credits-title { margin: 0 0 12px; font-size: 14px; font-weight: 300; letter-spacing: 0.08em; opacity: 0.85; }

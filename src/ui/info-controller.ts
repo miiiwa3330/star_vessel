@@ -18,7 +18,6 @@ import {
   nearestStars,
   pickAimed,
   starKey,
-  type InfoKind,
   type InfoTarget,
 } from '../world/info';
 import { allBodies, findBody, heliocentricPositionKm, type BodyInfo } from '../world/solar-system';
@@ -32,15 +31,15 @@ import { length, sub, type Vec3 } from '../world/vec';
 import type { Visit, VisitInput } from '../world/visits';
 import { visitApi } from '../net/visit-repository';
 import { formatDistance } from './format';
-import { hudActions, hudStore, type InfoCardState, type NearbySection } from './hud-store';
+import { hudActions, hudStore, type InfoCardState } from './hud-store';
 import { TargetMarker } from './target-marker';
 
 /** 近づいたときのカードを出しておく時間 */
 const NEAR_CARD_MS = 8_000;
 /** 近くの恒星・星団を探し直す間隔（星は 10 万個以上あるので、毎回は探さない） */
 const FAR_SEARCH_MS = 2_000;
-/** 一覧に出す数 */
-const LIST_SIZE = { bodies: 15, stars: 8, clusters: 5, nebulae: 5, galaxies: 5 };
+/** 選べるように探しておく、近くの恒星・星団などの数（照準の先・クリックで選ぶ相手） */
+const LIST_SIZE = { stars: 8, clusters: 5, nebulae: 5, galaxies: 5 };
 /** クリック・タップで選べる、画面の上での距離（CSS ピクセル） */
 const TAP_RADIUS_PX = 40;
 
@@ -81,7 +80,8 @@ export class InfoController {
     this.marker = new TargetMarker(deps.ui);
     hudActions.selectTarget = (key) => {
       this.selected = key ? (this.targets.find((t) => t.key === key) ?? null) : null;
-      hudStore.set({ selectedKey: this.selected?.key ?? null });
+      // 天体を選ぶと、選んでいたワープホールはやめる（カードはどちらか一方）
+      hudStore.set({ selectedKey: this.selected?.key ?? null, ...(this.selected ? { selectedWarp: null } : {}) });
     };
     hudActions.faceTarget = () => {
       if (this.selected) this.deps.face(sub(this.selected.positionKm, this.observer));
@@ -126,7 +126,7 @@ export class InfoController {
     }
     if (best) {
       this.selected = best;
-      hudStore.set({ selectedKey: best.key });
+      hudStore.set({ selectedKey: best.key, selectedWarp: null });
     }
   }
 
@@ -191,8 +191,12 @@ export class InfoController {
     const patch: Partial<typeof prev> = {};
     if (!sameCard(prev.infoCard, card)) patch.infoCard = blocked ? null : card;
     if (prev.aimLabel?.name !== aimLabel?.name || prev.aimLabel?.distance !== aimLabel?.distance) patch.aimLabel = aimLabel;
-    if (prev.leftPanel === 'nearby') patch.nearby = this.sections(abs);
     if (Object.keys(patch).length > 0) hudStore.set(patch);
+  }
+
+  /** 近くの恒星（白色矮星などの燃えかすも。マップに出す。FAR_SEARCH_MS ごとに探し直したもの） */
+  nearStars(): readonly { key: string; name: string; positionKm: Vec3 }[] {
+    return this.far.filter((t) => t.kind !== 'cluster' && t.kind !== 'nebula' && t.kind !== 'galaxy');
   }
 
   /** 毎フレーム：選んだ天体の印を動かす */
@@ -304,24 +308,6 @@ export class InfoController {
     return out;
   }
 
-  private sections(abs: Vec3): NearbySection[] {
-    const dist = (t: InfoTarget) => length(sub(t.positionKm, abs));
-    const item = (t: InfoTarget) => ({ key: t.key, name: t.name, kindJa: INFO_KIND_NAMES_JA[t.kind], distance: formatDistance(dist(t)) });
-    const byDist = (a: InfoTarget, b: InfoTarget) => dist(a) - dist(b);
-    const stars = this.targets.filter((t) => isStarKind(t.kind)).sort(byDist);
-    const others = this.targets.filter((t) => !isStarKind(t.kind) && t.kind !== 'cluster' && t.kind !== 'nebula' && t.kind !== 'galaxy').sort(byDist);
-    const clusters = this.targets.filter((t) => t.kind === 'cluster').sort(byDist);
-    const nebulae = this.targets.filter((t) => t.kind === 'nebula').sort(byDist);
-    const galaxies = this.targets.filter((t) => t.kind === 'galaxy').sort(byDist);
-    return [
-      { title: 'この恒星系の天体', items: others.slice(0, LIST_SIZE.bodies).map(item) },
-      { title: '近くの恒星', items: stars.slice(0, LIST_SIZE.stars).map(item) },
-      { title: '近くの星団', items: clusters.slice(0, LIST_SIZE.clusters).map(item) },
-      { title: '大きく見える星雲', items: nebulae.slice(0, LIST_SIZE.nebulae).map(item) },
-      { title: '大きく見える銀河', items: galaxies.slice(0, LIST_SIZE.galaxies).map(item) },
-    ];
-  }
-
   private card(t: InfoTarget, source: InfoCardState['source'], firstVisit: boolean): InfoCardState {
     return {
       key: t.key,
@@ -348,8 +334,6 @@ export class InfoController {
     visitApi.add(v).catch((e: unknown) => console.error(e));
   }
 }
-
-const isStarKind = (k: InfoKind) => k === 'star' || k === 'white-dwarf' || k === 'neutron-star' || k === 'black-hole';
 
 function sameCard(a: InfoCardState | null, b: InfoCardState | null): boolean {
   if (a === b) return true;
