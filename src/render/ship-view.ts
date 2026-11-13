@@ -12,6 +12,7 @@ import { defaultDesignFor, HULLS, type HullType, type ShipDesign } from '../worl
 import type { Quat } from '../world/quat';
 import { createShipModel, type ShipModel } from './ship-models';
 import { sub, type Vec3 } from '../world/vec';
+import { trailStrength, VaporTrail } from './vapor-trail';
 
 const MAX_SHIPS = 64;
 /** 航行灯の大きさ（CSS ピクセル）。ふちをぼかすので、見える大きさはこの 1/3 くらい */
@@ -25,12 +26,19 @@ export interface ShipToDraw {
   orientation: Quat;
   /** 船の設計（無ければ id から決める） */
   design?: ShipDesign;
+  /** 速度（km/s）。ベイパー（動いたときの尾）に使う */
+  velocityKmS?: Vec3;
 }
 
 interface Drawn {
   model: ShipModel;
   hull: HullType;
+  trail: VaporTrail;
+  /** これまでに見たいちばん速い速さ（km/s）。他の船は速さの設定が届かないので、これを「全速」とみなす */
+  topSpeed: number;
 }
+
+const ZERO: Vec3 = { x: 0, y: 0, z: 0 };
 
 export class ShipView {
   readonly group = new THREE.Group();
@@ -75,18 +83,25 @@ export class ShipView {
       this.group.remove(current.model.group);
       current.model.dispose();
     }
-    const d = { model: createShipModel(hull, hue), hull };
+    const trail = current?.trail ?? new VaporTrail();
+    const d = { model: createShipModel(hull, hue), hull, trail, topSpeed: current?.topSpeed ?? 0 };
     this.group.add(d.model.group);
+    if (!current) this.group.add(trail.mesh);
     return d;
   }
 
   /** 自分の船（三人称の視点のときだけ見せる）。自分は原点にいる */
-  setOwn(visible: boolean, design: ShipDesign, hue: number, orientation: Quat): void {
+  setOwn(visible: boolean, design: ShipDesign, hue: number, orientation: Quat, velocityKmS: Vec3 = ZERO, fullSpeedKmS = 0, dt = 0): void {
     if (!visible) {
-      if (this.own) this.own.model.group.visible = false;
+      if (this.own) {
+        this.own.model.group.visible = false;
+        this.own.trail.mesh.visible = false;
+      }
       return;
     }
     this.own = this.ensure(this.own, design.hull, hue);
+    const speed = Math.hypot(velocityKmS.x, velocityKmS.y, velocityKmS.z);
+    this.own.trail.update(ZERO, velocityKmS, trailStrength(speed, fullSpeedKmS), HULLS[design.hull].lengthKm, dt);
     const g = this.own.model.group;
     g.visible = true;
     g.position.set(0, 0, 0);
@@ -96,7 +111,7 @@ export class ShipView {
   /** 1 ピクセルの大きさを決める値（画面の高さの半分 ÷ tan(視野の半分)） */
   pxPerRadian = 700;
 
-  update(ships: readonly ShipToDraw[], observerKm: Vec3): void {
+  update(ships: readonly ShipToDraw[], observerKm: Vec3, dt = 0): void {
     const seen = new Set<string>();
     const n = Math.min(ships.length, MAX_SHIPS);
     for (let i = 0; i < n; i++) {
@@ -110,6 +125,10 @@ export class ShipView {
       g.position.set(rel.x, rel.y, rel.z);
       const q = ship.orientation;
       g.quaternion.copy(this.quat.set(q.x, q.y, q.z, q.w));
+      const v = ship.velocityKmS ?? ZERO;
+      const speed = Math.hypot(v.x, v.y, v.z);
+      d.topSpeed = Math.max(d.topSpeed, speed);
+      d.trail.update(rel, v, trailStrength(speed, d.topSpeed), HULLS[hull].lengthKm, dt);
       this.color.setHSL(ship.hue / 360, 0.75, 0.6);
       // 船が画面で 3 ピクセルより大きく見えるなら、航行灯の点は消す（船の模型が見える。要件 F33）
       const px = (HULLS[hull].lengthKm / 2 / Math.max(Math.hypot(rel.x, rel.y, rel.z), 1e-9)) * this.pxPerRadian;
@@ -119,8 +138,9 @@ export class ShipView {
     }
     for (const [id, d] of this.drawn) {
       if (seen.has(id)) continue;
-      this.group.remove(d.model.group);
+      this.group.remove(d.model.group, d.trail.mesh);
       d.model.dispose();
+      d.trail.dispose();
       this.drawn.delete(id);
     }
     this.lights.count = n;

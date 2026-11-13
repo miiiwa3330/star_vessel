@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties } from 'react';
 import { drawCloud, initialPitch, INITIAL_YAW, isCloudLook, makeCloud } from './cloud-picture';
 import { cssRgb, globeThumbUrl, paintStar, type CollectionLook } from './collection-look';
 import { renderGlobe } from './globe-render';
+import { drawConstellation } from './constellation-picture';
 
 /** 環の傾き（見た目のための値） */
 const RING_TILT_DEG = -16;
@@ -38,6 +39,7 @@ export function BodyGlobe({ look, size, unknown = false }: { look: CollectionLoo
   }
   if (look.type === 'star') return <StarThumb look={look} size={size} unknown={unknown} />;
   if (isCloudLook(look)) return <CloudThumb look={look} size={size} unknown={unknown} />;
+  if (look.type === 'constellation') return <ConstellationThumb look={look} size={size} unknown={unknown} />;
   if (look.type === 'craft') {
     return (
       <div className={`${cls} cg-craft`} style={box} aria-hidden="true">
@@ -76,6 +78,25 @@ function StarThumb({ look, size, unknown }: { look: Extract<CollectionLook, { ty
   return (
     <div className={`cg cg-star${unknown ? ' is-unknown' : ''}`} style={{ width: size, height: size }} aria-hidden="true">
       <canvas ref={ref} style={{ display: 'block', width: size, height: size, transform: `scale(${scale.toFixed(3)})`, filter: glow }} />
+    </div>
+  );
+}
+
+/** 星座の小さな絵：地球から見た線と星（絵は重ねない。詳細で押すと重なる） */
+function ConstellationThumb({ look, size, unknown }: { look: Extract<CollectionLook, { type: 'constellation' }>; size: number; unknown: boolean }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const res = Math.round(size * Math.min(window.devicePixelRatio || 1, 2));
+    canvas.width = res;
+    canvas.height = res;
+    drawConstellation(ctx, res, look.figure, unknown);
+  }, [look, size, unknown]);
+  return (
+    <div className={`cg cg-cloud cg-constellation${unknown ? ' is-unknown' : ''}`} style={{ width: size, height: size }} aria-hidden="true">
+      <canvas ref={ref} style={{ width: size, height: size }} />
     </div>
   );
 }

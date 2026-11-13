@@ -29,6 +29,8 @@ export interface SmoothedShip {
   design?: ShipDesign;
   /** 太陽中心の位置（km・EQJ） */
   positionKm: Vec3;
+  /** 速度（km/s。届いた値のまま。ベイパーの向きと強さに使う） */
+  velocityKmS: Vec3;
   orientation: Quat;
 }
 
@@ -83,6 +85,7 @@ export class ShipSmoother {
         hue: snap.hue,
         design: snap.d,
         positionKm: add(positionAt(snap, date), t.errorKm),
+        velocityKmS: snap.s.velocityKmS,
         orientation: t.orientation,
       });
     }

@@ -17,7 +17,7 @@ const small = () => matchMedia('(max-width: 720px), (pointer: coarse)').matches;
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** 種類で絞る順 */
-const KIND_ORDER: InfoKind[] = ['planet', 'dwarf', 'moon', 'asteroid', 'comet', 'spacecraft', 'star', 'exoplanet', 'neutron-star', 'black-hole', 'cluster', 'nebula', 'galaxy'];
+const KIND_ORDER: InfoKind[] = ['planet', 'dwarf', 'moon', 'asteroid', 'comet', 'spacecraft', 'star', 'exoplanet', 'neutron-star', 'black-hole', 'cluster', 'nebula', 'galaxy', 'constellation'];
 
 type Filter = InfoKind | 'all' | 'extra';
 
@@ -286,7 +286,7 @@ function CollectionDetail({
     <div className="hud-collection-detail">
       <div className="hud-collection-figure">
         <ObjectViewer key={entry.key} ref={figureRef} look={look} size={size} unknown={!known} />
-        <p className="hud-collection-drag">ドラッグで回せます</p>
+        <p className="hud-collection-drag">{look.type === 'constellation' ? (known && look.art ? '押すと絵が重なります' : '\u00a0') : 'ドラッグで回せます'}</p>
       </div>
       <div className="hud-collection-text" ref={textRef}>
         <p className="hud-collection-kind">

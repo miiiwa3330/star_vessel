@@ -59,8 +59,10 @@ export class FlightControls {
   onToggleMap: () => void = () => {};
   /** 下のボタン（ホットバー）を押す（1〜6 キー。マインクラフトと同じく数字で選ぶ） */
   onHotbar: (n: number) => void = () => {};
-  /** F2：写真を撮る（マインクラフトと同じキー） */
+  /** F2：写真を撮る構えに入る・やめる（マインクラフトと同じキー） */
   onPhoto: () => void = () => {};
+  /** Enter を、チャットより先に受け取る（写真の構えの間のシャッター）。受け取ったら true。main.ts が入れる */
+  onEnter: () => boolean = () => false;
   /** カーソルが出ているときに Esc を押した（開いている画面を閉じる・ゲームメニューを出す） */
   onEscape: () => void = () => {};
   /** ほとんど動かさずに離した（クリック・タップ）。画面の座標（CSS ピクセル）。main.ts が入れる */
@@ -356,6 +358,10 @@ export class FlightControls {
     // 画面が開いている間は操縦しない（ボタンを Tab と Space で押せるように、ブラウザに任せる）
     if (this.isBlocked()) return;
     // カーソルが出ていても（入ったばかり・カーソルを消せなかったとき）、チャットは開ける
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && plain && this.onEnter()) {
+      e.preventDefault();
+      return;
+    }
     if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyT') && plain) {
       // 押した文字が、開いた入力欄に入らないように
       e.preventDefault();

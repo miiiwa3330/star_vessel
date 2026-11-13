@@ -27,7 +27,9 @@ export type InfoKind =
   | 'spacecraft'
   | 'cluster'
   | 'nebula'
-  | 'galaxy';
+  | 'galaxy'
+  /** 星座（場所ではない。宇宙で選ぶと記録される。2026-11-13） */
+  | 'constellation';
 
 export const INFO_KIND_NAMES_JA: Record<InfoKind, string> = {
   star: '恒星',
@@ -45,6 +47,7 @@ export const INFO_KIND_NAMES_JA: Record<InfoKind, string> = {
   cluster: '星団',
   nebula: '星雲',
   galaxy: '銀河',
+  constellation: '星座',
 };
 
 /** 種類の英語の名前（左上の表示。2026-11-12） */
@@ -64,6 +67,7 @@ export const INFO_KIND_NAMES_EN: Record<InfoKind, string> = {
   cluster: 'Star cluster',
   nebula: 'Nebula',
   galaxy: 'Galaxy',
+  constellation: 'Constellation',
 };
 
 /** 情報を出す相手 */

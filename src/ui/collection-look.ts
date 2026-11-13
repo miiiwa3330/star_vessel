@@ -29,6 +29,7 @@ import type { BodyInfo } from '../world/solar-system';
 import type { InfoKind } from '../world/info';
 import type { NebulaType } from '../world/nebulae';
 import type { SurfaceMap } from './globe-render';
+import { artFigureTransform, type ConstellationArt, type ConstellationFigure } from '../world/constellation-figure';
 
 export type CollectionLook =
   | {
@@ -49,6 +50,8 @@ export type CollectionLook =
   | { type: 'nebula'; nebula: NebulaType; seed: number; scale: number }
   | { type: 'galaxy'; seed: number; picture: GalaxyPicture }
   | { type: 'craft' }
+  /** 星座：地球から見た線と星。art は重ねる絵（画像の URL と、絵の px → 図の座標の変換）。絵の無い星座は null */
+  | { type: 'constellation'; figure: ConstellationFigure; art: { url: string; transform: readonly number[] } | null }
   | { type: 'comet'; seed: number; picture: CometPicture };
 
 /** 天体のデータから決めた絵の値（無ければ、種類の典型の値） */
@@ -93,6 +96,12 @@ export function bodyLook(b: BodyInfo, kind: InfoKind): CollectionLook {
     look.ring = { inner, outer, color: RING_COLOR, alpha: 0.85 };
   }
   return look;
+}
+
+/** 星座の絵（図と、あれば重ねる絵） */
+export function constellationLook(figure: ConstellationFigure, art: ConstellationArt | undefined): CollectionLook {
+  const transform = art ? artFigureTransform(art, figure) : null;
+  return { type: 'constellation', figure, art: art && transform ? { url: `/textures/constellations/${art.file}`, transform } : null };
 }
 
 /** 天体の一覧に無いもの（星団・星雲・銀河など）の絵 */

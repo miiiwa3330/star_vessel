@@ -1,8 +1,9 @@
-import { forwardRef, useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { globeExtent, renderGlobe, type CloudPoint, type GlobeOptions, type SurfaceMap } from './globe-render';
 import { drawCloud, initialPitch, INITIAL_YAW, isCloudLook, makeCloud } from './cloud-picture';
 import { globeMap, type CollectionLook } from './collection-look';
 import { CraftIcon } from './BodyGlobe';
+import { drawConstellation, drawConstellationArt } from './constellation-picture';
 
 /** ドラッグ 1 px で回る角度・ひとりでに回る速さ（ラジアン/秒）・止まるまでの速さの減り方 */
 const ROTATE_PER_PX = 0.012;
@@ -15,7 +16,70 @@ const PITCH_LIMIT = 1.45;
  * 球の天体・恒星・ブラックホールは globe-render の 1 画素ずつの絵、星団・銀河・星雲・彗星は 3D の点の集まり、人工の物は線の絵を CSS で回す。
  * unknown：まだ訪れていない天体（黒いシルエット）
  */
-export const ObjectViewer = forwardRef<HTMLDivElement, { look: CollectionLook; size: number; unknown?: boolean }>(function ObjectViewer(
+export const ObjectViewer = forwardRef<HTMLDivElement, { look: CollectionLook; size: number; unknown?: boolean }>(function ObjectViewer(props, ref) {
+  // 星座は回さない（地球から見た空の図）。押すと絵が重なる
+  if (props.look.type === 'constellation') return <ConstellationViewer ref={ref} look={props.look} size={props.size} unknown={props.unknown ?? false} />;
+  return <SpinViewer ref={ref} {...props} />;
+});
+
+/**
+ * 星座の詳細の絵（2026-11-13）：地球から見た線と星（北が上・東が左）。**押すと、星座の絵が重なる**（もう一度押すと消える）。
+ * 絵は Stellarium の星座の絵。まだ集めていない星座では、絵は出さない
+ */
+const ConstellationViewer = forwardRef<HTMLDivElement, { look: Extract<CollectionLook, { type: 'constellation' }>; size: number; unknown: boolean }>(
+  function ConstellationViewer({ look, size, unknown }, ref) {
+    const linesRef = useRef<HTMLCanvasElement>(null);
+    const artRef = useRef<HTMLCanvasElement>(null);
+    const [artOn, setArtOn] = useState(false);
+    const [artReady, setArtReady] = useState(false);
+    const res = Math.round(size * Math.min(window.devicePixelRatio || 1, 2));
+    const art = unknown ? null : look.art;
+    useEffect(() => {
+      const ctx = linesRef.current?.getContext('2d');
+      if (ctx) drawConstellation(ctx, res, look.figure, unknown);
+    }, [look, res, unknown]);
+    // 絵は、はじめて押したときに読み込む
+    useEffect(() => {
+      if (!artOn || !art || artReady) return;
+      let alive = true;
+      const img = new Image();
+      img.onload = () => {
+        const ctx = artRef.current?.getContext('2d');
+        if (!alive || !ctx) return;
+        drawConstellationArt(ctx, res, img, art.transform);
+        setArtReady(true);
+      };
+      img.src = art.url;
+      return () => {
+        alive = false;
+      };
+    }, [artOn, art, artReady, res]);
+    const style = { width: size, height: size };
+    return (
+      <div
+        ref={ref}
+        className={`ov ov-constellation${unknown ? ' is-unknown' : ''}${art ? ' has-art' : ''}`}
+        style={style}
+        role={art ? 'button' : 'img'}
+        tabIndex={art ? 0 : undefined}
+        aria-pressed={art ? artOn : undefined}
+        aria-label={art ? '星座の絵を重ねる' : '星座の図'}
+        onClick={() => art && setArtOn((v) => !v)}
+        onKeyDown={(e) => {
+          if (art && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            setArtOn((v) => !v);
+          }
+        }}
+      >
+        <canvas ref={artRef} width={res} height={res} className={`ov-constellation-art${artOn && artReady ? ' is-on' : ''}`} style={style} />
+        <canvas ref={linesRef} width={res} height={res} className="ov-canvas ov-constellation-lines" style={style} />
+      </div>
+    );
+  },
+);
+
+const SpinViewer = forwardRef<HTMLDivElement, { look: CollectionLook; size: number; unknown?: boolean }>(function SpinViewer(
   { look, size, unknown = false },
   ref,
 ) {

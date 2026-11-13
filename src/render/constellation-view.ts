@@ -76,6 +76,12 @@ export class ConstellationView {
     return c;
   }
 
+  /** 向き dir の先の星座（明るくはしない。クリックで選ぶとき）。線を消しているときは null */
+  pick(cameraPc: Vec3, dir: Vec3): Constellation | null {
+    if (!this.group.visible || this.baseMaterial.opacity <= 0) return null;
+    return constellationAt(this.seg, cameraPc, dir);
+  }
+
   private setHilite(c: Constellation | null): void {
     if (c === this.shown) return;
     this.shown = c;

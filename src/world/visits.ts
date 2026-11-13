@@ -20,6 +20,7 @@ export const VISIT_KINDS: readonly InfoKind[] = [
   'cluster',
   'nebula',
   'galaxy',
+  'constellation',
 ];
 
 /** 1 人が記録できる数の上限（サーバーの容量のため） */

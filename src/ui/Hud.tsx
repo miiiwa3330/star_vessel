@@ -28,6 +28,15 @@ export function Hud() {
   const wide = o === 'map' || o === 'collection';
   const myWarps = s.warps.filter((w) => w.mine).length;
   const selectedWarp = o === 'radar' && s.selectedWarp ? (s.warps.find((w) => w.id === s.selectedWarp) ?? null) : null;
+  // 写真の構え（5・F2）：画面の表示をすべて消して、シャッターの線だけを出す（2026-11-13）
+  if (s.photoMode) {
+    return (
+      <>
+        <PhotoFinder />
+        {s.shutter > 0 && <div key={s.shutter} className="hud-shutter" aria-hidden="true" />}
+      </>
+    );
+  }
   return (
     <>
       {/* ゲームメニュー：画面全体をすりガラスにし、メニューのボタンのほかは押せない */}
@@ -163,10 +172,10 @@ export function Hud() {
         <button
           type="button"
           className="hud-button hud-icon-button"
-          aria-label="写真を撮る"
-          title="写真を撮る・5（F2 でも）"
+          aria-label="写真を撮る構えに入る"
+          title="写真・5（F2 でも）。Enter で撮る"
           onClick={(e) => {
-            hudActions.takePhoto();
+            hudActions.togglePhotoMode();
             e.currentTarget.blur();
           }}
         >
@@ -209,6 +218,33 @@ export function Hud() {
       <TouchPad hidden={false} />
       {o !== 'menu' && <AimLabel aim={s.aimLabel} constellation={s.aimConstellation} />}
     </>
+  );
+}
+
+/**
+ * 写真の構えの間の表示：真ん中の「＋」と、四すみのかぎ（シャッターの線）。写真には写らない（写るのは宇宙の canvas だけ）。
+ * PC は Enter で撮り、5・F2・Esc でやめる。スマホはキーが無いので、シャッターのボタンと「やめる」を出す
+ */
+function PhotoFinder() {
+  return (
+    <div className="hud-finder">
+      <div className="hud-finder-frame" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <i />
+      </div>
+      <div className="hud-finder-plus" aria-hidden="true" />
+      <p className="hud-finder-hint hud-keyboard-only" role="status">
+        Enter で撮る ・ 5 でやめる
+      </p>
+      <div className="hud-finder-touch hud-touch-only">
+        <button type="button" className="hud-button" onClick={() => hudActions.togglePhotoMode()}>
+          やめる
+        </button>
+        <button type="button" className="hud-finder-shutter" aria-label="シャッター" onClick={() => hudActions.takePhoto()} />
+      </div>
+    </div>
   );
 }
 

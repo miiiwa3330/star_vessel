@@ -146,6 +146,8 @@ export interface HudState {
   warpHere: { id: string; code: string } | null;
   /** 写真を撮った回数（シャッターの光を出すため） */
   shutter: number;
+  /** 写真を撮る構え（5・F2）。画面の表示をすべて消して、シャッターの線だけを出す。Enter で撮る（2026-11-13） */
+  photoMode: boolean;
 }
 
 const radarPrefs = loadRadarPrefs();
@@ -164,7 +166,7 @@ let state: HudState = {
   radarLayers: radarPrefs.layers,
   warps: [],
   warpsReady: false,
-  viewMode: 'first',
+  viewMode: 'third',
   overlay: null,
   pointerLock: false,
   locked: false,
@@ -189,6 +191,7 @@ let state: HudState = {
   mapFocus: null,
   warpHere: null,
   shutter: 0,
+  photoMode: false,
 };
 const listeners = new Set<() => void>();
 
@@ -229,7 +232,9 @@ export const hudActions = {
   faceWarp: (_id: string): void => {},
   /** レーダーを開いたときに、全員のワープホールを取り直す */
   refreshWarps: (): void => {},
-  /** 写真を撮る（下のボタン・5・F2）。main.ts が中身を入れる */
+  /** 写真を撮る構えに入る・やめる（下のボタン・5・F2）。main.ts が中身を入れる */
+  togglePhotoMode: (): void => {},
+  /** シャッターを押す（構えの間の Enter・スマホはシャッターのボタン）。main.ts が中身を入れる */
   takePhoto: (): void => {},
   /** レーダーの範囲（ふちの距離 km）を変える。この端末に覚えておく */
   setRadarRange: (km: number): void => {
