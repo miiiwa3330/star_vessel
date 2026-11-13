@@ -1,12 +1,15 @@
-import type { CSSProperties } from 'react';
-import { cssRgb, globeThumbUrl, type CollectionLook } from './collection-look';
+import { useEffect, useRef, type CSSProperties } from 'react';
+import { drawCloud, initialPitch, INITIAL_YAW, isCloudLook, makeCloud } from './cloud-picture';
+import { cssRgb, globeThumbUrl, paintStar, type CollectionLook } from './collection-look';
+import { renderGlobe } from './globe-render';
 
 /** 環の傾き（見た目のための値） */
 const RING_TILT_DEG = -16;
 const RING_SQUASH = 0.3;
 
 /**
- * コレクション（図鑑）の一覧の、天体の小さな絵（2026-11-12）。CSS だけで描く（1 ページに 15 個並ぶので軽く）。
+ * コレクション（図鑑）の一覧の、天体の小さな絵（2026-11-12）。球は CSS だけで描く（1 ページに 15 個並ぶので軽く）。
+ * 星団・銀河・星雲・彗星は、詳細の絵と同じ点の集まり（cloud-picture.ts）を、小さな canvas に 1 回だけ描く（2026-11-13。天体ごとに形が違う）。
  * unknown：まだ訪れていない天体。黒いシルエットにする（模様は描かない。形だけ分かるよう、ふちをうっすら光らせる）
  */
 export function BodyGlobe({ look, size, unknown = false }: { look: CollectionLook; size: number; unknown?: boolean }) {
@@ -33,20 +36,8 @@ export function BodyGlobe({ look, size, unknown = false }: { look: CollectionLoo
       </div>
     );
   }
-  if (look.type === 'star') {
-    return <div className={`${cls} cg-star`} style={{ ...box, ['--cg-color' as string]: cssRgb(look.color) }} aria-hidden="true" />;
-  }
-  if (look.type === 'cluster') {
-    return (
-      <div className={cls} style={box} aria-hidden="true">
-        <svg viewBox="-1 -1 2 2" width={size} height={size}>
-          {CLUSTER_DOTS.map((p, i) => (
-            <circle key={i} cx={p.x * (look.globular ? 0.7 : 1)} cy={p.y * (look.globular ? 0.7 : 1)} r={p.r} fill={p.warm ? '#ffe2b8' : '#dfe8ff'} opacity={p.a} />
-          ))}
-        </svg>
-      </div>
-    );
-  }
+  if (look.type === 'star') return <StarThumb look={look} size={size} unknown={unknown} />;
+  if (isCloudLook(look)) return <CloudThumb look={look} size={size} unknown={unknown} />;
   if (look.type === 'craft') {
     return (
       <div className={`${cls} cg-craft`} style={box} aria-hidden="true">
@@ -55,6 +46,61 @@ export function BodyGlobe({ look, size, unknown = false }: { look: CollectionLoo
     );
   }
   return <div className={`${cls} cg-${look.type}`} style={box} aria-hidden="true" />;
+}
+
+/** 一覧の恒星の球は、光の広がりの分を空けて、枠より少し小さく描く */
+const STAR_THUMB_FILL = 0.8;
+
+/**
+ * 恒星の小さな絵。詳細の絵（ObjectViewer.tsx）と同じ球（表面の模様・大きさ・光の広がり）を、小さな canvas に 1 回だけ描く
+ * （2026-11-13。一覧と詳細で見た目をそろえる）。模様は小さく（128×64）描くので、15 個並べても軽い
+ */
+function StarThumb({ look, size, unknown }: { look: Extract<CollectionLook, { type: 'star' }>; size: number; unknown: boolean }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const res = Math.round(size * Math.min(window.devicePixelRatio || 1, 2));
+    canvas.width = res;
+    canvas.height = res;
+    const image = ctx.createImageData(res, res);
+    const map = unknown ? null : paintStar(look.color, look.picture.surface, look.seed, 128, 64);
+    renderGlobe(image.data, res, map, { yaw: INITIAL_YAW, pitch: initialPitch(look), emissive: true, color: unknown ? [0, 0, 0] : look.color });
+    ctx.putImageData(image, 0, 0);
+  }, [look, size, unknown]);
+  const scale = look.picture.size * STAR_THUMB_FILL;
+  // 光の広がり：詳細（幅 340 px で 6〜36 px）と同じ割合。縮めた分を戻して、画面の上で同じ幅になるように
+  const glowPx = ((6 + 30 * look.picture.glow) * (size / 340)) / scale;
+  const glow = unknown ? undefined : `drop-shadow(0 0 ${glowPx.toFixed(1)}px ${cssRgb(look.color, 0.35 + 0.45 * look.picture.glow)}) drop-shadow(0 0 ${(glowPx * 0.4).toFixed(1)}px ${cssRgb(look.color, 0.5)})`;
+  return (
+    <div className={`cg cg-star${unknown ? ' is-unknown' : ''}`} style={{ width: size, height: size }} aria-hidden="true">
+      <canvas ref={ref} style={{ display: 'block', width: size, height: size, transform: `scale(${scale.toFixed(3)})`, filter: glow }} />
+    </div>
+  );
+}
+
+/** 長軸の向きが分からない銀河の傾き（見た目のための値） */
+const UNKNOWN_ROLL_DEG = -20;
+
+/** 点の集まりの小さな絵。銀河は、地球から見た傾きと長軸の向き（北が上・東が左）で描く */
+function CloudThumb({ look, size, unknown }: { look: Extract<CollectionLook, { type: 'cluster' | 'galaxy' | 'nebula' | 'comet' }>; size: number; unknown: boolean }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const res = Math.round(size * Math.min(window.devicePixelRatio || 1, 2));
+    canvas.width = res;
+    canvas.height = res;
+    drawCloud(ctx, res, makeCloud(look), INITIAL_YAW, initialPitch(look), { unknown, pointScale: 1.4, starAlpha: look.type === 'galaxy' ? 0.4 : 0.8 });
+  }, [look, size, unknown]);
+  const roll = look.type === 'galaxy' ? (look.picture.rollDeg ?? UNKNOWN_ROLL_DEG) : look.type === 'comet' ? -30 : 0;
+  return (
+    <div className={`cg cg-cloud cg-${look.type}${unknown ? ' is-unknown' : ''}`} style={{ width: size, height: size }} aria-hidden="true">
+      <canvas ref={ref} style={{ width: size, height: size, transform: roll ? `rotate(${roll}deg)` : undefined }} />
+    </div>
+  );
 }
 
 /** 人工衛星・探査機の線の絵 */
@@ -88,17 +134,3 @@ function RingPart({ d, inner, outer, color }: { d: number; inner: number; outer:
     />
   );
 }
-
-/** 星団の点（誰の端末でも同じになるよう、決まった並び。中心ほど多い） */
-const CLUSTER_DOTS = (() => {
-  let s = 12345;
-  const rand = () => {
-    s = (Math.imul(s, 1103515245) + 12345) >>> 0;
-    return s / 4294967296;
-  };
-  return Array.from({ length: 46 }, () => {
-    const r = 0.82 * Math.sqrt(rand()) * rand();
-    const a = rand() * 2 * Math.PI;
-    return { x: r * Math.cos(a), y: r * Math.sin(a), r: 0.018 + 0.03 * rand() ** 3, a: 0.55 + 0.45 * rand(), warm: rand() < 0.3 };
-  });
-})();

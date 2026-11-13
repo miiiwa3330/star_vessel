@@ -6,6 +6,7 @@
 import { galactoToEqjPc } from './galaxy';
 import { hashInts, mulberry32 } from './random';
 import type { BodyInfo } from './solar-system';
+import { starColor } from './star-color';
 import { KM_PER_PC } from './units';
 import { scale, type Vec3 } from './vec';
 
@@ -132,7 +133,9 @@ export function compactBody(
       radiusKm: WHITE_DWARF_RADIUS_KM,
       kind: 'star',
       spin: { type: 'steady', pole, periodHours: 2 + 20 * rand(), phaseRad: 0 },
-      glow: [0.85, 0.9, 1],
+      // 温度のデータがあれば、その色（冷えた白色矮星は黄色〜オレンジ）。無ければ青白
+      glow: opts.teffK ? starColor(opts.teffK) : [0.85, 0.9, 1],
+      teffK: opts.teffK,
       compact: { kind },
     };
   }

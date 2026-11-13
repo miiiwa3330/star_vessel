@@ -805,7 +805,8 @@
 .ov { position: relative; flex: none; display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; will-change: transform; }
 .ov:active { cursor: grabbing; }
 .ov-canvas { display: block; }
-.ov-star .ov-canvas { filter: drop-shadow(0 0 18px var(--ov-glow, rgba(255, 220, 160, 0.55))); }
+/* 恒星：球の大きさ（半径から）と光の広がり（光度から）は、天体ごとに ObjectViewer.tsx が入れる */
+.ov-star .ov-canvas { transform: scale(var(--ov-star-size, 1)); filter: drop-shadow(0 0 var(--ov-glow-px, 18px) var(--ov-glow, rgba(255, 220, 160, 0.55))); }
 .ov-black-hole .ov-canvas { filter: drop-shadow(0 0 12px rgba(255, 140, 60, 0.45)); }
 /* 星雲は、薄い光をたくさん重ねるので、色の段差（格子のような模様）が出ないよう、少しぼかす */
 .ov-nebula .ov-canvas { filter: blur(1.2px); }
@@ -844,13 +845,7 @@
 /* 傾ける前の向きで、上半分（奥）と下半分（手前）に分ける */
 .cg-ring-wrap.is-back .cg-ring { clip-path: inset(0 0 50% 0); }
 .cg-ring-wrap.is-front .cg-ring { clip-path: inset(50% 0 0 0); }
-.cg-star::before {
-  content: '';
-  width: 92%;
-  height: 92%;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 12%, var(--cg-color) 24%, color-mix(in srgb, var(--cg-color) 35%, transparent) 42%, transparent 70%);
-}
+/* 恒星は、詳細と同じ球を canvas に描く（BodyGlobe.tsx の StarThumb） */
 .cg-black-hole::before {
   content: '';
   width: 78%;
@@ -858,33 +853,9 @@
   border-radius: 50%;
   background: radial-gradient(circle, #000 0 30%, rgba(255, 170, 80, 0.95) 33%, rgba(255, 110, 30, 0.35) 46%, transparent 68%);
 }
-.cg-nebula::before {
-  content: '';
-  width: 86%;
-  height: 86%;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 38% 42%, rgba(255, 120, 190, 0.75), transparent 46%),
-    radial-gradient(circle at 64% 58%, rgba(110, 210, 255, 0.6), transparent 48%),
-    radial-gradient(circle at 50% 50%, rgba(190, 140, 255, 0.45), transparent 70%);
-  filter: blur(2px);
-}
-.cg-galaxy::before {
-  content: '';
-  width: 92%;
-  height: 92%;
-  border-radius: 50%;
-  transform: rotate(-24deg) scaleY(0.42);
-  background: radial-gradient(circle, #fff6e4 0 8%, rgba(255, 226, 180, 0.85) 18%, rgba(150, 180, 255, 0.5) 42%, transparent 70%);
-}
-.cg-comet::before {
-  content: '';
-  width: 90%;
-  height: 22%;
-  transform: rotate(-30deg);
-  border-radius: 999px;
-  background: linear-gradient(90deg, #fff 0 9%, rgba(180, 220, 255, 0.7) 14%, rgba(150, 200, 255, 0) 100%);
-}
+/* 星団・銀河・星雲・彗星：点の集まりを canvas に描く（BodyGlobe.tsx の CloudThumb） */
+.cg-cloud canvas { display: block; }
+.cg-nebula canvas { filter: blur(0.5px); }
 .cg-craft { color: rgba(220, 230, 245, 0.85); }
 @media (prefers-reduced-motion: reduce) {
   .cg-globe.is-spin .cg-sphere { animation: none; }

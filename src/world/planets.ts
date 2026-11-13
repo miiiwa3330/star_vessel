@@ -10,6 +10,8 @@
  * three.js・DOM・astronomy-engine を読み込まない。
  */
 import { exoplanetId } from './address';
+import { starColor, T_SUN_K } from './star-color';
+export { starColor };
 import { compactBody, type CompactKind } from './compact-objects';
 import { axisKmFromPeriod, meanAnomalyFromTrue, orbitNormal, periodDaysFromAxis, type KeplerElements } from './kepler';
 import type { RealPlanet, RealSystem } from './exoplanet-data';
@@ -29,8 +31,6 @@ export const R_SUN_KM = 695_700;
 /** 木星・地球の質量（太陽質量）。IAU 2015 の公称値の GM の比 */
 export const M_JUPITER_SUN = 1 / 1047.348644;
 export const M_EARTH_SUN = 1 / 332_946.0487;
-/** 太陽の有効温度（K）。IAU 2015 の公称値 */
-const T_SUN = 5772;
 /** J2000.0（2000-01-01T12:00:00 TT）を UNIX ミリ秒にしたもの（TT と UTC の差は無視） */
 const J2000_MS = Date.UTC(2000, 0, 1, 12);
 const JD_UNIX_EPOCH = 2_440_587.5;
@@ -92,27 +92,18 @@ export const isGiant = (absMag: number, bv: number): boolean => bv >= 0.9 && abs
 /** 恒星の半径（太陽半径）。光度（放射補正は無視）と有効温度から R = √L / (T/T☉)² */
 export function radiusFromStar(absMag: number, teffK: number): number {
   const lum = 10 ** (-0.4 * (absMag - 4.83));
-  return Math.sqrt(lum) / (teffK / T_SUN) ** 2;
+  return Math.sqrt(lum) / (teffK / T_SUN_K) ** 2;
 }
 
-/** 恒星の色（0〜1 の RGB）。有効温度からのおおよその色（見た目のための近似） */
-export function starColor(teffK: number): [number, number, number] {
-  const t = Math.min(40_000, Math.max(2_000, teffK)) / 100;
-  const r = t <= 66 ? 255 : 329.7 * (t - 60) ** -0.1332;
-  const g = t <= 66 ? 99.47 * Math.log(t) - 161.1 : 288.1 * (t - 60) ** -0.0755;
-  const b = t >= 66 ? 255 : t <= 19 ? 0 : 138.5 * Math.log(t - 10) - 305.0;
-  const c = (v: number) => Math.min(1, Math.max(0, v / 255));
-  return [c(r), c(g), c(b)];
-}
-
-interface StarModel {
+export interface StarModel {
   massSun: number;
   radiusSun: number;
   teffK: number;
   giant: boolean;
 }
 
-function starModel(host: HostStar, real: RealSystem | null): StarModel {
+/** 恒星の質量・半径・温度。実在のデータがあればそれ、無ければ色と明るさから（図鑑の絵でも使う） */
+export function starModel(host: Pick<HostStar, 'absMag' | 'bv'>, real: RealSystem | null): StarModel {
   const teffK = real?.star.teffK ?? teffFromBv(host.bv);
   const giant = isGiant(host.absMag, host.bv);
   return {
@@ -374,6 +365,7 @@ export function systemBodies(host: HostStar, real: RealSystem | null): BodyInfo[
       motion: { type: 'fixed', positionKm },
       spin: { type: 'steady', pole: { x: 0, y: 0, z: 1 }, periodHours: 600, phaseRad: 0 },
       glow: starColor(star.teffK),
+      teffK: star.teffK,
     },
   ];
   const generation = real ? 1 : PLANET_GENERATION;

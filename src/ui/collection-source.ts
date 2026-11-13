@@ -15,7 +15,8 @@ import { clusterLabel, type Cluster } from '../world/clusters';
 import { NEBULA_TYPE_NAMES_JA, nebulaLabel, type Nebula } from '../world/nebulae';
 import { galaxyLabel, type Galaxy } from '../world/galaxies';
 import type { Comet } from '../world/comets';
-import { teffFromBv, starColor } from '../world/planets';
+import { teffFromBv, starColor, starModel } from '../world/planets';
+import { clusterPicture, cometPicture, galaxyPicture, nebulaScale, starPicture } from '../world/picture';
 import { PLANET_FACTS, SUN_FACTS } from '../world/planet-facts';
 import { KM_PER_AU, KM_PER_LY, KM_PER_PC } from '../world/units';
 import { length, sub, type Vec3 } from '../world/vec';
@@ -215,20 +216,21 @@ export class CollectionSource {
         return b ? bodyLook(b, e.kind) : kindLook(e.kind, e.key);
       }
       case 'star': {
-        const teff = d.real?.star.teffK ?? teffFromBv(d.bv);
-        const c = starColor(teff);
-        return kindLook('star', e.key, { color: [c[0] * 255, c[1] * 255, c[2] * 255] });
+        // 宇宙の中の恒星と同じ計算（半径・温度。実在のデータがあればそれ）
+        const m = starModel(d, d.real ?? null);
+        const c = starColor(m.teffK);
+        return kindLook('star', e.key, { color: [c[0] * 255, c[1] * 255, c[2] * 255], star: starPicture(m) });
       }
       case 'compact':
         return kindLook(e.kind, e.key);
       case 'cluster':
-        return kindLook('cluster', e.key, { globular: d.c.kind === 'globular' });
+        return kindLook('cluster', e.key, { globular: d.c.kind === 'globular', cluster: clusterPicture(d.c) });
       case 'nebula':
-        return kindLook('nebula', e.key, { nebula: d.n.type });
+        return kindLook('nebula', e.key, { nebula: d.n.type, nebulaScale: nebulaScale(d.n.radiusPc) });
       case 'galaxy':
-        return kindLook('galaxy', e.key, { tType: d.g.tType });
+        return kindLook('galaxy', e.key, { galaxy: galaxyPicture(d.g) });
       case 'comet':
-        return kindLook('comet', e.key);
+        return kindLook('comet', e.key, { comet: cometPicture(d.comet) });
       case 'extra': {
         const b = findBody(e.key) ?? this.deps.systems.findBody(e.key);
         return b ? bodyLook(b, e.kind) : kindLook(e.kind, e.key);

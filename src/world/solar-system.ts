@@ -17,6 +17,7 @@ import {
 } from 'astronomy-engine';
 import { keplerPositionKm, orbitNormal, orbitToEqj, type KeplerElements } from './kepler';
 import { DEG, KM_PER_AU } from './units';
+import { T_SUN_K } from './star-color';
 import { add, length, mulMat, normalize, rotX, rotZ, scale, sub, type Mat3, type Vec3 } from './vec';
 import type { RingZone, SurfaceLook } from './surface';
 import type { CompactLook } from './compact-objects';
@@ -73,6 +74,8 @@ export interface BodyInfo {
   ringColor?: readonly [number, number, number];
   /** 光る天体（恒星）の色（0〜1 の RGB） */
   glow?: readonly [number, number, number];
+  /** 恒星の有効温度（K）。図鑑の絵（src/world/picture.ts）に使う */
+  teffK?: number;
   /** 大気（ふちに光の輪を描く）。見た目のための値 */
   atmosphere?: Atmosphere;
   /** 彗星の尾の長さを決める値（src/world/comets.ts の tailLengthKm） */
@@ -203,7 +206,7 @@ const galilean = (id: string, name: string, nameJa: string, radiusKm: number, in
 
 /** 最初から入っている天体 */
 export const CORE_BODIES: readonly BodyInfo[] = [
-  { ...major('Sun', '太陽', 695_700, 'star', null), glow: [1, 0.95, 0.85] },
+  { ...major('Sun', '太陽', 695_700, 'star', null), glow: [1, 0.95, 0.85], teffK: T_SUN_K },
   major('Mercury', '水星', 2_439.7, 'planet', 'Sun'),
   major('Venus', '金星', 6_051.8, 'planet', 'Sun'),
   major('Earth', '地球', 6_371.0, 'planet', 'Sun'),

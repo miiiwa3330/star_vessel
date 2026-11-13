@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useRef } from 'react';
-import { mulberry32 } from '../world/random';
-import { globeExtent, projectCloud, renderGlobe, type CloudPoint, type GlobeOptions, type SurfaceMap } from './globe-render';
+import { globeExtent, renderGlobe, type CloudPoint, type GlobeOptions, type SurfaceMap } from './globe-render';
+import { drawCloud, initialPitch, INITIAL_YAW, isCloudLook, makeCloud } from './cloud-picture';
 import { globeMap, type CollectionLook } from './collection-look';
 import { CraftIcon } from './BodyGlobe';
 
@@ -27,7 +27,7 @@ export const ObjectViewer = forwardRef<HTMLDivElement, { look: CollectionLook; s
     const box = boxRef.current;
     if (!box) return;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const state = { yaw: 0.6, pitch: look.type === 'galaxy' ? 0.75 : look.type === 'black-hole' ? 0.32 : 0.28, vy: 0, vp: 0, dragging: false, dirty: true };
+    const state = { yaw: INITIAL_YAW, pitch: initialPitch(look), vy: 0, vp: 0, dragging: false, dirty: true };
     let map: SurfaceMap | null = null;
     let cloud: CloudPoint[] | null = null;
     let alive = true;
@@ -37,7 +37,7 @@ export const ObjectViewer = forwardRef<HTMLDivElement, { look: CollectionLook; s
         map = m;
         state.dirty = true;
       });
-    } else if (look.type !== 'black-hole' && look.type !== 'craft') cloud = makeCloud(look);
+    } else if (isCloudLook(look)) cloud = makeCloud(look);
 
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d') ?? null;
@@ -69,26 +69,7 @@ export const ObjectViewer = forwardRef<HTMLDivElement, { look: CollectionLook; s
         ctx.putImageData(image, 0, 0);
         return;
       }
-      if (cloud) {
-        ctx.clearRect(0, 0, res, res);
-        ctx.globalCompositeOperation = unknown ? 'source-over' : 'lighter';
-        for (const q of projectCloud(cloud, state.yaw, state.pitch)) {
-          const x = (q.x * 0.47 + 0.5) * res;
-          const y = (-q.y * 0.47 + 0.5) * res;
-          const s = Math.max(0.6, q.p.s * res);
-          const a = q.p.a * (0.75 + 0.25 * q.z);
-          if (q.p.s > 0.02) {
-            const g = ctx.createRadialGradient(x, y, 0, x, y, s);
-            g.addColorStop(0, `rgba(${q.p.r}, ${q.p.g}, ${q.p.b}, ${a})`);
-            g.addColorStop(1, `rgba(${q.p.r}, ${q.p.g}, ${q.p.b}, 0)`);
-            ctx.fillStyle = g;
-          } else ctx.fillStyle = `rgba(${q.p.r}, ${q.p.g}, ${q.p.b}, ${a})`;
-          ctx.beginPath();
-          ctx.arc(x, y, s, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-        ctx.globalCompositeOperation = 'source-over';
-      }
+      if (cloud) drawCloud(ctx, res, cloud, state.yaw, state.pitch, { unknown });
     };
 
     // ドラッグで回す
@@ -171,7 +152,14 @@ export const ObjectViewer = forwardRef<HTMLDivElement, { look: CollectionLook; s
         width: size,
         height: size,
         ['--ov-ext' as string]: ext,
-        ...(look.type === 'star' ? { ['--ov-glow' as string]: `rgba(${look.color.map(Math.round).join(', ')}, 0.55)` } : {}),
+        ...(look.type === 'star'
+          ? {
+              ['--ov-glow' as string]: `rgba(${look.color.map(Math.round).join(', ')}, ${(0.35 + 0.45 * look.picture.glow).toFixed(2)})`,
+              ['--ov-star-size' as string]: look.picture.size,
+              // 光の広がり（縮めた分を戻して、画面の上で同じ幅になるように）
+              ['--ov-glow-px' as string]: `${((6 + 30 * look.picture.glow) / look.picture.size).toFixed(1)}px`,
+            }
+          : {}),
       }}
       role="img"
       aria-label="ドラッグで回せます"
@@ -190,131 +178,3 @@ export const ObjectViewer = forwardRef<HTMLDivElement, { look: CollectionLook; s
 });
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-
-/** 点の集まりを作る（種から決まる。誰の端末でも同じ形。見た目のための形で、観測の形ではない） */
-export function makeCloud(look: CollectionLook): CloudPoint[] {
-  const rand = mulberry32('seed' in look ? look.seed : 1);
-  const gauss = () => {
-    let s = 0;
-    for (let i = 0; i < 4; i++) s += rand();
-    return (s - 2) / 0.58;
-  };
-  const pts: CloudPoint[] = [];
-  const star = (x: number, y: number, z: number, s: number, warm: number, a = 1) => {
-    const t = warm;
-    pts.push({ x, y, z, s, r: Math.round(200 + 55 * t), g: Math.round(215 + 20 * (1 - Math.abs(t - 0.5))), b: Math.round(255 - 90 * t), a });
-  };
-  if (look.type === 'cluster') {
-    const n = look.globular ? 900 : 160;
-    for (let i = 0; i < n; i++) {
-      // 球状星団は中心に集まる（プラマーの分布。外へはみ出したものは選び直す）、散開星団はまばら
-      let r = 2;
-      while (r > 1) r = look.globular ? 0.16 / Math.sqrt(Math.max(1e-3, rand() ** (-2 / 3) - 1)) : 0.85 * Math.cbrt(rand());
-      const u = 2 * rand() - 1;
-      const th = rand() * 2 * Math.PI;
-      const rr = r;
-      const sxy = Math.sqrt(1 - u * u);
-      star(rr * sxy * Math.cos(th), rr * u, rr * sxy * Math.sin(th), (look.globular ? 0.005 : 0.008) + 0.012 * rand() ** 6, look.globular ? 0.55 + 0.4 * rand() : rand() * 0.6, look.globular ? 0.5 : 0.9);
-    }
-  } else if (look.type === 'galaxy') {
-    const t = look.tType ?? 4;
-    const elliptical = t <= -1;
-    const irregular = t >= 9;
-    // 中心のふくらみ
-    for (let i = 0; i < (elliptical ? 1400 : 380); i++) {
-      const k = elliptical ? 0.75 : 0.22;
-      star(gauss() * k * 0.5, gauss() * k * (elliptical ? 0.32 : 0.16), gauss() * k * 0.5, 0.005 + 0.006 * rand(), 0.75 + 0.25 * rand(), 0.55);
-    }
-    if (!elliptical) {
-      const arms = irregular ? 0 : 2;
-      for (let i = 0; i < 1600; i++) {
-        const r = 0.12 + 0.85 * Math.sqrt(rand());
-        let th = rand() * 2 * Math.PI;
-        if (arms > 0 && rand() < 0.78) {
-          const arm = Math.floor(rand() * arms);
-          th = (arm / arms) * 2 * Math.PI + Math.log(r / 0.12) * 2.2 + gauss() * 0.28;
-        }
-        const blue = rand() < 0.55;
-        const x = r * Math.cos(th) + (irregular ? gauss() * 0.18 : 0);
-        const z = r * Math.sin(th) + (irregular ? gauss() * 0.18 : 0);
-        star(x, gauss() * 0.025, z, 0.004 + 0.007 * rand(), blue ? 0.1 * rand() : 0.4 + 0.3 * rand(), 0.6);
-        // 星の生まれる所の、ほんのり赤い光
-        if (blue && rand() < 0.04) pts.push({ x, y: 0, z, s: 0.03 + 0.03 * rand(), r: 255, g: 120, b: 170, a: 0.22 });
-      }
-    }
-  } else if (look.type === 'nebula') {
-    // 種類ごとの色：電離した水素（赤・桃）、惑星状星雲（青緑の殻）、超新星残骸（すじ）、反射星雲（青）、暗黒星雲（茶）
-    const palette: Record<string, [number, number, number][]> = {
-      hii: [
-        [255, 90, 140],
-        [255, 150, 120],
-        [140, 200, 255],
-      ],
-      pn: [
-        [90, 230, 220],
-        [120, 160, 255],
-        [255, 120, 150],
-      ],
-      snr: [
-        [255, 160, 90],
-        [120, 170, 255],
-        [255, 110, 130],
-      ],
-      rn: [
-        [120, 170, 255],
-        [170, 200, 255],
-        [210, 220, 255],
-      ],
-      dn: [
-        [120, 80, 60],
-        [90, 60, 50],
-        [160, 120, 90],
-      ],
-    };
-    const cols = palette[look.nebula] ?? palette.hii;
-    const shell = look.nebula === 'pn' || look.nebula === 'snr';
-    for (let i = 0; i < 520; i++) {
-      let x: number;
-      let y: number;
-      let z: number;
-      if (shell) {
-        const u = 2 * rand() - 1;
-        const th = rand() * 2 * Math.PI;
-        const r = (look.nebula === 'pn' ? 0.55 : 0.75) + gauss() * 0.06;
-        const s = Math.sqrt(1 - u * u);
-        x = r * s * Math.cos(th);
-        y = r * u * (look.nebula === 'pn' ? 0.8 : 1);
-        z = r * s * Math.sin(th);
-      } else {
-        x = gauss() * 0.32;
-        y = gauss() * 0.24;
-        z = gauss() * 0.3;
-      }
-      const c = cols[Math.floor(rand() * cols.length)];
-      pts.push({ x, y, z, s: 0.05 + 0.08 * rand(), r: c[0], g: c[1], b: c[2], a: look.nebula === 'dn' ? 0.35 : shell ? 0.09 : 0.045 });
-    }
-    // 中の星
-    for (let i = 0; i < 24; i++) star(gauss() * 0.3, gauss() * 0.25, gauss() * 0.3, 0.005 + 0.006 * rand(), rand() * 0.4, 0.8);
-    if (look.nebula === 'pn') star(0, 0, 0, 0.018, 0, 1);
-  } else if (look.type === 'comet') {
-    // 核と、太陽と反対の向き（ここでは −x）へのびる尾
-    pts.push({ x: 0.55, y: 0, z: 0, s: 0.05, r: 255, g: 255, b: 255, a: 1 });
-    pts.push({ x: 0.55, y: 0, z: 0, s: 0.16, r: 170, g: 220, b: 255, a: 0.5 });
-    for (let i = 0; i < 700; i++) {
-      const t = rand();
-      const spread = 0.02 + t * 0.22;
-      const dust = rand() < 0.5;
-      pts.push({
-        x: 0.55 - t * 1.45,
-        y: gauss() * spread + (dust ? -t * t * 0.25 : 0),
-        z: gauss() * spread,
-        s: 0.02 + 0.05 * rand(),
-        r: dust ? 255 : 130,
-        g: dust ? 230 : 190,
-        b: dust ? 190 : 255,
-        a: 0.12 * (1 - t),
-      });
-    }
-  }
-  return pts;
-}
