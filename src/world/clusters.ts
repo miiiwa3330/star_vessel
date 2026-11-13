@@ -19,6 +19,8 @@ export interface Cluster {
   rtPc: number | null;
   /** Gaia で見つかったメンバーの数 */
   members: number;
+  /** 年齢（年の常用対数。Hunt & Reffert 2023 の値。分からなければ null） */
+  logAge: number | null;
 }
 
 type Raw = [string, string | null, 'o' | 'g', number, number, number, number, number | null, number, number | null];
@@ -32,6 +34,7 @@ export function decodeClusters(json: { clusters: Raw[] }): Cluster[] {
     r50Pc: c[6],
     rtPc: c[7],
     members: c[8],
+    logAge: c[9],
   }));
 }
 

@@ -10,7 +10,6 @@ import type { ViewMode } from '../controls/chase-camera';
 import type { Visit } from '../world/visits';
 import type { InfoKind } from '../world/info';
 import type { Vec3 } from '../world/vec';
-import type { CollectionEntry } from './info-controller';
 
 /** スマホの画面のボタンで押せるキー */
 export type MoveKeyCode = 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD' | 'Space' | 'ShiftLeft';
@@ -212,8 +211,8 @@ export const hudActions = {
    * 自分のワープホールのそばでは、そのワープホールを消す（もう一度押すと消える。2026-11-12）
    */
   pressWarpButton: (): void => {},
-  /** コレクションの詳細（説明と絵）。main.ts が中身を入れる */
-  describeVisit: (_v: Visit): CollectionEntry => ({ details: [], look: { type: 'craft' }, nameEn: null }),
+  /** 図鑑の天体の方を向く（図鑑の「その方を向く」）。main.ts が中身を入れる */
+  faceEntry: (_key: string): void => {},
   /** 3D のマップを、訪れた場所を真ん中にして開く（コレクションから） */
   openMapAt: (key: string): void => {
     hudStore.set({ mapFocus: key });

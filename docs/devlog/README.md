@@ -36,3 +36,4 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-12 | [開いている画面とカーソル（メニューは入ったときに出さない・× をなくす・1〜4 キー）](entries/2026-11-12-overlay-and-pointer-lock.md) |
 | 2026-11-12 | [マップの範囲と出すもの・ワープをマップへ・写真](entries/2026-11-12-map-zoom-warp-photo.md) |
 | 2026-11-12 | [レーダーと 3D のマップ・図鑑・その場で消すワープホール](entries/2026-11-12-radar-map-collection.md) |
+| 2026-11-13 | [図鑑：すべての天体・黒いシルエット・回せる絵・滑る詳細](entries/2026-11-13-collection-encyclopedia.md) |

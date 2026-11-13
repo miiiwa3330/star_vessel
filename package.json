@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "stars": "node tools/build-stars.mjs",
+    "star-info": "node tools/build-star-info.mjs",
     "constellations": "NODE_USE_ENV_PROXY=1 node tools/build-constellations.mjs",
     "exoplanets": "node tools/build-exoplanets.mjs && NODE_USE_ENV_PROXY=1 node tools/build-exoplanets-nasa.mjs",
     "moons": "NODE_USE_ENV_PROXY=1 node tools/build-moons.mjs && NODE_USE_ENV_PROXY=1 node tools/build-moon-names.mjs",

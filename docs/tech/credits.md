@@ -11,6 +11,8 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 
 | 素材 | 置き場所 | 出どころ | ライセンス | 表記のしかた |
 |------|----------|----------|------------|--------------|
+| HYG Database v4.4（恒星の名前・スペクトル型・見かけの等級・星座。2026-11-12） | `public/data/star-info.json`（変換したもの） | https://codeberg.org/astronexus/hyg（David Nash / astronexus） | CC BY-SA 4.0 | 星と同じ表記（下の行）。変更点を `public/data/star-info.LICENSE.txt` に書いている |
+| NASA Planetary Fact Sheet・Sun Fact Sheet（太陽・惑星・月・冥王星の数。2026-11-12） | `src/world/planet-facts.ts`（表の値を写した） | https://nssdc.gsfc.nasa.gov/planetary/factsheet/（NASA Goddard Space Flight Center） | NASA のデータ（著作権の制限なし。出典を書く） | 出典は `docs/tech/collection.md` |
 | HYG Database v4.4（恒星） | `public/data/stars.bin`（変換したもの） | https://codeberg.org/astronexus/hyg（David Nash / astronexus） | CC BY-SA 4.0 | 画面に「星：HYG v4.4（CC BY-SA 4.0）」とリンク。変換したデータも CC BY-SA 4.0 で、変更点を `public/data/stars.LICENSE.txt` に書いている |
 | Open Exoplanet Catalogue（系外惑星） | `public/data/exoplanets.json`（変換したもの） | https://github.com/OpenExoplanetCatalogue/open_exoplanet_catalogue（Hanno Rein ほか） | MIT | 画面に「系外惑星：Open Exoplanet Catalogue（MIT）」とリンク。著作権の表示と許諾の文を `public/data/exoplanets.LICENSE.txt` に置く（必ず json と一緒に置く） |
 | JPL の衛星のデータ（平均軌道要素・物理量・Horizons） | `public/data/moons.json`（変換したもの） | https://ssd.jpl.nasa.gov/（NASA/JPL Solar System Dynamics） | NASA/JPL のデータ（著作権の制限なし。出典を書く） | 画面に「衛星・小惑星：NASA/JPL」とリンク |

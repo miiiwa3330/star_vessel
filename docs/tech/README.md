@@ -20,6 +20,7 @@ summary: tech の目次。技術スタック・処理的に可能な範囲・技
 | [`exoplanets.md`](exoplanets.md) | 太陽系の外の惑星：実在の系外惑星のデータの出どころと変換、恒星の見つけ方、自動で作る惑星の決まりと数の出典、軌道と見た目 |
 | [`galaxy.md`](galaxy.md) | 天の川銀河のモデル（腕・中心部・ちり）、数の出典、観測と合っているかの確かめ方、銀河の光とまわりの星の作り方 |
 | [`server.md`](server.md) | サーバー（Cloudflare Workers・D1・Durable Objects・Better Auth）の構成、API、ワープホールの保存、宇宙船の位置のやりとり、アカウント、手元での動かし方、本番に出す前に残っていること |
+| [`collection.md`](collection.md) | コレクション（図鑑）：入れる天体の決まりと数、通しの番号、説明の文と数値の出典、まだ訪れていない天体の見せ方、回せる絵の描き方 |
 | [`credits.md`](credits.md) | 使っている外部のデータ・画像・ライブラリと、ライセンス・クレジット表記 |
 | [`feasibility.md`](feasibility.md) | Web とネイティブアプリで処理的に可能な範囲、実在のデータで再現できる範囲 |
 | [`astronomy-data.md`](astronomy-data.md) | 天体の計算ライブラリ（astronomy-engine）と恒星データ（HYG）の中身・できること・ライセンス |
