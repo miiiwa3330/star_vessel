@@ -22,6 +22,8 @@ import { galactoToEqjPc } from './world/galaxy';
 import { Hud } from './ui/Hud';
 import { InfoController } from './ui/info-controller';
 import { hudActions, hudStore, showNotice, type MapPoint } from './ui/hud-store';
+import { CollectionSource, setCollectionSource } from './ui/collection-source';
+import { decodeStarInfo, starNameJa } from './world/star-info';
 import { worldNow } from './world/clock';
 import { keepOutsideBodies } from './world/collision';
 import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/observer';
@@ -199,6 +201,8 @@ async function main() {
       return [] as CompactObject[];
     });
   const systems = new StarSystems(stars, realSystems, compactObjects);
+  // 恒星の名前と見え方（固有名のある恒星・系外惑星のある恒星。図鑑と情報のカード）。読めなくても動く
+  const starInfo = await fetchJson<{ stars: Parameters<typeof decodeStarInfo>[0]['stars'] }>('/data/star-info.json', { stars: [] }).then(decodeStarInfo);
   void loadGaiaStars(() => systems.catalogChanged()).catch((e: unknown) => console.error('Gaia の星のデータが読めない', e));
   // 人工衛星（ISS など）。サーバーが最新の軌道要素を取ってくる。取れなければ同梱の写し（古くなる）を使う
   const satRecords = await fetch('/api/satellites')
@@ -358,11 +362,32 @@ async function main() {
     nebulae,
     galaxies: externalGalaxies,
     face: (rel) => controls.lookAt(rel, controls.up()),
+    starName: (system) => starNameJa(starInfo.get(system)),
   });
   controls.onTap = (x, y) => info.tap(x, y, window.innerWidth, window.innerHeight);
   if (online) void info.connect();
-  // コレクションの詳細（要件 F38）と、3D のマップの、訪れた場所のいまの位置（要件 F62）
-  hudActions.describeVisit = (v) => info.entry(v.key, v.kind, v.name);
+  // コレクション（図鑑。要件 F38）：集められる天体のカタログと、詳細の説明。カタログは図鑑を初めて開いたときに作る
+  const collection = new CollectionSource({
+    systems,
+    realSystems,
+    starInfo,
+    compact: compactObjects,
+    clusters,
+    nebulae,
+    galaxies: externalGalaxies,
+    comets,
+    constellationsJa: new Map(constellationList.map((c) => [c.id, c.nameJa])),
+    largeAsteroidNumbers,
+    now: worldNow,
+  });
+  setCollectionSource(collection);
+  hudActions.faceEntry = (key) => {
+    const d = worldNow();
+    const e = collection.entry(key) ?? collection.extras(hudStore.get().visits).find((x) => x.key === key);
+    const p = e ? collection.positionKm(e, d) : info.locate(key, d);
+    if (p) controls.lookAt(sub(p, absolutePositionKm(observer, d)), controls.up());
+  };
+  // 3D のマップの、訪れた場所のいまの位置（要件 F62）
   const updateMapPoints = () => {
     const d = worldNow();
     const points: MapPoint[] = [];

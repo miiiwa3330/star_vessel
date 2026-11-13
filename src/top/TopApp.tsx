@@ -196,12 +196,19 @@ export function TopApp() {
 
   /**
    * タイトル画面のスクロールの位置（背景の地球を動かすため）。progress：最初の画面の高さを 1 とした位置（0〜1。1 で詳細の画面）、
-   * pastPx：1 を超えた分（px。地球を画面の外へ送る）。船を選ぶ間・月へ行く間は、スクロールできないので、いつも 0
+   * pastPx：1 を超えた分（px。地球を画面の外へ送る）。船を選ぶ間・月へ行く間は、スクロールできないので、いつも 0。
+   * マイページ（火星の箱）では、箱のスクロールの位置（最初の画面の高さを 1。1 で下のコレクションの画面）。火星が、タイトル画面の地球と同じように動く（2026-11-13）
    */
   const stageForScroll = useRef(stage);
   stageForScroll.current = stage;
   const getScroll = useCallback((): ScrollState => {
     const root = rootRef.current;
+    if (stageForScroll.current === 'auth') {
+      const box = root?.querySelector<HTMLElement>('.top-auth-box.is-mypage');
+      if (!box) return { progress: 0, pastPx: 0 };
+      const first = box.querySelector<HTMLElement>('.top-auth-first')?.offsetHeight || box.clientHeight || 1;
+      return { progress: Math.min(1, box.scrollTop / first), pastPx: Math.max(0, box.scrollTop - first) };
+    }
     if (!root || stageForScroll.current !== 'title') return { progress: 0, pastPx: 0 };
     const heroHeight = root.querySelector<HTMLElement>('.top-hero')?.offsetHeight || root.clientHeight || 1;
     return { progress: Math.min(1, root.scrollTop / heroHeight), pastPx: Math.max(0, root.scrollTop - heroHeight) };

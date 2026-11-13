@@ -5,7 +5,8 @@
  * 宇宙の明るい天体の上でも読めるよう、面の代わりに、ふちの無い暗いにじみ（--hud-scrim）を後ろに敷く。
  * 左上の STAR VESSEL（Monoton）と、緑のピクセル調の状態の表示（DotGothic16）は、そのまま
  */
-#ui {
+/* 世界の画面（#ui）と、ほかの画面に置く HUD の部品（.hud-scope。マイページの図鑑など）で使う値 */
+#ui, .hud-scope {
   --hud-ink: #e8ecf4;
   --hud-faint: rgba(232, 236, 244, 0.62);
   --hud-quiet: rgba(232, 236, 244, 0.5);
@@ -677,6 +678,18 @@
 }
 
 /* 画面を大きく使う面（マップ・コレクション）は、後ろの天体の模様で中身が読みにくくならないよう、ぼかしだけ強める（色の濃さはチャットと同じ） */
+/* マイページ（タイトル画面）の下に置く図鑑：画面に固定せず、その場所に置く */
+.hud-collection.is-embedded {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  z-index: auto;
+  flex: none;
+  width: min(880px, 100%);
+  height: min(720px, calc(100vh - 32px));
+  height: min(720px, calc(100svh - 32px));
+}
 .hud-collection.hud-glass-panel, .hud-starmap.hud-glass-panel {
   -webkit-backdrop-filter: blur(22px) saturate(1.1);
   backdrop-filter: blur(22px) saturate(1.1);
@@ -706,8 +719,18 @@
   text-align: center;
   overflow: hidden;
 }
-.hud-collection-head { display: flex; justify-content: center; align-items: center; min-height: 28px; }
-.hud-collection .hud-chips { flex: none; }
+.hud-collection-head { flex: none; display: flex; justify-content: center; align-items: baseline; gap: 16px; min-height: 28px; flex-wrap: wrap; }
+/* 集めた数 / 全体の数（2026-11-12） */
+.hud-collection-count { margin: 0; font-size: 13px; letter-spacing: 0.12em; color: var(--hud-faint); font-variant-numeric: tabular-nums; }
+.hud-collection-count strong { font-weight: 400; font-size: 16px; color: #fff; }
+.hud-collection-progress { flex: none; width: min(320px, 70%); height: 1px; margin: 4px auto 6px; background: rgba(232, 236, 244, 0.16); }
+.hud-collection-progress span { display: block; height: 100%; background: var(--hud-orange); box-shadow: 0 0 6px rgba(255, 138, 31, 0.7); }
+/* 一覧と詳細は、同じ場所に重ねる（画面は切り替えず、詳細の天体が一覧の場所から滑ってくる） */
+.hud-collection-body { position: relative; flex: 1; min-height: 0; }
+.hud-collection-list { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.32s ease; }
+.hud-collection-list.is-behind { opacity: 0; pointer-events: none; }
+.hud-collection-chips { flex: none; }
+.hud-chip-toggle { border-style: dashed; }
 .hud-collection-grid {
   flex: 1;
   min-height: 0;
@@ -744,28 +767,53 @@
 .hud-collection-cell:focus-visible { outline: 1px solid var(--hud-accent); outline-offset: -2px; }
 .hud-collection-no { font-size: 10px; letter-spacing: 0.16em; color: var(--hud-quiet); font-variant-numeric: tabular-nums; }
 .hud-collection-name { max-width: 100%; font-size: 12px; letter-spacing: 0.06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hud-collection-pager { flex: none; display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 8px; }
+.hud-collection-name.is-unknown, .hud-collection-title.is-unknown { color: var(--hud-quiet); letter-spacing: 0.3em; }
+.hud-collection-pager { flex: none; display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 8px; }
 .hud-collection-pager .hud-button { min-width: 44px; font-size: 16px; padding: 0 12px; }
-.hud-collection-page { font-size: 11px; letter-spacing: 0.16em; color: var(--hud-faint); font-variant-numeric: tabular-nums; }
-/* 詳細：左に天体、右に説明 */
+.hud-collection-page { min-width: 92px; font-size: 11px; letter-spacing: 0.12em; color: var(--hud-faint); font-variant-numeric: tabular-nums; text-align: center; }
+/* ページの多い一覧を一気にめくる、細い線のつまみ */
+.hud-collection-slider { width: min(320px, 40vw); accent-color: var(--hud-orange); background: transparent; cursor: pointer; }
+/* 詳細：左に天体（回せる）、右に説明（スクロールする） */
 .hud-collection-detail {
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: 32px;
   text-align: left;
 }
-.hud-collection-figure { display: flex; justify-content: center; align-items: center; }
-.hud-collection-text { overflow-y: auto; max-height: 100%; padding-right: 8px; }
+.hud-collection-figure { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; min-height: 0; }
+.hud-collection-drag { margin: 0; font-size: 10px; letter-spacing: 0.24em; color: var(--hud-quiet); }
+.hud-collection-text { overflow-y: auto; min-height: 0; padding: 8px 14px 24px 0; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(232, 236, 244, 0.3) transparent; }
 .hud-collection-kind { margin: 0; font-size: 11px; letter-spacing: 0.2em; color: var(--hud-orange); }
-.hud-collection-title { margin: 6px 0 0; font-size: 26px; font-weight: 300; letter-spacing: 0.08em; line-height: 1.4; }
+.hud-collection-title { margin: 6px 0 0; font-size: 28px; font-weight: 300; letter-spacing: 0.08em; line-height: 1.4; }
 .hud-collection-en { margin: 0; font-size: 13px; letter-spacing: 0.12em; color: var(--hud-faint); }
-.hud-collection-facts { list-style: none; margin: 16px 0 0; padding: 0; font-size: 13px; line-height: 1.9; }
-.hud-collection-facts li { padding: 4px 0; border-top: 1px solid var(--hud-rule); }
-.hud-collection-facts li:last-child { border-bottom: 1px solid var(--hud-rule); }
-.hud-collection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.hud-collection-parent { margin: 2px 0 0; font-size: 12px; color: var(--hud-faint); }
+.hud-collection-lead { margin-top: 16px; font-size: 14px; line-height: 2; letter-spacing: 0.04em; }
+.hud-collection-lead p { margin: 0 0 0.9em; }
+.hud-collection-section { margin-top: 18px; }
+.hud-collection-section h3 { margin: 0 0 6px; font-size: 11px; font-weight: 300; letter-spacing: 0.3em; color: var(--hud-orange); }
+.hud-collection-section dl { margin: 0; }
+.hud-collection-row { display: grid; grid-template-columns: minmax(8em, 0.9fr) minmax(0, 1.3fr); gap: 12px; padding: 5px 0; border-top: 1px solid var(--hud-rule); font-size: 13px; line-height: 1.7; }
+.hud-collection-row:last-child { border-bottom: 1px solid var(--hud-rule); }
+.hud-collection-row dt { color: var(--hud-faint); }
+.hud-collection-row dd { margin: 0; overflow-wrap: anywhere; }
+.hud-collection-note { margin: 0 0 0.6em; font-size: 13px; line-height: 1.9; }
+.hud-collection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+
+/* ---- 詳細の回せる天体（ObjectViewer） ---- */
+.ov { position: relative; flex: none; display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; will-change: transform; }
+.ov:active { cursor: grabbing; }
+.ov-canvas { display: block; }
+.ov-star .ov-canvas { filter: drop-shadow(0 0 18px var(--ov-glow, rgba(255, 220, 160, 0.55))); }
+.ov-black-hole .ov-canvas { filter: drop-shadow(0 0 12px rgba(255, 140, 60, 0.45)); }
+/* 星雲は、薄い光をたくさん重ねるので、色の段差（格子のような模様）が出ないよう、少しぼかす */
+.ov-nebula .ov-canvas { filter: blur(1.2px); }
+.ov-craft-stage { perspective: 600px; color: rgba(220, 230, 245, 0.9); }
+.ov-craft { transform-style: preserve-3d; }
+/* まだ訪れていない天体：黒いシルエット。形が分かるよう、ふちをうっすら光らせる */
+.ov.is-unknown .ov-canvas, .ov.is-unknown .ov-craft-stage { filter: brightness(0) drop-shadow(0 0 1px rgba(200, 215, 255, 0.55)) drop-shadow(0 0 10px rgba(140, 170, 255, 0.25)); }
+.cg.is-unknown { filter: brightness(0) drop-shadow(0 0 1px rgba(210, 222, 255, 0.75)) drop-shadow(0 0 5px rgba(140, 170, 255, 0.35)); }
 
 /* ---- 天体の絵（BodyGlobe）：CSS だけで描く ---- */
 .cg { position: relative; display: flex; align-items: center; justify-content: center; flex: none; }
@@ -881,8 +929,15 @@
   .hud-collection-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 2px; }
   .hud-collection-cell { padding: 2px; gap: 2px; }
   .hud-collection-name { font-size: 11px; }
-  /* 詳細：上に天体、下に説明 */
-  .hud-collection-detail { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 12px; align-items: start; overflow-y: auto; }
-  .hud-collection-title { font-size: 20px; }
-  .hud-collection-text { max-height: none; overflow: visible; }
+  /* 種類の切り替えは 1 列にして、横に流す（一覧の場所を空ける） */
+  .hud-collection-chips { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .hud-collection-chips .hud-chip { flex: none; }
+  .hud-collection-slider { display: none; }
+  /* 詳細：上に天体、下に説明（全体でスクロール） */
+  .hud-collection-detail { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
+  .hud-collection-figure { flex: none; }
+  .hud-collection-title { font-size: 21px; }
+  .hud-collection-text { overflow: visible; padding-right: 2px; }
+  .hud-collection-row { grid-template-columns: minmax(6.5em, 0.8fr) minmax(0, 1.2fr); font-size: 12px; }
+  .hud-collection-lead { font-size: 13px; }
 }

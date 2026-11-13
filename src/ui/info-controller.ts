@@ -14,7 +14,6 @@ import {
   galaxyKey,
   nebulaKey,
   describeHost,
-  INFO_KIND_NAMES_JA,
   nearestStars,
   pickAimed,
   starKey,
@@ -34,15 +33,6 @@ import { formatDistance } from './format';
 import { hudActions, hudStore, type InfoCardState } from './hud-store';
 import { TargetMarker } from './target-marker';
 import { bodyAddress } from '../world/address';
-import { bodyLook, kindLook, type CollectionLook } from './collection-look';
-
-/** コレクションの詳細に出すもの（要件 F38） */
-export interface CollectionEntry {
-  details: string[];
-  look: CollectionLook;
-  /** 英語の名前（日本語の名前と同じなら null） */
-  nameEn: string | null;
-}
 
 /** 近づいたときのカードを出しておく時間 */
 const NEAR_CARD_MS = 8_000;
@@ -65,6 +55,8 @@ interface Deps {
   galaxies: readonly Galaxy[];
   /** 自分の見ている向きの方を向く（その方を向くボタン） */
   face: (relKm: Vec3) => void;
+  /** 恒星の名前（固有名のある恒星。src/world/star-info.ts）。無ければ null */
+  starName?: (system: string) => string | null;
 }
 
 export class InfoController {
@@ -206,11 +198,6 @@ export class InfoController {
     if (Object.keys(patch).length > 0) hudStore.set(patch);
   }
 
-  /** 訪れた場所の天体を、記号から引く（太陽系の天体・ほかの恒星系の天体） */
-  private bodyOf(key: string): BodyInfo | null {
-    return findBody(key) ?? this.deps.systems.findBody(key);
-  }
-
   private deepOf(key: string): InfoTarget | null {
     if (key.startsWith('C:')) {
       const c = this.deps.clusters.find((x) => clusterKey(x) === key);
@@ -241,27 +228,6 @@ export class InfoController {
     const system = bodyAddress(key)?.system;
     if (system && system !== 'SOL') return this.starTarget(system)?.positionKm ?? null;
     return null;
-  }
-
-  /** コレクションの詳細（説明と絵） */
-  entry(key: string, kind: Visit['kind'], name: string): CollectionEntry {
-    const deep = this.deepOf(key);
-    if (deep) return { details: deep.details(), look: kindLook(kind, key), nameEn: deep.name === name ? null : deep.name };
-    if (key.endsWith('.0') || key === 'Sun') {
-      const star = this.starTarget(key === 'Sun' ? 'SOL' : key.slice(0, -2));
-      const body = this.bodyOf(key);
-      const en = body?.name ?? (key === 'Sun' ? 'Sun' : null);
-      return {
-        details: star?.details() ?? [],
-        look: body ? bodyLook(body, kind) : kindLook(kind, key),
-        nameEn: en && en !== name ? en : null,
-      };
-    }
-    const b = this.bodyOf(key);
-    if (!b) return { details: [INFO_KIND_NAMES_JA[kind]], look: kindLook(kind, key), nameEn: null };
-    const parent = b.parent ? this.bodyOf(b.parent) : null;
-    const en = b.name ?? b.id;
-    return { details: describeBody(b, parent?.nameJa ?? null), look: bodyLook(b, kind), nameEn: en !== name ? en : null };
   }
 
   /** 近くの恒星（白色矮星などの燃えかすも。レーダーに出す。FAR_SEARCH_MS ごとに探し直したもの） */
@@ -322,7 +288,7 @@ export class InfoController {
     if (!host) return null;
     const bodies = this.deps.systems.bodiesOf(system);
     const star = bodies.find((b) => b.id === starKey(system));
-    const name = host.compactInfo?.name ?? star?.nameJa ?? `恒星 ${system}`;
+    const name = host.compactInfo?.name ?? this.deps.starName?.(system) ?? star?.nameJa ?? `恒星 ${system}`;
     const planets = bodies.filter((b) => b.kind === 'exoplanet').length;
     return {
       key: starKey(system),

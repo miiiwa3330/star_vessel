@@ -100,6 +100,8 @@ export class EarthScene {
   private aim: Vec3 | null = null;
   private subjectId: string | null = null;
   private phi: number | undefined;
+  /** 行き先に着いているあいだの、スクロールの進み（0〜1。マイページの下へスクロールしたとき） */
+  private destScrollE = 0;
   /** 最初に描いた時刻（地球が下から上がってくる動きの始まり）。まだ描いていなければ 0 */
   private introStartMs = 0;
   /** 描いた最後の日時（同じ時刻なら、向きと太陽を計算し直さない） */
@@ -335,7 +337,7 @@ export class EarthScene {
       alpha: pose.basis.alpha + (detailAlpha - pose.basis.alpha) * e + introAlpha,
     };
 
-    const view = this.flightPose(earthBasis, dt, motion, stage);
+    const view = this.flightPose(earthBasis, dt, motion, stage, e);
     this.updateDepthRange(view.position);
     this.camera.position.set(view.position.x, view.position.y, view.position.z);
     this.camera.up.set(view.up.x, view.up.y, view.up.z);
@@ -371,7 +373,7 @@ export class EarthScene {
    * 行き先へ飛ぶ間と着いたあとは、行き先を線の前（+）に、戻る間は、地球が前に来るよう、行き先を後ろ（−）に置く。
    * どちらも、行き先から見た構図は同じで、地球は、画面の外（後ろか、上の遠く）にあるので、置き直しは見えない。
    */
-  private flightPose(earthBasis: ViewBasis, dt: number, motion: boolean, stage: TopStage): EarthCameraPose {
+  private flightPose(earthBasis: ViewBasis, dt: number, motion: boolean, stage: TopStage, scrollE: number): EarthCameraPose {
     const away = stage.view !== 'earth';
     if (this.phase === 'earth' && away) {
       this.dest = stage.view as Destination;
@@ -409,8 +411,14 @@ export class EarthScene {
     // 行き先から見たカメラの距離は、地球のときと同じ構図（縁の見え方）になるよう、半径に比例させる
     const rDest = (radiusKm * DISTANCE_KM) / bodyInfo('Earth').radiusKm;
     const alphaDest = limbAlpha(radiusKm, rDest, FOV, LIMB_NDC_Y);
+    // 着いているあいだのスクロール（マイページの下のコレクション。2026-11-13）：タイトル画面の地球と同じく、
+    // 天体から離れ、天体の中心を画面の上へ送る。戻るときは、離れて見ていた所から飛び立つ
+    if (this.phase === 'dest') this.destScrollE = scrollE;
+    const de = this.phase === 'out' ? 0 : this.destScrollE;
+    const rHere = rDest + (distanceForRadius(radiusKm, DETAIL_RADIUS_NDC, FOV) - rDest) * de;
+    const alphaHere = alphaDest + (alphaForCenter(DETAIL_CENTER_NDC_Y, FOV) - alphaDest) * de;
     const toDest = { up, forward, rFrom: earthBasis.distanceKm, alphaFrom: earthBasis.alpha, rTo: rDest, alphaTo: alphaDest, stageKm: STAGE_DISTANCE_KM };
-    const toEarth = { up, forward, rFrom: rDest, alphaFrom: alphaDest, rTo: earthBasis.distanceKm, alphaTo: earthBasis.alpha, stageKm: STAGE_DISTANCE_KM };
+    const toEarth = { up, forward, rFrom: rHere, alphaFrom: alphaHere, rTo: earthBasis.distanceKm, alphaTo: earthBasis.alpha, stageKm: STAGE_DISTANCE_KM };
     // 行き先の天体の中心（地球の中心が原点）。行くときと着いているあいだは、視線の先。戻るときは、地球が視線の先に来るよう、手前の側
     const center = this.phase === 'back' ? scale(legEndCenter(toEarth), -1) : legEndCenter(toDest);
     const mesh = this.bodies[this.dest];
@@ -423,7 +431,7 @@ export class EarthScene {
 
     if (this.phase === 'out') return forwardLeg({ ...toDest, f });
     if (this.phase === 'dest') {
-      const pose = posedView({ dir: up, u: forward, distanceKm: rDest, alpha: alphaDest });
+      const pose = posedView({ dir: up, u: forward, distanceKm: rHere, alpha: alphaHere });
       return { ...pose, position: add(pose.position, center) };
     }
     // back：行き先の中心から、前へ

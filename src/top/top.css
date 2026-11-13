@@ -199,7 +199,7 @@
 .top-go-error { text-align: center; }
 
 /* 右下の X と Miiiwa のアイコン（2026-11-06 に、右上から右下へ移した）。丸い背景は付けない。ふだんは少し透かし、マウスを乗せると透過を解く（アイコン自体の色の変化だけ） */
-.top-social { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); right: 14px; z-index: 3; display: flex; gap: 4px; }
+.top-social { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); right: 14px; z-index: 5; display: flex; gap: 4px; }
 .top-social-link {
   width: 42px;
   height: 42px;
@@ -343,6 +343,54 @@
   transition: opacity 0.5s ease, transform 0.5s ease;
 }
 .top-auth-box.is-open { opacity: 1; transform: none; }
+/* 月の箱：中の入れ物は、ないものとして扱う（前と同じ並び） */
+.top-auth-first { display: contents; }
+/*
+ * マイページ（火星の箱。2026-11-13）：下へスクロールすると、コレクション（図鑑）の画面がある。
+ * 最初の画面は箱だけ（下の端に COLLECTION ↓）、その下に画面いっぱいの図鑑
+ */
+.top-auth-box.is-mypage { display: block; justify-items: stretch; padding: 0; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; }
+/* 慣性のある動き（section-scroll.ts）の間は、吸い付きを切る（タイトル画面の .top.is-title と同じ） */
+.top-auth-box.is-mypage.is-gliding { scroll-snap-type: none; }
+.top-auth-box.is-mypage .top-auth-first, .top-mypage-collection { scroll-snap-align: start; scroll-snap-stop: always; }
+.top-auth-box.is-mypage.is-open { pointer-events: auto; }
+.top-auth-box.is-mypage .top-auth-first {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: var(--top-auth-top) 16px 72px;
+  box-sizing: border-box;
+}
+.top-mypage-cue {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font: inherit;
+  font-family: 'Josefin Sans', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.4em;
+  color: #ff8a1f;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.top-mypage-cue span { font-size: 16px; letter-spacing: 0; color: rgba(232, 236, 244, 0.62); animation: top-cue 1.8s ease-in-out infinite; }
+@keyframes top-cue { 50% { transform: translateY(4px); } }
+/* 図鑑の画面：タイトル画面の詳細（.top-details）と同じ配置。上に火星がかかり、その下から図鑑（幅は詳細と同じ 880px まで）。
+   図鑑が画面に収まらない分は、下へスクロールして見る（火星はページと一緒に上へ送る） */
+.top-mypage-collection { min-height: 100vh; min-height: 100svh; padding: clamp(230px, 46vh, 480px) 20px 36px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
+.top-mypage-wait { width: min(880px, 100%); text-align: left; }
+.top-mypage-wait .top-eyebrow { margin-top: 0; }
 .top-auth-box .top-card { pointer-events: none; position: relative; }
 .top-auth-box.is-open .top-card { pointer-events: auto; }
 .top-card {
@@ -470,6 +518,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .top-button, .top-hero, .top-tagline-wrap, .top-ufos, .top-start-word, .top-auth, .top-auth-box { transition: none; }
+  .top-mypage-cue span { animation: none; }
 }
 
 /* ---- 回復コード（要件 F51） ---- */
