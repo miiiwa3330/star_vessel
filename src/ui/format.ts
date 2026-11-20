@@ -22,6 +22,8 @@ export function formatDistanceEn(km: number): string {
 
 /** 速さを、大きさに合った単位で表す（1 秒あたり。左上の表示なので英語） */
 export function formatSpeed(kmS: number): string {
+  // 秒速 1 km より遅いときは m で書く（2026-11-21。下限が秒速 1 m になったため）
+  if (Math.abs(kmS) < 1) return `${Math.round(kmS * 1000).toLocaleString('en-US')} m/s`;
   return `${formatDistanceEn(kmS)}/s`;
 }
 

@@ -1,6 +1,7 @@
 /**
  * 人工衛星を光の点として描く。地球のまわりの約 1,700 機（src/world/satellites.ts）。
- * 遠くからでも見えるよう、点の大きさは画面のピクセルで決める。地球から遠い（100 万 km より外）ときは描かない
+ * 遠くからでも見えるよう、点の大きさは画面のピクセルで決める。地球から遠い（100 万 km より外）ときは描かない。
+ * 2026-11-21：実際より大きく見えすぎるとオーナーに言われ、点を 5 px から 3 px に、明るさを 0.9 から 0.55 に弱めた（見た目のための値）
  */
 import * as THREE from 'three/webgpu';
 import { exp, float, instancedBufferAttribute, uv, vec3 } from 'three/tsl';
@@ -8,7 +9,8 @@ import { satelliteSizeKm, type SatelliteCatalog } from '../world/satellites';
 import type { Vec3 } from '../world/vec';
 
 const HIDE_BEYOND_KM = 1e6;
-const SIZE_PX = 5;
+const SIZE_PX = 3;
+const BRIGHTNESS = 0.55;
 
 export class SatelliteField {
   readonly sprite: THREE.Sprite;
@@ -27,7 +29,7 @@ export class SatelliteField {
     });
     m.positionNode = instancedBufferAttribute(this.attr, 'vec3');
     m.sizeNode = float(SIZE_PX);
-    m.colorNode = vec3(1.0, 0.92, 0.7).mul(0.9);
+    m.colorNode = vec3(1.0, 0.92, 0.7).mul(BRIGHTNESS);
     const d = uv().sub(0.5).length().mul(2);
     m.opacityNode = exp(d.mul(d).mul(-8));
     this.sprite = new THREE.Sprite(m);

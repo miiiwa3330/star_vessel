@@ -21,6 +21,10 @@ describe('formatDistanceEn・formatSpeed（左上の英語の表示）', () => {
     expect(formatDistanceEn(KM_PER_AU)).toBe('1.00 AU');
     expect(formatDistanceEn(25_300 * KM_PER_LY)).toBe('25,300 ly');
     expect(formatSpeed(12)).toBe('12 km/s');
+    // 秒速 1 km より遅いときは m
+    expect(formatSpeed(0.5)).toBe('500 m/s');
+    expect(formatSpeed(0.001)).toBe('1 m/s');
+    expect(formatSpeed(1)).toBe('1 km/s');
   });
 });
 

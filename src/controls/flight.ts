@@ -21,11 +21,19 @@ import { SPRINT_FACTOR, approachVelocity, isDoubleTap, moveInput, nextSprint, se
 const LOOK_RAD_PER_PX = 0.003;
 const ROLL_RAD_PER_S = 1.2;
 const SPEED_STEP = 1.25;
-export const MIN_SPEED_KM_S = 0.1;
+/** 速さの下限（km/s）。2026-11-21 にオーナーの指示で、秒速 100 m から秒速 1 m に下げた（衛星などの小さな物に、ゆっくり近づけるように） */
+export const MIN_SPEED_KM_S = 0.001;
 /** 手で操縦する速さの上限（要件 F17・仮）は ship-schema.ts の MAX_SPEED_KM_S。サーバーも同じ値で確かめる */
 export { MAX_SPEED_KM_S };
 /** Ctrl（か Shift）を押しながらだと、1 段で速さを 10 倍にする（秒速 500 km から上限まで、約 13 段） */
 const FAST_SPEED_STEP = 10;
+/**
+ * 速さを上げる・下げるキー（キーの場所で決める）。2026-11-21 にオーナーの指示で、「＋」は Shift を押さずに効くようにした。
+ * 「＋」の書いてあるキーそのもの：日本語の配列では「;」のキー（Semicolon）、英語の配列では「=」のキー（Equal）。テンキーの「＋」「−」も。
+ * Shift は下降なので、10 倍ずつにするのは Ctrl だけ（それまでは Shift でも 10 倍になり、日本語の配列で「＋」を押すと下降しながら 10 倍になっていた）
+ */
+const SPEED_UP_CODES = new Set(['Semicolon', 'Equal', 'NumpadAdd', 'BracketRight']);
+const SPEED_DOWN_CODES = new Set(['Minus', 'NumpadSubtract', 'BracketLeft']);
 /** Pointer Lock の直後などに、マウスの動きがまとめて大きく届くことがある（ブラウザの不具合）。これより大きい 1 回の動きは捨てる */
 const MAX_LOCKED_MOVE_PX = 400;
 /** 止まろうとしていて、目標の速さのこの割合より遅くなったら止める */
@@ -302,10 +310,10 @@ export class FlightControls {
     e.preventDefault();
     if (!this.flying) return;
     if (e.altKey) this.onZoom(e.deltaY < 0 ? 1 : -1);
-    // Shift はいま下降なので、10 倍ずつは Ctrl（Shift＋ホイールも残す。Mac では横のスクロールになるので deltaX も見る）
+    // Shift は下降なので、10 倍ずつは Ctrl だけ（2026-11-21 から。キーの＋−と同じ）。Mac では Shift＋ホイールが横のスクロールになるので deltaX も見る
     else {
       const d = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-      if (d !== 0) this.changeSpeed(d < 0 ? 1 : -1, e.ctrlKey || e.shiftKey);
+      if (d !== 0) this.changeSpeed(d < 0 ? 1 : -1, e.ctrlKey);
     }
   };
 
@@ -380,8 +388,8 @@ export class FlightControls {
     if (e.code === 'F5') {
       e.preventDefault(); // 読み込み直さない
       if (!e.repeat) this.onToggleView();
-    } else if (e.key === '+' || e.key === '=' || e.key === ']') this.changeSpeed(1, e.shiftKey || e.ctrlKey);
-    else if (e.key === '-' || e.key === '_' || e.key === '[') this.changeSpeed(-1, e.shiftKey || e.ctrlKey);
+    } else if (SPEED_UP_CODES.has(e.code)) this.changeSpeed(1, e.ctrlKey);
+    else if (SPEED_DOWN_CODES.has(e.code)) this.changeSpeed(-1, e.ctrlKey);
     else if (e.code === 'KeyV' && !e.repeat) this.onToggleView();
     else if (e.code === 'KeyC' && !e.repeat && !e.ctrlKey) this.onToggleConstellations();
     else {
