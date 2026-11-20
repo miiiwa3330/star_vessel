@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { hideLoading, showLoading } from '../loading-screen';
 import { currentAccount, ensureSession } from '../net/auth';
 import { shipApi } from '../net/ship-repository';
 import { defaultDesignFor, HULL_TYPES, SHIP_DESIGN_VERSION, type HullType } from '../world/ship-design';
@@ -220,6 +221,8 @@ export function TopApp() {
     goingRef.current = true;
     setGoing(true);
     setError(null);
+    // 押したらすぐローディング画面（ページが /play に変わっても、世界が動き出すまで続けて出す。src/loading-screen.ts）
+    showLoading();
     try {
       await loading.current;
       const hull = hullOfTarget(shared.target);
@@ -229,6 +232,7 @@ export function TopApp() {
       location.assign(playUrl(location.search));
     } catch (e) {
       console.error(e);
+      hideLoading();
       setError('宇宙船を保存できませんでした。もう一度お試しください');
       goingRef.current = false;
       setGoing(false);

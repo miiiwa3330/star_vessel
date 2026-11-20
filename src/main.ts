@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import { hideLoading } from './loading-screen';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FlightControls } from './controls/flight';
@@ -800,6 +801,8 @@ async function main() {
   const shownProvisional = new Set<string>();
   let velocityKmS = { x: 0, y: 0, z: 0 };
   hudStore.set({ status: null });
+  // ローディング画面（src/loading-screen.ts）は、最初の 1 枚を描いてから消す（真っ黒な画面が見えないように）
+  requestAnimationFrame(() => requestAnimationFrame(() => hideLoading()));
 
   renderer.setAnimationLoop(() => {
     const nowMs = performance.now();
@@ -1013,4 +1016,6 @@ async function main() {
 main().catch((e: unknown) => {
   console.error(e);
   hudStore.set({ status: `Failed to start: ${e instanceof Error ? e.message : String(e)}` });
+  // 動かせなかったときは、ローディング画面を消して、左上の理由を見せる
+  hideLoading();
 });

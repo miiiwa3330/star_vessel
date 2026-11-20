@@ -160,6 +160,10 @@
 /* タップできる範囲を、見た目の文字より広げる（約 330×110px）。選ぶ画面では、地球の縁の近くまで下げる（2026-11-06 にオーナーの指示） */
 .top-start { position: relative; }
 .top-hero.is-select .top-start { transform: translateY(clamp(36px, 7vh, 64px)); }
+/* スマホ・高さの低い画面：船を選ぶ画面では、名前が上がって右上の SIGN IN・SIGN UP に近づくので、その下まで空ける（2026-11-21） */
+@media (max-width: 640px), (max-height: 720px) {
+  .top-hero.is-select { padding-top: calc(96px + env(safe-area-inset-top)); }
+}
 .top-start::after { content: ''; position: absolute; inset: -14px -20px; }
 .top-start:focus-visible { outline: 1px solid var(--top-accent); outline-offset: -8px; border-radius: 12px; }
 

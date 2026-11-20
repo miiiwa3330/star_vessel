@@ -43,6 +43,8 @@ npm run db:migrate               # 手元のデータベースにテーブルを
 npm run dev                      # http://localhost:5173 がタイトル画面。世界は http://localhost:5173/play
 ```
 
+本番（試しに公開中）：https://star-vessel.miiiwa.com 。出すときは `npm run deploy`（マイグレーションを足したら、先に `npm run db:migrate:prod`）。くわしくは [`docs/tech/server.md`](docs/tech/server.md) の「本番」
+
 | 操作 | PC | スマホ |
 |------|----|--------|
 | 向きを変える | 画面をクリックするとカーソルが消え、マウスで向きを変える（Esc でゲームメニュー） | ドラッグ |

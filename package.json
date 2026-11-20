@@ -27,6 +27,8 @@
     "galaxies": "NODE_USE_ENV_PROXY=1 node tools/build-galaxies.mjs",
     "gaia": "NODE_USE_ENV_PROXY=1 node tools/build-gaia.mjs",
     "db:migrate": "wrangler d1 migrations apply DB --local",
+    "db:migrate:prod": "wrangler d1 migrations apply DB --remote --env production",
+    "deploy": "CLOUDFLARE_ENV=production npm run build && wrangler deploy",
     "auth:schema": "node tools/gen-auth-schema.ts",
     "sim:ships": "node tools/sim-ships.mjs"
   },

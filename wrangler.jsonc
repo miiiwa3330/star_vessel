@@ -10,7 +10,7 @@
     {
       "binding": "DB",
       "database_name": "star-vessel",
-      // 本番の D1 を作ったら（npx wrangler d1 create star-vessel）、その id に置き換える。手元の開発ではこの値のままでよい
+      // 手元の開発の D1（本番の D1 は下の env.production。2026-11-21 に作った）
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
@@ -18,5 +18,19 @@
   // 宇宙の部屋（恒星系ごと）。無料プランでも使える SQLite 型として作る
   "durable_objects": { "bindings": [{ "name": "SPACE", "class_name": "SpaceRoom" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SpaceRoom"] }],
-  "vars": { "BETTER_AUTH_URL": "http://localhost:5173" }
+  "vars": { "BETTER_AUTH_URL": "http://localhost:5173" },
+  // 本番（2026-11-21。オーナーが決めた：URL は star-vessel.miiiwa.com、手元から出す、まずは試しに）。
+  // 出し方は npm run deploy（CLOUDFLARE_ENV=production でビルドして wrangler deploy）。手元の開発は上の値のまま
+  "env": {
+    "production": {
+      "name": "star-vessel",
+      "routes": [{ "pattern": "star-vessel.miiiwa.com", "custom_domain": true }],
+      "workers_dev": false,
+      "vars": { "BETTER_AUTH_URL": "https://star-vessel.miiiwa.com" },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "star-vessel", "database_id": "96644928-7083-42b2-a0f7-f04b13033008", "migrations_dir": "migrations" }
+      ],
+      "durable_objects": { "bindings": [{ "name": "SPACE", "class_name": "SpaceRoom" }] }
+    }
+  }
 }

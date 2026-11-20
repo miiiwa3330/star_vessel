@@ -153,13 +153,20 @@ npm run dev                      # http://localhost:5173 がタイトル画面�
 - 新しいパッケージを入れたあとに開発サーバーが `504 (Outdated Optimize Dep)` を返し続けたら、開発サーバーを止めて起動し直す（2026-11-05 に、起動したままパッケージを入れて起きた）
 - npm 11 はパッケージのインストール時のスクリプトを止める。esbuild・workerd は、スクリプトを許可しなくても動くことを確かめた（許可はしていない）
 
-## 本番に出す前に残っていること
+## 本番（2026-11-21 に試しに出した）
 
-- 本番の D1 を作り（`npx wrangler d1 create star-vessel`）、`wrangler.jsonc` の `database_id` を置き換え、`npx wrangler d1 migrations apply DB --remote`
-- `BETTER_AUTH_SECRET` を本番の秘密の値として入れる（`npx wrangler secret put BETTER_AUTH_SECRET`）。`BETTER_AUTH_URL` を本番の URL にする
+オーナーが決めた：**URL は https://star-vessel.miiiwa.com**、**手元から出す**（`npm run deploy`）、**まずは試しに**（URL を知っている人だけで試す。下の「残っていること」は、試しながら足す）。
+
+- 設定は `wrangler.jsonc` の `env.production`。Worker の名前は `star-vessel`、独自ドメイン（Custom Domain）、`workers.dev` は使わない。手元の開発の設定（上の値）は変えていない（D1 の id を変えると、手元の D1 の中身が見えなくなるため、本番だけ別の環境にした）
+- 本番の D1：`star-vessel`（id `96644928-7083-42b2-a0f7-f04b13033008`）。マイグレーションは `npm run db:migrate:prod`（2026-11-21 に 0001〜0008 を当てた）
+- `BETTER_AUTH_SECRET`：`npx wrangler secret put BETTER_AUTH_SECRET --env production` で入れた（その場で作った値。どこにも書いていない）。`BETTER_AUTH_URL` は `https://star-vessel.miiiwa.com`
+- 出し方：`npm run deploy`（`CLOUDFLARE_ENV=production` でビルドすると、Cloudflare の Vite プラグインが本番の設定を `dist/star_vessel/wrangler.json` に書き、`wrangler deploy` がそれを使う）。GitHub に push しても本番は変わらない
+- **パスキーは、このドメインに結びつく**（`rpID` は `star-vessel.miiiwa.com`）。ドメインを変えると、それまでのパスキーは使えなくなる
+- 確かめたこと（2026-11-21）：`/`・`/play`・`/data/stars.bin`・`/api/presence`・`/api/satellites`・`/api/auth/get-session` が 200。**`/api/satellites` は本番では SatNOGS から取れた**（手元の開発では取れず、写しを使っていた）。Chrome（WebGPU）で、タイトル画面と、世界の画面（宇宙の部屋につながり、チャット・ワープホールのボタンが使える状態。読み込みは約 7 秒・約 15 MB）を見た。**パスワードでの登録・ログイン、パスキー、スマホの実機は、まだ確かめていない**
+
+## 本番で残っていること
 - **匿名のアカウントを大量に作られないようにする**：いまは誰でも何度でも匿名のアカウントを作れる。Cloudflare の Rate Limiting か Turnstile を足す
 - **登録・ログインの試行を制限する（パスワードの総当たり対策）**：Better Auth に標準の制限があるが、Workers でどう効くか（接続ごとに別のメモリで動くので、共有されないかもしれない）は確かめていない。本番の前に、Cloudflare の Rate Limiting などで、`/api/auth/sign-in/*` と `/api/auth/sign-up/*` を制限する。回復コードの `/api/recovery/lookup`・`/reset`・`/code` も同じ（コードは推測できない長さだが、D1 の読み込みとパスワードの確認を無駄に使わせないため）
 - **パスキーを本物の端末で確かめる**（iPhone・Android・Mac。端末をまたぐ同期も）。手元では Chrome の仮想の認証器でしか確かめていない。HTTPS とドメインが要るので、本番か、それに近い環境で
 - **パスワードのハッシュの計算時間**：Workers の無料プランは、1 回の CPU 時間の上限が短い。登録・ログイン・決め直しのハッシュ（Better Auth の既定は scrypt）が上限に収まるかは、本番で確かめていない
 - **`/api/presence` の悪用**：認証なしで誰でも読める。D1 の読み込みを避けるため 15 秒だけ Cache-Control で覚えさせているが、Cloudflare 側の制限（Rate Limiting）も足す
-- 公開の方法（Workers Builds で GitHub から出すか、手元から出すか）を決める
