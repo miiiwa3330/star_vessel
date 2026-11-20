@@ -227,7 +227,7 @@ export function KeyboardGuide() {
       <ul className="kb-touch">
         <li>
           <span className="kb-touch-head">スマホ</span>
-          ドラッグ：向きを変える ／ 左下の十字：前後左右（前を 2 回押しでダッシュ） ／ 右下：上昇・下降 ／ タップ：天体を選ぶ ／ レーダーを押す：大きくする
+          ドラッグ：向きを変える ／ 下の真ん中のパッド：倒した向きに進む（端まで倒すとダッシュ） ／ 右下のバー：上へスワイプで速く・下へで遅く ／ 左下の＋：アイコンとチャット ／ 左上の STAR VESSEL：メニュー ／ 左上の情報：タップで隠す（＊で出す） ／ タップ：天体を選ぶ ／ レーダーを押す：大きくする
         </li>
         <li>
           <span className="kb-touch-head">レーダー</span>

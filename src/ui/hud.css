@@ -85,15 +85,10 @@
 .hud-help { font-size: 12px; line-height: 1.9; text-align: center; }
 .hud-touch-only { display: none; }
 
-.hud-speed-buttons { position: absolute; left: 16px; flex-direction: column; gap: 6px; }
-
 /* スマホ：操作の説明はタッチだけにし、下の 2 つは縦に並べる */
 @media (max-width: 720px), (pointer: coarse) {
   .hud-keyboard-only { display: none; }
   .hud-touch-only { display: block; }
-  .hud-finder-touch.hud-touch-only { display: flex; }
-  /* スマホでは右上にレーダーとボタンがあり、右下が空くので、速さのボタンは右下に置く */
-  .hud-speed-buttons.hud-touch-only { display: flex; left: auto; right: 16px; bottom: 16px; }
 }
 
 /* ---- ボタン：タイトル画面の .top-button と同じ。細い線の丸いボタン、ふだんは薄く、ホバーで白 ---- */
@@ -211,45 +206,8 @@
 /* 下のボタンの数字（PC だけ。1〜5 キーで押せる） */
 .hud-hotkey { position: absolute; right: -3px; bottom: -5px; font-size: 10px; line-height: 1; letter-spacing: 0; color: var(--hud-quiet); text-shadow: 0 0 3px rgba(2, 4, 10, 0.95); }
 
-/* スマホの操縦のボタン（要件 F60。マインクラフト統合版の形）。左下に十字、右下に上昇・下降 */
+/* スマホの操縦（バーチャルパッド・速さのバー）は、ファイルの最後の「スマホの画面」にまとめた（2026-11-21） */
 .hud-touchpad { display: none; }
-.hud-pad-button {
-  width: 46px;
-  height: 46px;
-  min-height: 0;
-  padding: 0;
-  font-size: 14px;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  /* 明るい天体の上でも形が分かるよう、ごく薄く暗くする */
-  background: rgba(2, 4, 10, 0.22);
-}
-.hud-pad-button:active { color: #fff; border-color: #fff; background: rgba(255, 255, 255, 0.12); }
-.hud-dpad {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-  display: grid;
-  grid-template-columns: repeat(3, 46px);
-  grid-template-rows: repeat(3, 46px);
-  gap: 4px;
-}
-.hud-dpad .is-up { grid-area: 1 / 2; }
-.hud-dpad .is-left { grid-area: 2 / 1; }
-.hud-dpad .is-right { grid-area: 2 / 3; }
-.hud-dpad .is-down { grid-area: 3 / 2; }
-.hud-lift { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 4px; }
-.hud-lift .is-lift { width: 64px; font-size: 12px; }
-@media (max-width: 720px), (pointer: coarse) {
-  .hud-touchpad { display: block; }
-  /* 十字のボタン（高さ 146px）の上にアイコンバー、上昇・下降（96px）の上に速さのボタンを置く。
-     ボタンが 5 つになったので（2026-11-12）、右の速さのボタンに重ならないよう、少し小さく詰める */
-  .hud-hotbar { bottom: 172px; gap: 6px; }
-  .hud-hotbar .hud-icon-button { width: 38px; height: 38px; }
-  .hud-speed-buttons.hud-touch-only { bottom: 120px; }
-}
 
 /* ---- 右の列：レーダー。面は無く、細い線の円だけ（中はうっすら暗く） ---- */
 .hud-dock {
@@ -403,7 +361,6 @@
 /* 操作の案内は、入ったときに少しだけ出して消す（表示を残さない） */
 .hud-finder-hint { position: absolute; left: 0; right: 0; bottom: 9vmin; margin: 0; text-align: center; font-size: 13px; letter-spacing: 0.12em; opacity: 0; animation: hud-finder-hint 3.2s ease-out; }
 @keyframes hud-finder-hint { 0%, 70% { opacity: 0.85; } 100% { opacity: 0; } }
-.hud-finder-touch { position: absolute; left: 0; right: 0; bottom: 28px; display: none; align-items: center; justify-content: center; gap: 22px; pointer-events: auto; }
 .hud-finder-shutter { width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 5px rgba(0, 0, 0, 0.35); cursor: pointer; }
 .hud-finder-shutter:active { background: rgba(255, 255, 255, 0.4); }
 body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo-mode .target-arrow { display: none !important; }
@@ -939,4 +896,172 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
   .hud-collection-text { overflow: visible; padding-right: 2px; }
   .hud-collection-row { grid-template-columns: minmax(6.5em, 0.8fr) minmax(0, 1.2fr); font-size: 12px; }
   .hud-collection-lead { font-size: 13px; }
+}
+
+/* スマホだけの部品（.hud-icon-button の inline-flex が .hud-touch-only より強いので、ここで PC では消す） */
+.hud-chat-toggle, .hud-items-toggle { display: none; }
+/* 左上のタイトル：押すとゲームメニュー（2026-11-21）。見た目は前のまま */
+.hud-brand { pointer-events: auto; }
+.hud-brand-button { font: inherit; letter-spacing: inherit; word-spacing: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hud-brand-button:focus-visible { outline: 1px solid var(--hud-accent); outline-offset: 4px; }
+
+/*
+ * ---- スマホの画面（2026-11-21 にオーナーの指示で作り直した。PC の画面は変えない） ----
+ * 左上の情報はタップで隠して「＊」に。左の列にアイコン（1〜6 とチャット）。下の真ん中にバーチャルパッド、右に速さのバー。
+ * チャットは開閉式。写真の構えは、シャッターが下の真ん中、やめる × が右下のかぎの内側。上の方の規則を、ここで上書きする
+ */
+@media (max-width: 720px), (pointer: coarse) {
+  /* 左上の情報：タップで隠す。隠している間は「＊」を置き、タップでまた出す */
+  .hud-left .hud-status { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .hud-status-toggle.hud-touch-only {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin: -6px 0 0 -8px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #5eff72;
+    font-family: 'DotGothic16', ui-monospace, monospace;
+    font-size: 24px;
+    line-height: 1;
+    pointer-events: auto;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    text-shadow: 0 0 6px rgba(2, 4, 10, 0.9);
+  }
+
+  /* 左の列：1〜6 とチャット。下から縦に並べる */
+  .hud-hotbar {
+    left: calc(12px + env(safe-area-inset-left));
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    transform: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .hud-hotbar .hud-icon-button { width: 40px; height: 40px; }
+  .hud-chat-toggle.hud-touch-only { display: inline-flex; }
+  /* アイコンは「＋」にまとめ、四角い枠で囲む（2026-11-21）。「＋」はいつもいちばん下。閉じている間は「＋」だけ */
+  .hud-hotbar { gap: 4px; padding: 4px; border: 1px solid var(--hud-line); border-radius: 0; background: rgba(2, 4, 10, 0.22); }
+  .hud-hotbar > .hud-icon-button { border: 0; }
+  .hud-hotbar > .hud-icon-button.is-selected { color: #fff; background: rgba(255, 255, 255, 0.12); }
+  .hud-hotbar:not(.is-open) > .hud-icon-button:not(.hud-items-toggle) { display: none; }
+  .hud-items-toggle { display: inline-flex; order: 99; }
+  .hud-chat-unread {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--hud-orange);
+    box-shadow: 0 0 6px rgba(255, 138, 31, 0.8);
+  }
+
+  /* チャット：開閉式。開くと、左の列と右の速さのバーの間、パッドの上に出す */
+  .hud-chat.is-collapsed { display: none; }
+  .hud-chat { left: 64px; right: 64px; bottom: calc(156px + env(safe-area-inset-bottom)); width: auto; }
+  /* 左の列と速さのバーの間に収めるので、8 つのスタンプが 1 列に入るよう、少し小さくする */
+  .hud-chat-emoji { width: 28px; height: 28px; font-size: 17px; }
+  .hud-chat-stamps { gap: 0; padding: 3px 3px 0; }
+
+  /* バーチャルパッド：下の真ん中 */
+  .hud-touchpad { display: block; }
+  .hud-stick {
+    position: absolute;
+    left: 50%;
+    bottom: calc(26px + env(safe-area-inset-bottom));
+    width: 112px;
+    height: 112px;
+    margin-left: -56px;
+    border-radius: 50%;
+    border: 1px solid var(--hud-line);
+    background: radial-gradient(circle, rgba(2, 4, 10, 0.12), rgba(2, 4, 10, 0.32));
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .hud-stick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 46px;
+    height: 46px;
+    margin: -23px 0 0 -23px;
+    border-radius: 50%;
+    border: 1px solid rgba(232, 236, 244, 0.6);
+    background: rgba(232, 236, 244, 0.1);
+    pointer-events: none;
+  }
+  .hud-stick.is-active .hud-stick-knob { border-color: #fff; background: rgba(255, 255, 255, 0.22); }
+
+  /* 速さのバー：右。上が＋・下が− */
+  .hud-speedbar {
+    position: absolute;
+    right: calc(8px + env(safe-area-inset-right));
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 48px;
+    padding: 6px 0;
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  /* オレンジ（タイトル画面の差し色。2026-11-21） */
+  .hud-speedbar-mark { font-size: 16px; line-height: 1; color: var(--hud-orange); text-shadow: 0 0 4px rgba(2, 4, 10, 0.9); }
+  /* 角は角、細め（2026-11-21。丸いつまみは無くし、塗った長さだけで速さを見せる） */
+  .hud-speedbar-track { position: relative; width: 3px; height: clamp(120px, 22svh, 180px); border-radius: 0; background: rgba(255, 138, 31, 0.22); }
+  .hud-speedbar-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0; background: linear-gradient(to top, rgba(255, 138, 31, 0.35), rgba(255, 138, 31, 0.95)); box-shadow: 0 0 6px rgba(255, 138, 31, 0.5); }
+  .hud-speedbar-value {
+    position: absolute;
+    right: 50px;
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    font-family: 'DotGothic16', ui-monospace, monospace;
+    font-size: 14px;
+    color: var(--hud-orange);
+    text-shadow: 0 0 4px rgba(2, 4, 10, 0.95);
+    pointer-events: none;
+  }
+
+  /* レーダー・マップ・コレクション・写真の面：左の列の分だけ右へ寄せる。下のアイコンバーが無くなったので、下まで使う */
+  .hud-radar-panel, .hud-collection, .hud-starmap, .hud-photo { left: calc(50% + 26px); width: calc(100vw - 84px); }
+  .hud-collection, .hud-starmap { height: calc(100svh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  .hud-left .hud-info-card.is-docked { left: 64px; bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+  /* 写真の構え：シャッターは下の真ん中、やめる × は右下のかぎ（」）の内側 */
+  .hud-finder-shutter.hud-touch-only { display: block; position: absolute; left: 50%; bottom: calc(7vmin + 8px); margin-left: -31px; pointer-events: auto; }
+  .hud-finder-close.hud-touch-only {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: calc(7vmin + 10px);
+    bottom: calc(7vmin + 10px);
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #fff;
+    filter: drop-shadow(0 0 3px rgba(2, 4, 10, 0.9));
+    pointer-events: auto;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+/* 横向きなど、高さの足りないスマホ：左の列を詰める */
+@media ((max-width: 720px) or (pointer: coarse)) and (max-height: 520px) {
+  .hud-hotbar { gap: 3px; bottom: 12px; }
+  .hud-hotbar .hud-icon-button { width: 34px; height: 34px; }
 }

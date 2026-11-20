@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import '@fontsource/monoton/400.css';
 import '@fontsource/josefin-sans/300.css';
 import '@fontsource/dotgothic16/400.css';
@@ -43,10 +43,21 @@ export function Hud() {
       {o === 'menu' && <PauseMenu />}
       {backdrop && <div className="hud-backdrop" aria-hidden="true" onClick={() => hudActions.setOverlay(null)} />}
       <div className={`hud-left${wide ? ' is-over' : ''}`}>
-        <header className="hud-brand">STAR VESSEL</header>
+        {/* タイトルを押すと、ゲームメニュー（2026-11-21。スマホには Esc が無いので、ここから開く。PC でも同じ） */}
+        <header className="hud-brand">
+          <button type="button" className="hud-brand-button" aria-label="メニューを開く" onClick={() => hudActions.setOverlay('menu')}>
+            STAR VESSEL
+          </button>
+        </header>
         {/* 左上の表示は英語（2026-11-12 にオーナーの指示） */}
+        {/* スマホ：左上の表示はタップで隠し、代わりに「＊」を置く。「＊」をタップすると、また出す（2026-11-21） */}
+        {!s.statusVisible && !wide && (
+          <button type="button" className="hud-status-toggle hud-touch-only" aria-label="左上の情報を出す" onClick={() => hudActions.toggleStatus()}>
+            ＊
+          </button>
+        )}
         {s.statusVisible && !wide && (
-          <div className="hud-status" lang="en">
+          <div className="hud-status" lang="en" onClick={() => touchOnly && hudActions.toggleStatus()}>
             <div>UTC {utc}</div>
             <div>
               {formatDistanceEn(s.altitudeKm)} above {s.anchorName}
@@ -83,7 +94,7 @@ export function Hud() {
         </div>
       )}
       {o === 'radar' && <RadarPanel blips={s.radar} rangeKm={s.radarRangeKm} layers={s.radarLayers} selectedKey={s.selectedKey} selectedWarp={s.selectedWarp} withCard={selectedWarp !== null || s.infoCard !== null} />}
-      <ChatBox ready={s.chatReady} log={s.chatLog} open={o === 'chat'} underPanel={o === 'radar' || o === 'photo' || wide} />
+      <ChatBox ready={s.chatReady} log={s.chatLog} open={o === 'chat'} underPanel={o === 'radar' || o === 'photo' || wide} collapsed={!s.chatOpen} />
       {o === 'map' && <StarMap points={s.mapPoints} selfKm={s.mapSelfKm} focusKey={s.mapFocus} />}
       {o === 'collection' && <CollectionPanel visits={s.visits} />}
       {o === 'photo' && s.photo && <PhotoView photo={s.photo} />}
@@ -91,7 +102,7 @@ export function Hud() {
       {s.shutter > 0 && <div key={s.shutter} className="hud-shutter" aria-hidden="true" />}
       {/* PC で、入ったばかり・カーソルを消せなかったとき（ゲームメニューは出さず、クリックを待つ） */}
       {s.pointerLock && !s.locked && o === null && <div className="hud-lock-hint">クリックで操縦をはじめる</div>}
-      <div className="hud-hotbar" role="toolbar" aria-label="メニュー">
+      <div className={`hud-hotbar${s.itemsOpen ? ' is-open' : ''}`} role="toolbar" aria-label="メニュー">
         <button
           type="button"
           className={`hud-button hud-icon-button${o === 'collection' ? ' is-selected' : ''}`}
@@ -205,25 +216,86 @@ export function Hud() {
             <circle cx="17.5" cy="7.2" r="1.1" fill="currentColor" />
           </svg>
         </button>
+        {/* スマホ：チャットは開閉式。このボタンで開く・閉じる（PC はいつも左下に出している） */}
+        <ChatToggle open={s.chatOpen} log={s.chatLog} />
+        {/* スマホ：アイコンは「＋」にまとめる。いちばん下の「＋」で開き、「−」で閉じる（2026-11-21） */}
+        <ItemsToggle open={s.itemsOpen} chatOpen={s.chatOpen} log={s.chatLog} />
       </div>
 
-      <div className="hud-speed-buttons hud-touch-only">
-        <button type="button" className="hud-button" onClick={() => hudActions.changeSpeed(1)} aria-label="速くする">
-          速く
-        </button>
-        <button type="button" className="hud-button" onClick={() => hudActions.changeSpeed(-1)} aria-label="遅くする">
-          遅く
-        </button>
-      </div>
-      <TouchPad hidden={false} />
+      {/* スマホの操縦：下の真ん中のバーチャルパッドと、右の速さのバー。画面を開いている間は隠す */}
+      <TouchPad hidden={o !== null} speedKmS={s.speedKmS} />
       {o !== 'menu' && <AimLabel aim={s.aimLabel} constellation={s.aimConstellation} />}
     </>
   );
 }
 
+/** 指で操作する端末か（スマホ。左上の表示をタップで隠すのは、スマホだけ） */
+const touchOnly = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
+/** 閉じている間に、新しい発言が届いたか（チャットのボタンと「＋」の点に使う） */
+function useUnread(open: boolean, log: readonly { key: number }[]): boolean {
+  const latest = log[0]?.key ?? 0;
+  const seen = useRef(latest);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (open) {
+      seen.current = latest;
+      setTick((t) => t + 1);
+    }
+  }, [open, latest]);
+  return !open && latest > seen.current;
+}
+
+/** スマホ：アイコンをまとめた「＋」。押すと開いて「−」になる。閉じている間にチャットが届いたら点を付ける */
+function ItemsToggle({ open, chatOpen, log }: { open: boolean; chatOpen: boolean; log: readonly { key: number }[] }) {
+  const unread = useUnread(chatOpen || open, log);
+  return (
+    <button
+      type="button"
+      className="hud-button hud-icon-button hud-items-toggle"
+      aria-label={open ? 'アイコンをしまう' : 'アイコンを出す'}
+      aria-expanded={open}
+      onClick={(e) => {
+        hudActions.toggleItems();
+        e.currentTarget.blur();
+      }}
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+        <path d={open ? 'M5 12h14' : 'M12 5v14M5 12h14'} />
+      </svg>
+      {unread && <span className="hud-chat-unread" aria-hidden="true" />}
+    </button>
+  );
+}
+
+/**
+ * スマホのチャットの開閉のボタン（左の列のいちばん下）。閉じている間に新しい発言が届いたら、点を付ける
+ */
+function ChatToggle({ open, log }: { open: boolean; log: readonly { key: number }[] }) {
+  const unread = useUnread(open, log);
+  return (
+    <button
+      type="button"
+      className={`hud-button hud-icon-button hud-touch-only hud-chat-toggle${open ? ' is-selected' : ''}`}
+      aria-label={open ? 'チャットを閉じる' : unread ? 'チャットを開く（新しい発言があります）' : 'チャットを開く'}
+      aria-pressed={open}
+      onClick={(e) => {
+        hudActions.toggleChat();
+        e.currentTarget.blur();
+      }}
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 5h16v11H9l-4 3.5V16H4V5Z" />
+        <path d="M8 9.5h8M8 12.5h5" />
+      </svg>
+      {unread && <span className="hud-chat-unread" aria-hidden="true" />}
+    </button>
+  );
+}
+
 /**
  * 写真の構えの間の表示：真ん中の「＋」と、四すみのかぎ（シャッターの線）。写真には写らない（写るのは宇宙の canvas だけ）。
- * PC は Enter で撮り、5・F2・Esc でやめる。スマホはキーが無いので、シャッターのボタンと「やめる」を出す
+ * PC は Enter で撮り、5・F2・Esc でやめる。スマホはキーが無いので、下の真ん中にシャッター、右下のかぎの内側に × を出す
  */
 function PhotoFinder() {
   return (
@@ -238,12 +310,13 @@ function PhotoFinder() {
       <p className="hud-finder-hint hud-keyboard-only" role="status">
         Enter で撮る ・ 5 でやめる
       </p>
-      <div className="hud-finder-touch hud-touch-only">
-        <button type="button" className="hud-button" onClick={() => hudActions.togglePhotoMode()}>
-          やめる
-        </button>
-        <button type="button" className="hud-finder-shutter" aria-label="シャッター" onClick={() => hudActions.takePhoto()} />
-      </div>
+      {/* スマホ：シャッターは下の真ん中、やめるのは右下のかぎ（」）の内側の × （2026-11-21） */}
+      <button type="button" className="hud-finder-shutter hud-touch-only" aria-label="シャッター" onClick={() => hudActions.takePhoto()} />
+      <button type="button" className="hud-finder-close hud-touch-only" aria-label="写真の構えをやめる" onClick={() => hudActions.togglePhotoMode()}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
     </div>
   );
 }

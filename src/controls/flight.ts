@@ -15,16 +15,14 @@
  */
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 import type { Vec3 } from '../world/vec';
-import { MAX_SPEED_KM_S } from '../world/ship-schema';
+import { MAX_SPEED_KM_S, MIN_SPEED_KM_S } from '../world/ship-schema';
 import { SPRINT_FACTOR, approachVelocity, isDoubleTap, moveInput, nextSprint, settle } from './movement';
 
 const LOOK_RAD_PER_PX = 0.003;
 const ROLL_RAD_PER_S = 1.2;
 const SPEED_STEP = 1.25;
-/** 速さの下限（km/s）。2026-11-21 にオーナーの指示で、秒速 100 m から秒速 1 m に下げた（衛星などの小さな物に、ゆっくり近づけるように） */
-export const MIN_SPEED_KM_S = 0.001;
 /** 手で操縦する速さの上限（要件 F17・仮）は ship-schema.ts の MAX_SPEED_KM_S。サーバーも同じ値で確かめる */
-export { MAX_SPEED_KM_S };
+export { MAX_SPEED_KM_S, MIN_SPEED_KM_S };
 /** Ctrl（か Shift）を押しながらだと、1 段で速さを 10 倍にする（秒速 500 km から上限まで、約 13 段） */
 const FAST_SPEED_STEP = 10;
 /**
@@ -190,7 +188,8 @@ export class FlightControls {
     this.keys.forEach((k) => this.allKeys.add(k));
     this.virtualKeys.forEach((k) => this.allKeys.add(k));
     const input = moveInput(this.allKeys);
-    const ctrl = this.keys.has('ControlLeft') || this.keys.has('ControlRight');
+    // スマホのバーチャルパッドは、端まで倒すと Ctrl を押したことにする（ダッシュ。src/controls/touch-stick.ts）
+    const ctrl = this.keys.has('ControlLeft') || this.keys.has('ControlRight') || this.virtualKeys.has('ControlLeft');
     this.sprinting = nextSprint(this.sprinting, input, ctrl, this.doubleTapped);
     this.doubleTapped = false;
 
