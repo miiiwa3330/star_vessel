@@ -15,12 +15,14 @@ import { clusterLabel, type Cluster } from '../world/clusters';
 import { NEBULA_TYPE_NAMES_JA, nebulaLabel, type Nebula } from '../world/nebulae';
 import { galaxyLabel, type Galaxy } from '../world/galaxies';
 import type { Comet } from '../world/comets';
-import { teffFromBv, starColor } from '../world/planets';
+import { teffFromBv, starColor, starModel } from '../world/planets';
+import { clusterPicture, cometPicture, galaxyPicture, nebulaScale, starPicture } from '../world/picture';
 import { PLANET_FACTS, SUN_FACTS } from '../world/planet-facts';
 import { KM_PER_AU, KM_PER_LY, KM_PER_PC } from '../world/units';
 import { length, sub, type Vec3 } from '../world/vec';
 import type { Visit } from '../world/visits';
-import { bodyLook, kindLook, type CollectionLook } from './collection-look';
+import { bodyLook, constellationLook, kindLook, type CollectionLook } from './collection-look';
+import { constellationKey, type ConstellationArt, type ConstellationFigure } from '../world/constellation-figure';
 
 /** カタログの 1 つの元のデータ */
 export type CollectionData =
@@ -32,6 +34,8 @@ export type CollectionData =
   | { t: 'cluster'; c: Cluster }
   | { t: 'nebula'; n: Nebula }
   | { t: 'galaxy'; g: Galaxy }
+  /** 星座（宇宙で選ぶと記録される。場所は無い） */
+  | { t: 'constellation'; figure: ConstellationFigure }
   /** カタログに無いが、訪れた場所（自動で作った星など）。番号は付けない */
   | { t: 'extra'; visit: Visit };
 
@@ -64,6 +68,9 @@ export interface CollectionDeps {
   comets: readonly Comet[];
   /** 星座の略号 → 日本語の名前 */
   constellationsJa: ReadonlyMap<string, string>;
+  /** 星座の図（略号 → 地球から見た線と星）と、重ねる絵 */
+  constellationFigures: ReadonlyMap<string, ConstellationFigure>;
+  constellationArt: ReadonlyMap<string, ConstellationArt>;
   largeAsteroidNumbers: ReadonlySet<number>;
   now: () => Date;
 }
@@ -178,6 +185,9 @@ export class CollectionSource {
     }
     for (const g of d.galaxies)
       out.push({ key: galaxyKey(g), kind: 'galaxy', name: galaxyLabel(g), nameEn: enName(g.name, galaxyLabel(g)), distancePc: length(g.positionPc), data: { t: 'galaxy', g } });
+    // 星座（88 個。場所が無いので、距離は入れない＝いちばん後ろに、略号の順で並ぶ）
+    for (const f of d.constellationFigures.values())
+      out.push({ key: constellationKey(f.id), kind: 'constellation', name: f.nameJa, nameEn: `${f.nameEn}（${f.id}）`, data: { t: 'constellation', figure: f } });
     return out;
   }
 
@@ -215,20 +225,23 @@ export class CollectionSource {
         return b ? bodyLook(b, e.kind) : kindLook(e.kind, e.key);
       }
       case 'star': {
-        const teff = d.real?.star.teffK ?? teffFromBv(d.bv);
-        const c = starColor(teff);
-        return kindLook('star', e.key, { color: [c[0] * 255, c[1] * 255, c[2] * 255] });
+        // 宇宙の中の恒星と同じ計算（半径・温度。実在のデータがあればそれ）
+        const m = starModel(d, d.real ?? null);
+        const c = starColor(m.teffK);
+        return kindLook('star', e.key, { color: [c[0] * 255, c[1] * 255, c[2] * 255], star: starPicture(m) });
       }
       case 'compact':
         return kindLook(e.kind, e.key);
       case 'cluster':
-        return kindLook('cluster', e.key, { globular: d.c.kind === 'globular' });
+        return kindLook('cluster', e.key, { globular: d.c.kind === 'globular', cluster: clusterPicture(d.c) });
       case 'nebula':
-        return kindLook('nebula', e.key, { nebula: d.n.type });
+        return kindLook('nebula', e.key, { nebula: d.n.type, nebulaScale: nebulaScale(d.n.radiusPc) });
       case 'galaxy':
-        return kindLook('galaxy', e.key, { tType: d.g.tType });
+        return kindLook('galaxy', e.key, { galaxy: galaxyPicture(d.g) });
       case 'comet':
-        return kindLook('comet', e.key);
+        return kindLook('comet', e.key, { comet: cometPicture(d.comet) });
+      case 'constellation':
+        return constellationLook(d.figure, this.deps.constellationArt.get(d.figure.id));
       case 'extra': {
         const b = findBody(e.key) ?? this.deps.systems.findBody(e.key);
         return b ? bodyLook(b, e.kind) : kindLook(e.kind, e.key);
@@ -254,6 +267,8 @@ export class CollectionSource {
         return pc(d.n.positionPc);
       case 'galaxy':
         return pc(d.g.positionPc);
+      case 'constellation':
+        return null;
       default:
         try {
           return heliocentricPositionKm(e.key, date);
@@ -269,6 +284,13 @@ export class CollectionSource {
   hint(e: CollectionEntry): Article {
     const date = this.deps.now();
     const rows: [string, string][] = [['種類', kindName(e)]];
+    if (e.data.t === 'constellation') {
+      return {
+        lead: [],
+        sections: [{ title: 'わかっていること', rows: [...rows, ['場所', '地球から見た空']] }],
+        notes: ['まだ集めていません。宇宙で星座の線を出して（下の星座のボタン・3）、この星座を選ぶと、名前と絵が見られるようになります。'],
+      };
+    }
     const where = this.roughPlace(e, date);
     if (where) rows.push(['場所', where]);
     return {
@@ -312,6 +334,22 @@ export class CollectionSource {
     else if (d.t === 'cluster') this.clusterSections(d.c, sections);
     else if (d.t === 'nebula') this.nebulaSections(d.n, sections);
     else if (d.t === 'galaxy') this.galaxySections(d.g, sections);
+    else if (d.t === 'constellation') {
+      const f = d.figure;
+      const brightest = f.stars.reduce((a, b) => (b.mag < a.mag ? b : a));
+      sections.push({
+        title: 'データ',
+        rows: [
+          ['種類', kindName(e)],
+          ['略号', f.id],
+          ['英語の名前', f.nameEn],
+          ['線でつないだ星', `${f.stars.length} 個（線 ${f.lines.length / 4} 本）`],
+          ['いちばん明るい星', `${round2(brightest.mag)} 等`],
+          ['絵', this.deps.constellationArt.has(f.id) ? 'Stellarium の星座の絵（Johan Meuris。Free Art License 1.3）' : 'この星座の絵はありません'],
+        ],
+      });
+      notes.push('星座の星は、地球から見ると近くに並んで見えますが、実際の距離はばらばらです。宇宙で星座の線を出したまま太陽系から遠くへ飛ぶと、形が崩れていくのが見えます。');
+    }
     else if (d.t === 'extra') {
       const b = findBody(e.key) ?? this.deps.systems.findBody(e.key);
       if (b) sections.push({ title: 'データ', rows: describeBody(b, null).map((s, i) => [i === 0 ? '種類' : '・', s] as [string, string]) });
@@ -347,6 +385,7 @@ export class CollectionSource {
     if (d.t === 'cluster') return `deep:${d.c.name}`;
     if (d.t === 'nebula') return `deep:${d.n.name}`;
     if (d.t === 'galaxy') return `deep:${d.g.name}`;
+    if (d.t === 'constellation') return `con:${d.figure.id}`;
     return '';
   }
 

@@ -91,6 +91,7 @@
 @media (max-width: 720px), (pointer: coarse) {
   .hud-keyboard-only { display: none; }
   .hud-touch-only { display: block; }
+  .hud-finder-touch.hud-touch-only { display: flex; }
   /* スマホでは右上にレーダーとボタンがあり、右下が空くので、速さのボタンは右下に置く */
   .hud-speed-buttons.hud-touch-only { display: flex; left: auto; right: 16px; bottom: 16px; }
 }
@@ -386,6 +387,26 @@
   animation: hud-shutter 0.45s ease-out;
 }
 @keyframes hud-shutter { from { opacity: 0.55; } to { opacity: 0; } }
+
+/* 写真の構え：シャッターの線（真ん中の「＋」と四すみのかぎ）。ほかの表示は出さない */
+.hud-finder { position: fixed; inset: 0; z-index: 30; pointer-events: none; color: rgba(255, 255, 255, 0.85); }
+.hud-finder-plus { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%, -50%); }
+.hud-finder-plus::before, .hud-finder-plus::after { content: ''; position: absolute; background: currentColor; box-shadow: 0 0 2px rgba(0, 0, 0, 0.6); }
+.hud-finder-plus::before { left: 0; right: 0; top: 50%; height: 1px; }
+.hud-finder-plus::after { top: 0; bottom: 0; left: 50%; width: 1px; }
+.hud-finder-frame { position: absolute; inset: 7vmin; }
+.hud-finder-frame i { position: absolute; width: 26px; height: 26px; border: 0 solid currentColor; opacity: 0.8; }
+.hud-finder-frame i:nth-child(1) { left: 0; top: 0; border-left-width: 1px; border-top-width: 1px; }
+.hud-finder-frame i:nth-child(2) { right: 0; top: 0; border-right-width: 1px; border-top-width: 1px; }
+.hud-finder-frame i:nth-child(3) { left: 0; bottom: 0; border-left-width: 1px; border-bottom-width: 1px; }
+.hud-finder-frame i:nth-child(4) { right: 0; bottom: 0; border-right-width: 1px; border-bottom-width: 1px; }
+/* 操作の案内は、入ったときに少しだけ出して消す（表示を残さない） */
+.hud-finder-hint { position: absolute; left: 0; right: 0; bottom: 9vmin; margin: 0; text-align: center; font-size: 13px; letter-spacing: 0.12em; opacity: 0; animation: hud-finder-hint 3.2s ease-out; }
+@keyframes hud-finder-hint { 0%, 70% { opacity: 0.85; } 100% { opacity: 0; } }
+.hud-finder-touch { position: absolute; left: 0; right: 0; bottom: 28px; display: none; align-items: center; justify-content: center; gap: 22px; pointer-events: auto; }
+.hud-finder-shutter { width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 5px rgba(0, 0, 0, 0.35); cursor: pointer; }
+.hud-finder-shutter:active { background: rgba(255, 255, 255, 0.4); }
+body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo-mode .target-arrow { display: none !important; }
 .hud-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 400; letter-spacing: 0.08em; color: var(--hud-accent); }
 
 /* 船の上の吹き出し */
@@ -419,6 +440,7 @@
 @media (prefers-reduced-motion: reduce) {
   .chat-bubble.is-pop { animation: none; }
   .hud-shutter { animation: none; }
+  .hud-finder-hint { animation: none; opacity: 0.85; }
   .hud-radar-sweep { animation: none; display: none; }
   .hud-button, .hud-chip, .hud-radar-button { transition: none; }
 }
@@ -805,10 +827,17 @@
 .ov { position: relative; flex: none; display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; will-change: transform; }
 .ov:active { cursor: grabbing; }
 .ov-canvas { display: block; }
-.ov-star .ov-canvas { filter: drop-shadow(0 0 18px var(--ov-glow, rgba(255, 220, 160, 0.55))); }
+/* 恒星：球の大きさ（半径から）と光の広がり（光度から）は、天体ごとに ObjectViewer.tsx が入れる */
+.ov-star .ov-canvas { transform: scale(var(--ov-star-size, 1)); filter: drop-shadow(0 0 var(--ov-glow-px, 18px) var(--ov-glow, rgba(255, 220, 160, 0.55))); }
 .ov-black-hole .ov-canvas { filter: drop-shadow(0 0 12px rgba(255, 140, 60, 0.45)); }
 /* 星雲は、薄い光をたくさん重ねるので、色の段差（格子のような模様）が出ないよう、少しぼかす */
 .ov-nebula .ov-canvas { filter: blur(1.2px); }
+/* 星座：線と星の下に、絵を重ねる（押すと出る） */
+.ov-constellation { cursor: default; touch-action: auto; }
+.ov-constellation.has-art { cursor: pointer; }
+.ov-constellation canvas { position: absolute; left: 0; top: 0; display: block; }
+.ov-constellation-art { opacity: 0; transition: opacity 0.6s ease; }
+.ov-constellation-art.is-on { opacity: 0.6; }
 .ov-craft-stage { perspective: 600px; color: rgba(220, 230, 245, 0.9); }
 .ov-craft { transform-style: preserve-3d; }
 /* まだ訪れていない天体：黒いシルエット。形が分かるよう、ふちをうっすら光らせる */
@@ -844,13 +873,7 @@
 /* 傾ける前の向きで、上半分（奥）と下半分（手前）に分ける */
 .cg-ring-wrap.is-back .cg-ring { clip-path: inset(0 0 50% 0); }
 .cg-ring-wrap.is-front .cg-ring { clip-path: inset(50% 0 0 0); }
-.cg-star::before {
-  content: '';
-  width: 92%;
-  height: 92%;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 12%, var(--cg-color) 24%, color-mix(in srgb, var(--cg-color) 35%, transparent) 42%, transparent 70%);
-}
+/* 恒星は、詳細と同じ球を canvas に描く（BodyGlobe.tsx の StarThumb） */
 .cg-black-hole::before {
   content: '';
   width: 78%;
@@ -858,33 +881,9 @@
   border-radius: 50%;
   background: radial-gradient(circle, #000 0 30%, rgba(255, 170, 80, 0.95) 33%, rgba(255, 110, 30, 0.35) 46%, transparent 68%);
 }
-.cg-nebula::before {
-  content: '';
-  width: 86%;
-  height: 86%;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 38% 42%, rgba(255, 120, 190, 0.75), transparent 46%),
-    radial-gradient(circle at 64% 58%, rgba(110, 210, 255, 0.6), transparent 48%),
-    radial-gradient(circle at 50% 50%, rgba(190, 140, 255, 0.45), transparent 70%);
-  filter: blur(2px);
-}
-.cg-galaxy::before {
-  content: '';
-  width: 92%;
-  height: 92%;
-  border-radius: 50%;
-  transform: rotate(-24deg) scaleY(0.42);
-  background: radial-gradient(circle, #fff6e4 0 8%, rgba(255, 226, 180, 0.85) 18%, rgba(150, 180, 255, 0.5) 42%, transparent 70%);
-}
-.cg-comet::before {
-  content: '';
-  width: 90%;
-  height: 22%;
-  transform: rotate(-30deg);
-  border-radius: 999px;
-  background: linear-gradient(90deg, #fff 0 9%, rgba(180, 220, 255, 0.7) 14%, rgba(150, 200, 255, 0) 100%);
-}
+/* 星団・銀河・星雲・彗星：点の集まりを canvas に描く（BodyGlobe.tsx の CloudThumb） */
+.cg-cloud canvas { display: block; }
+.cg-nebula canvas { filter: blur(0.5px); }
 .cg-craft { color: rgba(220, 230, 245, 0.85); }
 @media (prefers-reduced-motion: reduce) {
   .cg-globe.is-spin .cg-sphere { animation: none; }

@@ -40,6 +40,8 @@ import { ClusterView } from './render/cluster-view';
 import { NebulaView } from './render/nebula-view';
 import { ExtragalacticView } from './render/extragalactic-view';
 import { ConstellationView } from './render/constellation-view';
+import { ConstellationArtView } from './render/constellation-art-view';
+import { constellationFigures, constellationKey, decodeConstellationArt, type ConstellationArt } from './world/constellation-figure';
 import { CometField } from './render/comet-field';
 import { activeComets, cometBody, decodeComets, type Comet } from './world/comets';
 import { constellationSegments, decodeConstellations, type Constellation } from './world/constellations';
@@ -190,6 +192,11 @@ async function main() {
   const constellationSeg = constellationSegments(constellationList, stars.data, STAR_STRIDE);
   const constellationView = new ConstellationView(constellationSeg);
   starScene.add(constellationView.group);
+  // 星座の絵（Stellarium。選んだ星座に重ねる）と、図鑑に出す星座の図
+  const constellationArtData = await fetchJson<{ art: Record<string, ConstellationArt> }>('/data/constellation-art.json', { art: {} }).then(decodeConstellationArt);
+  const constellationArt = new ConstellationArtView(constellationArtData);
+  starScene.add(constellationArt.group);
+  const constellationFigureMap = constellationFigures(constellationList, stars.data, STAR_STRIDE);
   // 系外惑星（要件 F22）。いる恒星系の恒星と惑星を、天体の一覧に入れ替えて登録する
   const realSystems = decodeExoplanets(exoplanetsJson);
   // 実在の星の燃えかす（白色矮星・パルサー・ブラックホール）。読めなくても宇宙は見られるようにする
@@ -364,7 +371,27 @@ async function main() {
     face: (rel) => controls.lookAt(rel, controls.up()),
     starName: (system) => starNameJa(starInfo.get(system)),
   });
-  controls.onTap = (x, y) => info.tap(x, y, window.innerWidth, window.innerHeight);
+  // クリック・タップ：天体があればそれを選ぶ。無ければ、線を出しているときは、その先の星座を選ぶ（絵を重ねて、コレクションに入れる。2026-11-13）
+  let lastObserverPc = { x: 0, y: 0, z: 0 };
+  const tapDirection = new THREE.Vector3();
+  controls.onTap = (x, y) => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (info.tap(x, y, w, h)) return;
+    tapDirection.set((x / w) * 2 - 1, 1 - (y / h) * 2, 0.5).unproject(camera).sub(camera.position).normalize();
+    const c = constellationView.pick(lastObserverPc, { x: tapDirection.x, y: tapDirection.y, z: tapDirection.z });
+    if (!c) return;
+    // もう一度選ぶと、絵を消す
+    if (constellationArt.shownId === c.id) {
+      constellationArt.hide();
+      return;
+    }
+    const name = constellationFigureMap.get(c.id)?.nameJa ?? c.nameJa;
+    const first = info.collect({ key: constellationKey(c.id), kind: 'constellation', name });
+    const hasArt = constellationArt.show(c.id);
+    const tail = !hasArt ? '（この星座の絵はありません）' : ConstellationArtView.tooFar(lastObserverPc) ? '（絵は、太陽系のそばで見えます）' : '';
+    showNotice(first ? `${name}をコレクションに入れました${tail}` : `${name}${tail}`);
+  };
   if (online) void info.connect();
   // コレクション（図鑑。要件 F38）：集められる天体のカタログと、詳細の説明。カタログは図鑑を初めて開いたときに作る
   const collection = new CollectionSource({
@@ -377,6 +404,8 @@ async function main() {
     galaxies: externalGalaxies,
     comets,
     constellationsJa: new Map(constellationList.map((c) => [c.id, c.nameJa])),
+    constellationFigures: constellationFigureMap,
+    constellationArt: constellationArtData,
     largeAsteroidNumbers,
     now: worldNow,
   });
@@ -437,21 +466,39 @@ async function main() {
   const unlessMenu = (f: () => void) => () => {
     if (hudStore.get().overlay !== 'menu') f();
   };
-  controls.onToggleRadar = unlessMenu(() => hudActions.toggleOverlay('radar'));
-  controls.onToggleMap = unlessMenu(() => hudActions.toggleOverlay('map'));
+  const unlessPhoto = (f: () => void) => () => {
+    if (!hudStore.get().photoMode) f();
+  };
+  controls.onToggleRadar = unlessMenu(unlessPhoto(() => hudActions.toggleOverlay('radar')));
+  controls.onToggleMap = unlessMenu(unlessPhoto(() => hudActions.toggleOverlay('map')));
   controls.onHotbar = (n) =>
     unlessMenu(() => {
+      // 写真の構えの間は、5（構えをやめる）だけ受け付ける
+      if (hudStore.get().photoMode && n !== 5) return;
       if (n === 1) hudActions.toggleOverlay('collection');
       else if (n === 2) hudActions.cycleStarLimit();
       else if (n === 3) hudActions.toggleConstellations();
       else if (n === 4 && hudStore.get().warpsReady) hudActions.pressWarpButton();
-      else if (n === 5) hudActions.takePhoto();
+      else if (n === 5) hudActions.togglePhotoMode();
       else if (n === 6) hudActions.toggleOverlay('map');
     })();
-  controls.onPhoto = unlessMenu(() => hudActions.takePhoto());
-  controls.onEscape = () => hudActions.setOverlay(hudStore.get().overlay === null ? 'menu' : null);
+  controls.onPhoto = unlessMenu(() => hudActions.togglePhotoMode());
+  // 写真の構えの間の Enter は、シャッター（チャットは開かない）
+  controls.onEnter = () => {
+    if (!hudStore.get().photoMode) return false;
+    hudActions.takePhoto();
+    return true;
+  };
+  controls.onEscape = () => {
+    if (hudStore.get().photoMode) {
+      setPhotoMode(false);
+      return;
+    }
+    hudActions.setOverlay(hudStore.get().overlay === null ? 'menu' : null);
+  };
   // Enter・T でチャットの入力欄を開く
   controls.onOpenChat = () => {
+    if (hudStore.get().photoMode) return;
     // つながる前は入力欄を使えない
     if (!hudStore.get().chatReady) {
       showNotice('宇宙の部屋につながると、チャットを使えます');
@@ -461,6 +508,11 @@ async function main() {
   };
   // マウスのカーソルを消して操縦する（PC。要件 F60）。操縦中に Esc でカーソルが戻ったら、ゲームメニューを出す
   controls.onUserUnlock = () => {
+    // 写真の構えの間の Esc は、構えをやめるだけ（ゲームメニューは出さない）
+    if (hudStore.get().photoMode) {
+      setPhotoMode(false);
+      return;
+    }
     if (hudStore.get().overlay === null) hudStore.set({ overlay: 'menu' });
   };
   controls.onLockState = (locked, pointerLock) => hudStore.set({ locked, pointerLock });
@@ -493,6 +545,7 @@ async function main() {
   // 星座の線（要件 F40）。選んだものは、この端末に覚えておく
   const setConstellations = (on: boolean) => {
     constellationView.visible = on;
+    if (!on) constellationArt.hide();
     hudStore.set({ constellations: on, aimConstellation: on ? hudStore.get().aimConstellation : null });
     try {
       localStorage.setItem(CONSTELLATIONS_KEY, on ? '1' : '0');
@@ -603,9 +656,27 @@ async function main() {
   hudActions.changeSpeed = (steps) => controls.changeSpeed(steps, true);
   // 写真（要件 F61）：次に描いたすぐあとの画面を、そのまま画像にする（画面の表示・文字は入らない。宇宙だけが写る）。
   // WebGPU・WebGL2 とも、描いた直後の同じ処理の中でないと、画面の中身を読めないため、ループの中で撮る
+  // 2026-11-13：5・F2 は「構え」（画面の表示をすべて消して、シャッターの線だけを出す）。構えの間に Enter でシャッター
   let photoRequested = false;
+  function setPhotoMode(on: boolean): void {
+    if (hudStore.get().photoMode === on) return;
+    hudStore.set({ photoMode: on });
+    // 船の上の吹き出し・選んだ天体の印（React の外の表示）も消す
+    document.body.classList.toggle('is-photo-mode', on);
+  }
+  hudActions.togglePhotoMode = () => {
+    const s = hudStore.get();
+    if (s.overlay === 'menu') return;
+    if (s.photoMode) {
+      setPhotoMode(false);
+      return;
+    }
+    // 開いている画面（レーダー・撮った写真など）は閉じて、宇宙だけにする
+    if (s.overlay !== null) hudActions.setOverlay(null);
+    setPhotoMode(true);
+  };
   hudActions.takePhoto = () => {
-    photoRequested = true;
+    if (hudStore.get().photoMode) photoRequested = true;
   };
   const capturePhoto = (date: Date) => {
     const width = canvas.width;
@@ -632,6 +703,7 @@ async function main() {
       const stamp = date.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
       const photo = { url: URL.createObjectURL(blob), blob, fileName: `star-vessel-${stamp}.png`, width, height };
       hudStore.set({ photo, shutter: hudStore.get().shutter + 1 });
+      setPhotoMode(false);
       hudActions.setOverlay('photo');
     }, 'image/png');
   };
@@ -673,7 +745,7 @@ async function main() {
   if (import.meta.env.DEV) {
     const devTools = {
       /** 動きの滑らかさを測るための入口（描いている物を直接読む） */
-      debug: { shipView, cometField, satelliteField, solar, asteroids, starScene, chase },
+      debug: { shipView, cometField, satelliteField, solar, asteroids, starScene, chase, controls },
       /** 太陽中心の EQJ（pc）の場所へ行き、lookAtPc の方を向く */
       teleportPc(p: { x: number; y: number; z: number }, lookAtPc = { x: 0, y: 0, z: 0 }) {
         observer = reanchor({ anchor: 'Sun', offsetKm: { x: p.x * KM_PER_PC, y: p.y * KM_PER_PC, z: p.z * KM_PER_PC } }, worldNow());
@@ -803,12 +875,12 @@ async function main() {
       }
     }
     const others = shipSmoother.update(link.ships, date, dt);
-    shipView.update(others, abs);
+    shipView.update(others, abs, dt);
 
     const shownHull = myDesign.hull;
     chase.pose(controls.orientation, hullLengthKm(shownHull), camera.position, camera.quaternion);
     const q = controls.orientation;
-    shipView.setOwn(chase.mode !== 'first', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w });
+    shipView.setOwn(chase.mode !== 'first', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w }, velocityKmS, controls.speedKmS, dt);
     starCamera.quaternion.copy(camera.quaternion);
 
     // チャットの吹き出しを、船の少し上に置く。自分の船は、一人称のときは画面の下の方に出す
@@ -837,7 +909,9 @@ async function main() {
     galaxy.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
     clusterView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, nowMs);
     nebulaView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, nowMs);
-    constellationView.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
+    lastObserverPc = { x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC };
+    constellationView.update(lastObserverPc);
+    constellationArt.update(lastObserverPc, dt);
 
     info.updateMarker(w, h, false);
 

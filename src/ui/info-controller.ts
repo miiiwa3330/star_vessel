@@ -109,8 +109,8 @@ export class InfoController {
     for (const v of this.pending.splice(0)) this.send(v);
   }
 
-  /** クリック・タップした場所の近くの相手を選ぶ。何も無ければ何もしない */
-  tap(x: number, y: number, w: number, h: number): void {
+  /** クリック・タップした場所の近くの相手を選ぶ。選んだら true。何も無ければ何もせず false */
+  tap(x: number, y: number, w: number, h: number): boolean {
     let best: InfoTarget | null = null;
     let bestD = Infinity;
     const pxPerRad = h / 2 / Math.tan((this.deps.camera.fov * Math.PI) / 360);
@@ -130,6 +130,12 @@ export class InfoController {
       this.selected = best;
       hudStore.set({ selectedKey: best.key, selectedWarp: null });
     }
+    return best !== null;
+  }
+
+  /** 場所の無いもの（星座）をコレクションに記録する。はじめてなら true */
+  collect(v: VisitInput): boolean {
+    return this.record(v);
   }
 
   /** 1 秒に 10 回。相手の一覧・カード・コレクションを更新する */
@@ -356,7 +362,7 @@ export class InfoController {
   }
 
   /** コレクションに記録する。はじめて訪れたなら true */
-  private record(t: InfoTarget): boolean {
+  private record(t: Pick<InfoTarget, 'key' | 'kind' | 'name'>): boolean {
     if (this.visited.has(t.key)) return false;
     this.visited.add(t.key);
     const input: VisitInput = { key: t.key, kind: t.kind, name: t.name.slice(0, 80) };

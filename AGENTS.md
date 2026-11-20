@@ -4,7 +4,7 @@
 
 **サービスの内容そのもの（コンセプト・体験の設計・機能仕様・世界観・技術選定の理由）は本ファイルに書かない。** それらの正本は `docs/` 配下に置く。本ファイルは「どう作業するか」だけを扱う。
 
-> **現在の状態（2026-11-12）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（187 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。さらに、船を UFO の形にし、スタンプ・人工衛星・星団・星の燃えかす（白色矮星・パルサー・ブラックホール）・小さな小惑星への接近を足した。さらに、もやを消し、遠くは点・近くは実際の大きさにし、星の見え方の切り替え・天体の情報（近くの一覧・照準の先・近づいたときのカード）・訪れた天体のコレクション・地球を原点にした座標を足した。さらに、画面を整理した（操作の説明とクレジットをボタンにしまう、照準の先は 1 行、レーダーの名前が重ならない、衛星の日本語の名前）。さらに、星座の線、実データの星雲・ほかの銀河・彗星・探査機・仮符号の衛星・いて座 A*・木星などの環・地球の夜景と雲・星団の本物のメンバーの星・恒星の動きと時刻合わせを足した。さらに、動くものが飛ばないようにした（時刻・他の船・彗星の点・小惑星の点・2 秒ごとの引っかかり）。さらに、サービスの画面づくりを始め、タイトル画面（いまの時刻の本物の地球と、飛んでいる本物のプレイヤーの船が背景。「-START-」をタップして進む。名前はオレンジの Monoton。スクロールすると地球が動いて、サービスの詳細が読める。右下に X と Miiiwa のアイコン、右上に SIGN IN・SIGN UP）と準備画面（宇宙船を選ぶ・ユーザー名とパスワードで登録・回復コード・パスキー・いま遊んでいる人数・出発）を足した（世界は `/play` に移した）。さらに、**準備画面を無くし**、「-START-」で名前が上がり UFO が 3 つ右から光の速さで飛んできて、スライドで宇宙船を選び「GO」で出発する形（名前を押すと戻り、船は左へ消える）と、SIGN IN・SIGN UP でカメラが月まで飛んでアカウントの箱が開き、終わると地球へ戻る形（サインインしているときは、ユーザー名を押すと火星へ飛んで、ユーザー情報とサインアウトが出る）にした（いま遊んでいる人数の表示は、場所が決まるまで出していない）。さらに、**世界の操縦をマインクラフトの操作感に合わせた**（PC はカーソルを出さずマウスで向きを変え、Esc でゲームメニュー、W/A/S/D と Space/Shift はいま見ている視点の向き・上下に沿って動き、W の 2 回押し・Ctrl でダッシュ、慣性、F5 で一人称→後ろから→前から、スマホは左下に十字と右下に上昇・下降）。さらに、**世界の画面の表示を、タイトル画面・アカウントの箱と同じ UI にした**（枠・面なし、Josefin Sans の 300、細い線の丸いボタン、オレンジの英字の見出し。左上の STAR VESSEL と緑の状態の表示はそのまま）。さらに、**スタンプをチャットに置き換え**（左下。PC は Enter・T）、**「近く」の一覧をやめてレーダーを押すと大きくなるマップに**（M キー。点を押すと天体を選ぶ）、**操作の説明をキーボードとマウスの図に**した（タイトル画面の詳細にも）。さらに、チャットにスタンプ（絵文字 8 つを常に出し、☺ でもっと多くの絵文字）を足し、チャットを履歴と入力欄を線で分けた 1 枚のすりガラス（角は角）にし、**入ったばかりではゲームメニューを出さず**、ゲームメニューの間は画面全体をすりガラスにしてメニューのほかを押せなくし、マップなどを開くとカーソルが出るようにし、× をなくした（まわりを押すか Esc で閉じる。下のボタンは 1〜4 キーでも押せる）。さらに、**マップの範囲を二本指（PC はホイール）で変え、出すものを切り替えられる**ようにし（閉じても隅のレーダーはそのまま）、**ワープをマップに移し**（下のボタンはワープホールを作るボタンに）、**写真**（5・F2。保存・共有）を足した。さらに、**大きくしたものも含めて「レーダー」と呼ぶ**ことにし（R キー）、**訪れた場所だけが少しずつ解放される 3D のマップ**（M・6）と、**画面を大きく使う図鑑のコレクション**（一覧は横 5・縦 3、詳細は左に天体・右に説明）を足し、左上の表示を英語にし、ワープホールはそのそばでワープホールのボタンを 2 回押して消す形にし、レーダー・マップ・コレクション・写真の面もすりガラスにした。さらに、**コレクションを、名前のある実在の天体すべて（26,216 個）を集める図鑑にした**（通しの番号、まだ訪れていない天体は黒いシルエットと「？？？」、一覧から詳細へ天体が滑る、詳細の天体をドラッグで回せる、AI が書いた解説と NASA の表などからの数の表）。さらに、**マイページ（火星の箱）の下にスクロールすると、同じ図鑑が出る**ようにした。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
+> **現在の状態（2026-11-12）**：「世界の創造」の土台に、レーダー・ワープホール（全員と共有）・天体に近づける距離の制限・他のプレイヤーの宇宙船・銀河の形の自動生成を足した。さらに、惑星の模様と土星の環、天体の一覧（registry）、ガリレオ衛星、太陽系の外の惑星（実在＋自動生成）を足した。さらに、大気の光の輪・恒星の表面と光の広がり・環の影と、自動で作る系外惑星の衛星と環を足した。さらに、太陽系の衛星（187 個）・小惑星（約 90 万個）・惑星の画像、宇宙船を選ぶ機能（3 種類）、一人称・三人称の視点を足した。さらに、船を UFO の形にし、スタンプ・人工衛星・星団・星の燃えかす（白色矮星・パルサー・ブラックホール）・小さな小惑星への接近を足した。さらに、もやを消し、遠くは点・近くは実際の大きさにし、星の見え方の切り替え・天体の情報（近くの一覧・照準の先・近づいたときのカード）・訪れた天体のコレクション・地球を原点にした座標を足した。さらに、画面を整理した（操作の説明とクレジットをボタンにしまう、照準の先は 1 行、レーダーの名前が重ならない、衛星の日本語の名前）。さらに、星座の線、実データの星雲・ほかの銀河・彗星・探査機・仮符号の衛星・いて座 A*・木星などの環・地球の夜景と雲・星団の本物のメンバーの星・恒星の動きと時刻合わせを足した。さらに、動くものが飛ばないようにした（時刻・他の船・彗星の点・小惑星の点・2 秒ごとの引っかかり）。さらに、サービスの画面づくりを始め、タイトル画面（いまの時刻の本物の地球と、飛んでいる本物のプレイヤーの船が背景。「-START-」をタップして進む。名前はオレンジの Monoton。スクロールすると地球が動いて、サービスの詳細が読める。右下に X と Miiiwa のアイコン、右上に SIGN IN・SIGN UP）と準備画面（宇宙船を選ぶ・ユーザー名とパスワードで登録・回復コード・パスキー・いま遊んでいる人数・出発）を足した（世界は `/play` に移した）。さらに、**準備画面を無くし**、「-START-」で名前が上がり UFO が 3 つ右から光の速さで飛んできて、スライドで宇宙船を選び「GO」で出発する形（名前を押すと戻り、船は左へ消える）と、SIGN IN・SIGN UP でカメラが月まで飛んでアカウントの箱が開き、終わると地球へ戻る形（サインインしているときは、ユーザー名を押すと火星へ飛んで、ユーザー情報とサインアウトが出る）にした（いま遊んでいる人数の表示は、場所が決まるまで出していない）。さらに、**世界の操縦をマインクラフトの操作感に合わせた**（PC はカーソルを出さずマウスで向きを変え、Esc でゲームメニュー、W/A/S/D と Space/Shift はいま見ている視点の向き・上下に沿って動き、W の 2 回押し・Ctrl でダッシュ、慣性、F5 で一人称→後ろから→前から、スマホは左下に十字と右下に上昇・下降）。さらに、**世界の画面の表示を、タイトル画面・アカウントの箱と同じ UI にした**（枠・面なし、Josefin Sans の 300、細い線の丸いボタン、オレンジの英字の見出し。左上の STAR VESSEL と緑の状態の表示はそのまま）。さらに、**スタンプをチャットに置き換え**（左下。PC は Enter・T）、**「近く」の一覧をやめてレーダーを押すと大きくなるマップに**（M キー。点を押すと天体を選ぶ）、**操作の説明をキーボードとマウスの図に**した（タイトル画面の詳細にも）。さらに、チャットにスタンプ（絵文字 8 つを常に出し、☺ でもっと多くの絵文字）を足し、チャットを履歴と入力欄を線で分けた 1 枚のすりガラス（角は角）にし、**入ったばかりではゲームメニューを出さず**、ゲームメニューの間は画面全体をすりガラスにしてメニューのほかを押せなくし、マップなどを開くとカーソルが出るようにし、× をなくした（まわりを押すか Esc で閉じる。下のボタンは 1〜4 キーでも押せる）。さらに、**マップの範囲を二本指（PC はホイール）で変え、出すものを切り替えられる**ようにし（閉じても隅のレーダーはそのまま）、**ワープをマップに移し**（下のボタンはワープホールを作るボタンに）、**写真**（5・F2。保存・共有）を足した。さらに、**大きくしたものも含めて「レーダー」と呼ぶ**ことにし（R キー）、**訪れた場所だけが少しずつ解放される 3D のマップ**（M・6）と、**画面を大きく使う図鑑のコレクション**（一覧は横 5・縦 3、詳細は左に天体・右に説明）を足し、左上の表示を英語にし、ワープホールはそのそばでワープホールのボタンを 2 回押して消す形にし、レーダー・マップ・コレクション・写真の面もすりガラスにした。さらに、**コレクションを、名前のある実在の天体すべて（26,216 個）を集める図鑑にした**（通しの番号、まだ訪れていない天体は黒いシルエットと「？？？」、一覧から詳細へ天体が滑る、詳細の天体をドラッグで回せる、AI が書いた解説と NASA の表などからの数の表）。さらに、**マイページ（火星の箱）の下にスクロールすると、同じ図鑑が出る**ようにした。さらに、**図鑑の絵を、種類ごとに同じ形から、天体 1 つずつのデータに合わせた絵にした**（恒星の大きさ・光の広がり・表面の模様、星団・銀河・星雲・彗星の形。白色矮星は温度の色）。さらに、**最初の視点を三人称にし**（FPS の三人称の形。照準は UFO の上）、**UFO が動くとベイパー（白い尾）**が出るようにし、**写真は 5 で構え（表示を消してシャッターの線だけ）・Enter で撮る**形にし、**星座をクリックすると Stellarium の星座の絵が重なり、図鑑に星座（88 個）が入る**ようにした。サーバーは手元（`npm run dev`）でだけ動かしていて、本番には出していない。決まり次第、本ファイルの該当節を更新する（下の「このファイルの育て方」）。
 
 ---
 
@@ -144,12 +144,12 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 | 背景の船を出す（確かめ用） | `npm run sim:ships`（`tools/sim-ships.mjs`。開発サーバーが動いている状態で、地球のまわりを動く船を 4 隻、本物のプレイヤーと同じ通信で出す。`B=http://localhost:5174 SECONDS=300` で変えられる。タイトル画面の背景の船・人数の確かめに使う） |
 | 衛星・小惑星のデータの作り直し | `npm run moons`・`npm run asteroids`（JPL から取得。衛星の日本語の名前は Wikidata から。衛星は元期から離れるほどずれるので年に一度くらい。Node の fetch をプロキシ越しに使うため `NODE_USE_ENV_PROXY=1` を付けている） |
 | 人工衛星・星団・燃えかすのデータの作り直し | `npm run satellites`・`npm run clusters`・`npm run compact`（星団と燃えかすは VizieR のハーバード大学のミラーから取る。CDS の本家は開発の環境から応答が無い） |
-| 星座・彗星・探査機・星雲・銀河のデータの作り直し | `npm run constellations`（星のデータが先に要る）・`npm run comets`・`npm run spacecraft`・`npm run nebulae`・`npm run galaxies`。探査機は Horizons の予報が伸びたら。`npm run exoplanets` は NASA Exoplanet Archive の分も足す |
+| 星座・彗星・探査機・星雲・銀河のデータの作り直し | `npm run constellations`（星のデータが先に要る）・`npm run constellation-art`（星座の絵。`npm run stars` が取得した HYG が先に要る）・`npm run comets`・`npm run spacecraft`・`npm run nebulae`・`npm run galaxies`。探査機は Horizons の予報が伸びたら。`npm run exoplanets` は NASA Exoplanet Archive の分も足す |
 | 恒星の名前の表の作り直し | `npm run star-info`（`npm run stars` が取得した HYG と `exoplanets.json` が先に要る。`public/data/star-info.json` を書き出す。図鑑と情報のカードの恒星の名前） |
 | 本物の星の作り直し | `npm run cluster-members`（`npm run clusters` が先）・`npm run gaia`（`npm run stars`・`exoplanets`・`compact` が先。数分かかる） |
 
 - **「動いた」と書く前に、画面で確かめる。** テストが通っても、描画の向き・明るさ・重なりは画面でしか分からない。WebGPU と WebGL2（WebGPU を消した状態）の両方と、スマホの幅（390px 前後）で見る
-- 開発サーバーでは、ブラウザの開発者ツールから瞬間移動できる：`__sv.teleportGalacto({ x: 0, y: 0, z: 45 })`（銀河中心の座標・kpc。この例は銀河の真上）、`__sv.teleportPc({ x, y, z })`（太陽中心の EQJ・pc）、`__sv.teleportBody('Saturn', 400000, 'pole')`（天体の id、中心からの距離 km、どこから見るか：`'day'` 昼の側〈省略時〉・`'pole'` 北極の上・`'night'` 夜の側）、`__sv.teleportSystem('E1WHADEK', 0.1)`（恒星系の記号と恒星からの距離 AU。この例は TRAPPIST-1）。描いている物は `__sv.debug` から読める（動きの滑らかさを測るときなど）。本番のビルドには入らない。タイトル画面の 3D の地球は `__earth`（開発サーバーのみ。届いた船・カメラの向きを読める）。段階・カメラの行き先と着いた先・UFO の位置・月へ飛ぶ速さは `__topStage`（開発サーバーのみ。`arrival`〈earth・there・flying〉・`view`〈earth・moon・mars〉・`warp`・`pos`・`target`）
+- 開発サーバーでは、ブラウザの開発者ツールから瞬間移動できる：`__sv.teleportGalacto({ x: 0, y: 0, z: 45 })`（銀河中心の座標・kpc。この例は銀河の真上）、`__sv.teleportPc({ x, y, z })`（太陽中心の EQJ・pc）、`__sv.teleportBody('Saturn', 400000, 'pole')`（天体の id、中心からの距離 km、どこから見るか：`'day'` 昼の側〈省略時〉・`'pole'` 北極の上・`'night'` 夜の側）、`__sv.teleportSystem('E1WHADEK', 0.1)`（恒星系の記号と恒星からの距離 AU。この例は TRAPPIST-1）。描いている物は `__sv.debug` から読める（動きの滑らかさを測るときなど）。自動操作（ヘッドレスの Chrome など）ではカーソルを消す操縦に入れないので、`__sv.debug.controls.usesLock = false` にすると、入らなくてもキーで操縦できる。ソフトウェアの描画は遅すぎるので、Chrome は GPU で動かす（`--use-angle=metal --enable-gpu`。2026-11-13）。本番のビルドには入らない。タイトル画面の 3D の地球は `__earth`（開発サーバーのみ。届いた船・カメラの向きを読める）。段階・カメラの行き先と着いた先・UFO の位置・月へ飛ぶ速さは `__topStage`（開発サーバーのみ。`arrival`〈earth・there・flying〉・`view`〈earth・moon・mars〉・`warp`・`pos`・`target`）
 - 小惑星（約 90 万個）はソフトウェアの描画（GPU の無い環境の自動の確かめ）では重すぎるので、世界の URL（`/play`）に `?asteroids=bright` を付けて明るい約 7.6 万個だけにする（例：`/play?asteroids=bright&stars=hyg`。2026-11-06 から、世界は `/` ではなく `/play`。`/` はタイトル画面）。Gaia の星も重いので `?stars=hyg` で読まないようにできる
 - パスキーを確かめるときは、Chrome の仮想の認証器を使う（Playwright なら CDP の `WebAuthn.addVirtualAuthenticator`）
 - 他のプレイヤーの機能を確かめるときは、別々のブラウザ（別のアカウントになる）を 2 つ開く
@@ -177,6 +177,7 @@ src/
     satellites.ts         人工衛星（SGP4。satellite.js はこのファイルの中だけで使う）。satellite-data.ts は取り込み（サーバーと共有）
     clusters.ts           星団
     constellations.ts     星座の線
+    constellation-figure.ts 星座の絵を空に貼る計算と、図鑑の星座の図（地球から見た線と星）
     comets.ts             彗星（楕円・放物線・双曲線の位置、尾の長さ）
     spacecraft.ts         探査機（Horizons の表の補間）
     nebulae.ts            星雲（読み方・形を作る）
@@ -197,18 +198,20 @@ src/
     stars.ts              星のデータの読み方と、見た目（大きさ・明るさ・色）
     clock.ts              世界の時刻（サーバーの時計に、飛ばさずに合わせる）
     ship-smoothing.ts     他の船を滑らかに動かす（位置の食い違いを少しずつ消す・向きを少しずつ回す）
+    picture.ts            図鑑の絵を、天体 1 つずつのデータから決める計算（恒星の大きさ・光・模様、星団・銀河・星雲・彗星）
+    star-color.ts         恒星の色（温度から）と太陽の温度
     units.ts / vec.ts     単位と、倍精度のベクトル・行列
   render/                 three.js での描画（太陽系・星・銀河・ワープホール・他の船）。body-looks.ts は天体の画像のファイル名と模様の色、
                           body-effects.ts は大気・恒星の光・環の影、surface-worker.ts は模様を描く Web Worker、
-                          asteroid-field.ts は小惑星の光の点（GPU でケプラーの方程式を解く）、ship-models.ts は 3 種類の UFO、
-                          satellite-field.ts は人工衛星の光の点、cluster-view.ts は星団、constellation-view.ts は星座の線、
+                          asteroid-field.ts は小惑星の光の点（GPU でケプラーの方程式を解く）、ship-models.ts は 3 種類の UFO、vapor-trail.ts は動いたときのベイパー、
+                          satellite-field.ts は人工衛星の光の点、cluster-view.ts は星団、constellation-view.ts は星座の線、constellation-art-view.ts は選んだ星座の絵、
                           comet-field.ts は彗星の光の点、nebula-view.ts は星雲、extragalactic-view.ts はほかの銀河
   controls/flight.ts      操縦（PC の Pointer Lock・スマホのボタン）。movement.ts は慣性・ダッシュの計算（テストあり）、chase-camera.ts は一人称・後ろから・前からの視点
   ui/                     画面の表示（React）。hud-store.ts を通して世界から値を受け取り、hudActions で世界へ操作を渡す（開いている画面は overlay の 1 つだけ）。
                           PauseMenu.tsx は PC のゲームメニュー（Esc）、TouchPad.tsx はスマホの十字・上昇／下降のボタン、
                           ChatBox.tsx は左下のチャット（スタンプと、☺ の絵文字の一覧。絵文字は emoji-list.ts）、chat-bubbles.ts は船の上の吹き出し（毎フレーム動かすので DOM を直接動かす）。
                           Radar.tsx はレーダー、RadarPanel.tsx は押すと大きくなるレーダー（R。二本指・ホイールで範囲、下に出すものの切り替え。範囲と出すものは radar-prefs.ts で端末に覚える。2026-11-12 まで「マップ」と呼んでいた）。
-                          StarMap.tsx は訪れた場所の 3D のマップ（M・6。2D の canvas に描く）。CollectionPanel.tsx はコレクションの図鑑（一覧と詳細。天体が滑る動き）、collection-source.ts は図鑑に入れる天体・詳細の表と文、collection-loader.ts は世界の画面の外（マイページ）で図鑑のデータを読む所、encyclopedia-text.ts は AI が書いた解説（開いたときに読み込む）、BodyGlobe.tsx は一覧の天体の絵（CSS。絵の選び方は collection-look.ts）、ObjectViewer.tsx・globe-render.ts は詳細のドラッグで回せる絵（canvas に 1 画素ずつ）。InfoCard.tsx は TARGET のカードと、マップで選んだワープホールのカード（WarpCard。ワープはここから）。PhotoView.tsx は撮った写真（保存・共有）。KeyboardGuide.tsx は操作の図（キーボードとマウスに線を伸ばす。タイトル画面の詳細でも使う）。
+                          StarMap.tsx は訪れた場所の 3D のマップ（M・6。2D の canvas に描く）。CollectionPanel.tsx はコレクションの図鑑（一覧と詳細。天体が滑る動き）、collection-source.ts は図鑑に入れる天体・詳細の表と文、collection-loader.ts は世界の画面の外（マイページ）で図鑑のデータを読む所、encyclopedia-text.ts は AI が書いた解説（開いたときに読み込む）、BodyGlobe.tsx は一覧の天体の絵（球は CSS、恒星・星団・銀河・星雲・彗星は小さな canvas。絵の選び方は collection-look.ts、点の集まりの形は cloud-picture.ts、星座の線と絵は constellation-picture.ts）、ObjectViewer.tsx・globe-render.ts は詳細のドラッグで回せる絵（canvas に 1 画素ずつ）。InfoCard.tsx は TARGET のカードと、マップで選んだワープホールのカード（WarpCard。ワープはここから）。PhotoView.tsx は撮った写真（保存・共有）。KeyboardGuide.tsx は操作の図（キーボードとマウスに線を伸ばす。タイトル画面の詳細でも使う）。
                           info-controller.ts は天体の情報とコレクションをつなぐところ、target-marker.ts は選んだ天体の印
   top/                    タイトル画面（/）。船を選ぶ・月でアカウントも、この中の状態（URL は変えない）。世界は読み込まない。routes.ts は URL の決まり（/play かそれ以外か）、
                           TopApp.tsx は段階（title・select・auth・return）の切り替えと出発、TitleScreen.tsx は最初の画面（名前・一言・「-START-」→「-Go!-」）、
@@ -229,12 +232,13 @@ public/
   data/clusters.json      星団（npm run clusters）
   data/compact.json       白色矮星・パルサー・ブラックホール（npm run compact）
   data/constellations.json 星座の線（npm run constellations。constellations.LICENSE.txt と必ず一緒に置く）
+  data/constellation-art.json 星座の絵の置き方（npm run constellation-art。constellation-art.LICENSE.txt と必ず一緒に置く）
   data/comets.json・spacecraft.json・nebulae.json・galaxies.json  彗星・探査機・星雲・銀河（それぞれ npm run の同じ名前）
   data/stars-motion.bin   星の動き（npm run stars。stars.bin と同じ順）
   data/star-info.json     恒星の固有名・符号・スペクトル型・見かけの等級・星座（npm run star-info。star-info.LICENSE.txt と必ず一緒に置く）
   data/stars-gaia-*.bin   Gaia DR3 の近くの星（npm run gaia。stars-gaia.LICENSE.txt と必ず一緒に置く）
   data/cluster-members/   星団の本物のメンバーの星（npm run cluster-members。目次は cluster-members.json）
-  textures/               天体の画像（出どころは docs/tech/credits.md）
+  textures/               天体の画像（出どころは docs/tech/credits.md）。constellations/ は星座の絵（Stellarium。Free Art License 1.3。変えずに置く）
 worker/                   サーバー（Cloudflare Workers）。index.ts が入口、warps.ts がワープホールの API、ships.ts が宇宙船の設計の API、visits.ts が訪れた天体の API、presence.ts がいま遊んでいる人数の API、showcase.ts が背景の船（地球のまわりの船）の API、recovery.ts が回復コードの API、satellites.ts が人工衛星の軌道要素の API、space-room.ts が宇宙の部屋（Durable Object。人数も書く）、auth*.ts がアカウント（ユーザー名の登録・匿名の記録の引き継ぎ）
 migrations/               D1 のテーブル（0001 は npm run auth:schema で作ったもの。0005 はその差分、0006 はいま遊んでいる人数、0007 は回復コード、0008 はパスキー）
 tools/build-stars.mjs     HYG → stars.bin の変換
@@ -246,6 +250,7 @@ tools/build-satellites.mjs SatNOGS DB → satellites.json
 tools/build-clusters.mjs  Hunt & Reffert 2023（VizieR のミラー）→ clusters.json
 tools/build-compact.mjs   白色矮星・パルサー・ブラックホールの一覧（VizieR のミラー）→ compact.json
 tools/build-constellations.mjs d3-celestial → constellations.json
+tools/build-constellation-art.mjs Stellarium の星座の絵 → public/textures/constellations/・constellation-art.json
 tools/build-comets.mjs・build-spacecraft.mjs  JPL → comets.json・spacecraft.json
 tools/build-nebulae.mjs・build-galaxies.mjs   SIMBAD・OpenNGC・VizieR → nebulae.json・galaxies.json
 tools/build-exoplanets-nasa.mjs NASA Exoplanet Archive にだけある惑星を exoplanets.json に足す

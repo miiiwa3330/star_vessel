@@ -150,7 +150,7 @@ const CALLOUTS: Callout[] = [
   },
   { lines: [toRight(key('E'), gapAbove(2), 200)], text: ['右に傾く'], x: RX, y: 204, anchor: 'start' },
   { lines: [toRight(key('D'), gapAbove(3), 236)], text: ['右へ'], x: RX, y: 240, anchor: 'start' },
-  { lines: [[[key('Enter').right, key('Enter').cy], [RX - 6, 272]]], text: ['チャット（T でも）'], x: RX, y: 276, anchor: 'start' },
+  { lines: [[[key('Enter').right, key('Enter').cy], [RX - 6, 272]]], text: ['チャット（T でも）', '写真の構えではシャッター'], x: RX, y: 276, anchor: 'start' },
   { lines: [toRight(key('S'), gapBelow(3), 308)], text: ['後ろへ'], x: RX, y: 312, anchor: 'start' },
   // 下：C・Space・M・Alt。R（レーダー）は、線を通せるすき間が無い（上は 1〜6 の線、左右は Q・E・D の線）ので、M の説明に並べて書く
   { lines: [downVia(key('C'), gapBelow(4), key('Cmd').cx, BOTTOM1 - 16)], text: ['星座'], x: key('Cmd').cx, y: BOTTOM1, anchor: 'middle' },

@@ -4,7 +4,8 @@
  * 世界の画面（main.ts）は、宇宙を描くために同じデータをすでに読んでいるので、これは使わずに自分で作る。
  * 読むデータを足したら、main.ts の読み込みと食い違わないようにする（docs/tech/collection.md）
  */
-import { decodeStars } from '../world/stars';
+import { decodeStars, STAR_STRIDE } from '../world/stars';
+import { constellationFigures, decodeConstellationArt, type ConstellationArt } from '../world/constellation-figure';
 import { decodeExoplanets } from '../world/exoplanet-data';
 import { decodeCompact } from '../world/compact-objects';
 import { StarSystems } from '../world/star-systems';
@@ -35,7 +36,7 @@ export function loadCollectionSource(): Promise<CollectionSource> {
 const json = <T>(url: string): Promise<T> => fetch(url).then((r) => (r.ok ? (r.json() as Promise<T>) : Promise.reject(new Error(`${url}: ${r.status}`))));
 
 async function load(): Promise<CollectionSource> {
-  const [starsBin, exoplanets, compact, moons, large, spacecraft, comets, clusters, nebulae, galaxies, starInfo, constellations] = await Promise.all([
+  const [starsBin, exoplanets, compact, moons, large, spacecraft, comets, clusters, nebulae, galaxies, starInfo, constellations, constellationArt] = await Promise.all([
     fetch('/data/stars.bin').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`stars.bin: ${r.status}`)))),
     json<Parameters<typeof decodeExoplanets>[0]>('/data/exoplanets.json'),
     json<Parameters<typeof decodeCompact>[0]>('/data/compact.json'),
@@ -48,6 +49,7 @@ async function load(): Promise<CollectionSource> {
     json<Parameters<typeof decodeGalaxies>[0]>('/data/galaxies.json'),
     json<Parameters<typeof decodeStarInfo>[0]>('/data/star-info.json'),
     json<{ constellations: Constellation[] }>('/data/constellations.json'),
+    json<{ art: Record<string, ConstellationArt> }>('/data/constellation-art.json').catch(() => ({ art: {} })),
   ]);
   // 太陽系の天体（衛星は番号のあるものだけ。仮符号の衛星は図鑑に入らない）
   registerBodies(moonBodies(moons.moons, { gm: majorGmKm3s2 }).filter((b) => !/p[0-9]+$/.test(b.id)));
@@ -76,6 +78,8 @@ async function load(): Promise<CollectionSource> {
     galaxies: decodeGalaxies(galaxies),
     comets: cometList,
     constellationsJa: new Map(decodeConstellations(constellations).map((c) => [c.id, c.nameJa])),
+    constellationFigures: constellationFigures(decodeConstellations(constellations), stars.data, STAR_STRIDE),
+    constellationArt: decodeConstellationArt(constellationArt),
     largeAsteroidNumbers: new Set(large.large.map((a) => a.number)),
     now: () => new Date(),
   });
