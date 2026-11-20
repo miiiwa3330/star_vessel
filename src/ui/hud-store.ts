@@ -174,7 +174,8 @@ let state: HudState = {
   overlay: null,
   pointerLock: false,
   locked: false,
-  statusVisible: true,
+  // スマホは、左上の情報を最初は隠して「＊」だけにする（2026-11-21。オーナーの指示）。PC は出しておく（F3 で切り替え）
+  statusVisible: !(typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px), (pointer: coarse)').matches),
   orbitDrag: false,
   chatReady: false,
   chatLog: [],
