@@ -19,9 +19,23 @@ const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
  * 近くのプレイヤー（船が見えている相手）に届き、送った人の船の上にも吹き出しが出る。
  * 履歴は、しばらくすると薄くなって消える（入力欄を使っている間は、全部出す）。マインクラフトのチャットと同じ考え方。
  * スタンプ（絵文字 8 つ）は常に並べ、押すとそのまま送る。入力欄の右の ☺ は、もっと多くの絵文字から選んで入力欄に足すとき用。
- * PC は Enter か T で入力欄を開き、Enter で送る・Esc でやめる（どちらも操縦に戻る）
+ * PC は Enter か T で入力欄を開き、Enter で送る・Esc でやめる（どちらも操縦に戻る）。
+ * スマホは開閉式（2026-11-21）：左の列のチャットのボタンで開く・閉じる。閉じている間に届いた発言は、ボタンの点で知らせる
  */
-export function ChatBox({ ready, log, open, underPanel = false }: { ready: boolean; log: ChatLogItem[]; open: boolean; underPanel?: boolean }) {
+export function ChatBox({
+  ready,
+  log,
+  open,
+  underPanel = false,
+  collapsed = false,
+}: {
+  ready: boolean;
+  log: ChatLogItem[];
+  open: boolean;
+  underPanel?: boolean;
+  /** スマホで閉じているとき（開閉式。2026-11-21）。PC では使わない（CSS がスマホのときだけ隠す） */
+  collapsed?: boolean;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
   const [picker, setPicker] = useState(false);
@@ -58,7 +72,7 @@ export function ChatBox({ ready, log, open, underPanel = false }: { ready: boole
   };
   const shown = open ? log : log.filter((l) => now - l.at < LINE_HIDE_MS).slice(0, SHOWN_LINES);
   return (
-    <div className={`hud-chat${open ? ' is-open' : ''}${underPanel ? ' is-under-panel' : ''}`}>
+    <div className={`hud-chat${open ? ' is-open' : ''}${underPanel ? ' is-under-panel' : ''}${collapsed ? ' is-collapsed' : ''}`}>
       {shown.length > 0 && (
         <ol className="hud-chat-log" aria-label="チャットの履歴" aria-live="polite">
           {[...shown].reverse().map((l) => (

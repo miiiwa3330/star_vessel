@@ -12,7 +12,7 @@ import type { InfoKind } from '../world/info';
 import type { Vec3 } from '../world/vec';
 
 /** スマホの画面のボタンで押せるキー */
-export type MoveKeyCode = 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD' | 'Space' | 'ShiftLeft';
+export type MoveKeyCode = 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD' | 'Space' | 'ShiftLeft' | 'ControlLeft';
 
 /** 情報のカード（要件 F36・F37） */
 export interface InfoCardState {
@@ -148,6 +148,10 @@ export interface HudState {
   shutter: number;
   /** 写真を撮る構え（5・F2）。画面の表示をすべて消して、シャッターの線だけを出す。Enter で撮る（2026-11-13） */
   photoMode: boolean;
+  /** スマホのチャットを開いているか（開閉式。2026-11-21）。PC はいつも出しておくので使わない */
+  chatOpen: boolean;
+  /** スマホの左下の「＋」を開いて、アイコンを出しているか（2026-11-21。最初はしまっておく） */
+  itemsOpen: boolean;
 }
 
 const radarPrefs = loadRadarPrefs();
@@ -192,6 +196,8 @@ let state: HudState = {
   warpHere: null,
   shutter: 0,
   photoMode: false,
+  chatOpen: false,
+  itemsOpen: false,
 };
 const listeners = new Set<() => void>();
 
@@ -280,6 +286,16 @@ export const hudActions = {
   /** 選んだ天体の方を向く */
   faceTarget: (): void => {},
   /** 左上の表示（座標など）を出す・消す（F3 キー） */
+  /** スマホの「＋」：アイコンを出す・しまう */
+  toggleItems: (): void => {
+    hudStore.set({ itemsOpen: !hudStore.get().itemsOpen });
+  },
+  /** スマホのチャットを開く・閉じる（開閉式。2026-11-21）。閉じるときは、入力欄も閉じる */
+  toggleChat: (): void => {
+    const open = !hudStore.get().chatOpen;
+    hudStore.set({ chatOpen: open });
+    if (!open && hudStore.get().overlay === 'chat') hudActions.setOverlay(null);
+  },
   toggleStatus: (): void => {
     hudStore.set({ statusVisible: !hudStore.get().statusVisible });
   },

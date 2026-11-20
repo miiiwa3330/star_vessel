@@ -653,7 +653,8 @@ async function main() {
     removeArmed = { id: here.id, until: now + REMOVE_CONFIRM_MS };
     showNotice(`もう一度押すと、ワープホール ${here.code} を消します`, REMOVE_CONFIRM_MS);
   };
-  hudActions.changeSpeed = (steps) => controls.changeSpeed(steps, true);
+  // スマホの速さのバー（1 段 1.25 倍。2026-11-21 まではボタン 1 回で 10 倍だった）
+  hudActions.changeSpeed = (steps) => controls.changeSpeed(steps);
   // 写真（要件 F61）：次に描いたすぐあとの画面を、そのまま画像にする（画面の表示・文字は入らない。宇宙だけが写る）。
   // WebGPU・WebGL2 とも、描いた直後の同じ処理の中でないと、画面の中身を読めないため、ループの中で撮る
   // 2026-11-13：5・F2 は「構え」（画面の表示をすべて消して、シャッターの線だけを出す）。構えの間に Enter でシャッター

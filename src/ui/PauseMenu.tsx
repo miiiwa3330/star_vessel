@@ -34,7 +34,7 @@ export function PauseMenu() {
         <button type="button" className="hud-button hud-pause-button" onClick={() => window.location.assign('/')}>
           タイトルへ
         </button>
-        <div className="hud-pause-note">Esc でもゲームに戻れます</div>
+        <div className="hud-pause-note hud-keyboard-only">Esc でもゲームに戻れます</div>
       </div>
     </div>
   );

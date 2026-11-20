@@ -19,6 +19,8 @@ export const SHIP_STALE_MS = 5_000;
 export const SHIP_MIN_INTERVAL_MS = 150;
 /** 手で操縦する速さの上限（要件 F17・仮）。秒速 1,000 光年 */
 export const MAX_SPEED_KM_S = 1_000 * KM_PER_LY;
+/** 速さの下限（km/s）。2026-11-21 にオーナーの指示で、秒速 100 m から秒速 1 m に下げた（衛星などの小さな物に、ゆっくり近づけるように） */
+export const MIN_SPEED_KM_S = 0.001;
 
 export interface ShipState {
   anchor: BodyId;
