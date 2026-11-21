@@ -44,3 +44,11 @@ export function loadingMotion(elapsedMs: number, readyMs: number | null): Loadin
 /** 前のページから引き継いだ始まりの時刻を使えるか */
 export const usableStart = (startMs: number | null, nowMs: number): startMs is number =>
   startMs !== null && Number.isFinite(startMs) && startMs <= nowMs && nowMs - startMs < CARRY_MAX_MS;
+
+const MAX_UFO_IMAGE_URL_LEN = 200_000;
+
+/** localStorage に覚えた船の絵 URL が安全なデータ URI（PNG/WebP/JPEG の base64）か確かめる */
+export const isSafeUfoImageUrl = (url: unknown): url is string =>
+  typeof url === 'string' &&
+  url.length <= MAX_UFO_IMAGE_URL_LEN &&
+  /^data:image\/(?:png|webp|jpeg);base64,[A-Za-z0-9+/=]+$/.test(url);

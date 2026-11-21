@@ -74,6 +74,8 @@ export function accountErrorMessage(code: string | undefined, status?: number): 
     case 'PASSKEY_NOT_FOUND':
     case 'AUTHENTICATION_FAILED':
       return 'このパスキーではサインインできません。消されたパスキーかもしれません';
+    case 'PASSKEY_USERNAME_MISMATCH':
+      return 'この宇宙船名のパスキーではありません。宇宙船名を確かめてください';
     default:
       return status === 429 ? '短い間に何度も試されました。しばらくしてからもう一度お試しください' : 'うまくいきませんでした。しばらくしてからもう一度お試しください';
   }

@@ -19,6 +19,7 @@ async function post<T>(path: string, body: unknown, messages: Record<string, str
     throw new AccountError(GENERIC);
   }
   const json = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
+  if (res.status === 429) throw new AccountError('短い間に何度も試されました。しばらくしてからもう一度お試しください');
   if (!res.ok || !json) throw new AccountError(messages[json?.error ?? ''] ?? GENERIC);
   return json;
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { MapIcon } from './icons';
 import '@fontsource/monoton/400.css';
 import '@fontsource/josefin-sans/300.css';
-import '@fontsource/dotgothic16/400.css';
+import '@fontsource/dotgothic16/latin-400.css';
 import { formatCoordinates, formatDistanceEn, formatSpeed } from './format';
 import { STAR_LIMIT_NAMES_JA } from '../world/stars';
 import { hudActions, hudStore, type ScanHud } from './hud-store';
@@ -56,7 +56,7 @@ export function Hud() {
         {/* 左上の表示は、最初は隠して「＊」だけ。「＊」・X キーで出し、表示を押す・X キーで隠す（2026-11-21。PC・スマホとも） */}
         {!s.statusVisible && !wide && (
           <button type="button" className="hud-status-toggle" aria-label="左上の情報を出す（X）" title="左上の情報を出す（X）" onClick={() => hudActions.toggleStatus()}>
-            ＊
+            *
           </button>
         )}
         {s.statusVisible && !wide && (

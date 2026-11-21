@@ -83,10 +83,11 @@ export function isBlock(b: Block): boolean {
 export const cellIndex = (x: number, y: number, z: number): number => (y * GRID + z) * GRID + x;
 
 /**
- * どのマスを、どのブロックが占めているか（ブロックの番号。空きは −1）。重なりがあれば null
+ * どのマスを、どのブロックが占めているか（ブロックの番号。空きは −1）。重なりがあれば null。
+ * scratch を渡すと確保し直さず使い回せる
  */
-export function occupancy(blocks: readonly Block[]): Int32Array | null {
-  const occ = new Int32Array(GRID * GRID * GRID).fill(-1);
+export function occupancy(blocks: readonly Block[], scratch?: Int32Array): Int32Array | null {
+  const occ = scratch && scratch.length === GRID * GRID * GRID ? scratch.fill(-1) : new Int32Array(GRID * GRID * GRID).fill(-1);
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i];
     const n = blockCells(b);
@@ -102,10 +103,10 @@ export function occupancy(blocks: readonly Block[]): Int32Array | null {
 }
 
 /** ブロックの並びとして正しいか（数の上限・1 つずつの形・重なり）。サーバーは必ずこれで確かめる */
-export function isValidBlocks(blocks: readonly Block[]): boolean {
+export function isValidBlocks(blocks: readonly Block[], scratch?: Int32Array): boolean {
   if (blocks.length === 0 || blocks.length > MAX_BLOCKS) return false;
   if (!blocks.every(isBlock)) return false;
-  return occupancy(blocks) !== null;
+  return occupancy(blocks, scratch) !== null;
 }
 
 // ---- 4 バイトにまとめる：x 7 ビット・y 7・z 7・大きさ 2・色 5（合わせて 28 ビット。上の 4 ビットは 0） ----
@@ -178,7 +179,7 @@ export function encodeBlocks(blocks: readonly Block[]): string {
 }
 
 /** 文字列からブロックの並びに戻す。形が正しくなければ（範囲の外・重なり・上限を超える）null */
-export function decodeBlocks(text: unknown): Block[] | null {
+export function decodeBlocks(text: unknown, scratch?: Int32Array): Block[] | null {
   if (typeof text !== 'string' || text.length === 0 || text.length > MAX_BLOCKS_TEXT) return null;
   const bytes = fromBase64(text);
   if (!bytes || bytes.length % 4 !== 0) return null;
@@ -188,12 +189,12 @@ export function decodeBlocks(text: unknown): Block[] | null {
     if (v >>> 28 !== 0) return null;
     blocks.push(unpack(v));
   }
-  return isValidBlocks(blocks) ? blocks : null;
+  return isValidBlocks(blocks, scratch) ? blocks : null;
 }
 
 /** 決まった順にそろえた文字列か（サーバーが保存する前に確かめる。同じ船が違う文字列で保存されないように） */
-export const canonicalBlocks = (text: string): string | null => {
-  const blocks = decodeBlocks(text);
+export const canonicalBlocks = (text: string, scratch?: Int32Array): string | null => {
+  const blocks = decodeBlocks(text, scratch);
   return blocks ? encodeBlocks(blocks) : null;
 };
 

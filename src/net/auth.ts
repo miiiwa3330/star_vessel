@@ -71,7 +71,9 @@ export interface PasskeyItem {
  * 確かめは、サインインのあとにブラウザで行う（パスキー自体が本人確認なので、宇宙船名は、入れ間違いを防ぐためのもの）
  */
 export async function loginWithPasskey(username: string): Promise<boolean> {
-  const res = await authClient.signIn.passkey();
+  const res = await authClient.signIn.passkey({
+    fetchOptions: { headers: { 'x-passkey-username': username.trim() } },
+  });
   if (res.error) {
     if (isPasskeyCancel((res.error as { code?: string }).code)) return false;
     return fail(res.error);

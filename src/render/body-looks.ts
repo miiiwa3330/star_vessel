@@ -7,24 +7,26 @@
  */
 import type { Rgb, SurfaceLook } from '../world/surface';
 
-/** public/textures/ に置くと使われる画像。地球と月は必ず置く（リポジトリに入っている） */
+/** public/textures/ に置くと使われる画像。地球と月は最初に読み、ほかの惑星は近づいてから遅れて読む */
 export const TEXTURE_FILES: Readonly<Record<string, string>> = {
-  Earth: '2k_earth_daymap.jpg',
+  Earth: '2k_earth_daymap.webp',
   // 地球の夜の灯りと雲（天体の id ではない。src/render/solar-system-view.ts が使う）
-  EarthNight: '2k_earth_nightmap.jpg',
-  EarthClouds: '2k_earth_clouds.jpg',
-  Moon: '2k_moon.jpg',
-  Mercury: '2k_mercury.jpg',
-  Venus: '2k_venus_atmosphere.jpg',
-  Mars: '2k_mars.jpg',
-  Jupiter: '2k_jupiter.jpg',
-  Saturn: '2k_saturn.jpg',
-  Uranus: '2k_uranus.jpg',
-  Neptune: '2k_neptune.jpg',
+  EarthNight: '2k_earth_nightmap.webp',
+  EarthClouds: '2k_earth_clouds.webp',
+  Moon: '2k_moon.webp',
+  Mercury: '2k_mercury.webp',
+  Venus: '2k_venus_atmosphere.webp',
+  Mars: '2k_mars.webp',
+  Jupiter: '2k_jupiter.webp',
+  Saturn: '2k_saturn.webp',
+  Uranus: '2k_uranus.webp',
+  Neptune: '2k_neptune.webp',
 };
 
 /** 必ずある画像（無ければ起動に失敗させる） */
 export const REQUIRED_TEXTURES: readonly string[] = ['Earth', 'Moon'];
+/** 起動時に先に読み込む画像（これ以外は近づいたときに遅延読み込みする） */
+export const INITIAL_TEXTURES: readonly string[] = ['Earth', 'EarthNight', 'EarthClouds', 'Moon'];
 
 const rgb = (hex: number): Rgb => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
 

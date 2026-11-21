@@ -7,6 +7,7 @@
  */
 import { Hono } from 'hono';
 import { addressCode, addressPrefix } from '../src/world/address';
+import { PRIVATE_NO_STORE, readJsonWithLimit } from '../src/world/http-security';
 import { isWarpPlacement, MAX_WARPS_PER_PLAYER, type WarpHole } from '../src/world/warp-schema';
 import type { BodyId } from '../src/world/solar-system';
 import type { AppEnv } from './index';
@@ -28,6 +29,7 @@ interface WarpRow {
 const COLUMNS = 'id, owner_id, code, anchor, offset_x, offset_y, offset_z, facing_x, facing_y, facing_z, created_at';
 /** 一度に返す数の上限。全員分を返すのは、ワープホールが少ないうちだけの作り（docs/tech/server.md） */
 const LIST_LIMIT = 1000;
+const MAX_WARP_BODY_BYTES = 4_096;
 
 const toWarp = (r: WarpRow, userId: string | null): WarpHole => ({
   id: r.id,
@@ -42,16 +44,20 @@ const toWarp = (r: WarpRow, userId: string | null): WarpHole => ({
 export const warps = new Hono<AppEnv>();
 
 warps.get('/', async (c) => {
-  const { results } = await c.env.DB.prepare(`SELECT ${COLUMNS} FROM warps ORDER BY created_at LIMIT ?`)
+  c.header('cache-control', PRIVATE_NO_STORE);
+  const { results } = await c.env.DB.prepare(`SELECT ${COLUMNS} FROM warps ORDER BY created_at DESC LIMIT ?`)
     .bind(LIST_LIMIT)
     .all<WarpRow>();
   return c.json(results.map((r) => toWarp(r, c.get('userId'))));
 });
 
 warps.post('/', async (c) => {
+  c.header('cache-control', PRIVATE_NO_STORE);
   const userId = c.get('userId');
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json().catch(() => null);
+  const read = await readJsonWithLimit(c.req.raw, MAX_WARP_BODY_BYTES);
+  if (!read.ok) return c.json({ error: read.reason }, read.reason === 'too_large' ? 413 : 400);
+  const body = read.data;
   if (!isWarpPlacement(body)) return c.json({ error: 'invalid' }, 400);
 
   const id = crypto.randomUUID();

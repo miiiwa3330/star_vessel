@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLY_IN_MS, FLY_OUT_MS, flyOutStartMs, loadingMotion, MIN_MS, usableStart } from './loading-timing';
+import { FLY_IN_MS, FLY_OUT_MS, flyOutStartMs, isSafeUfoImageUrl, loadingMotion, MIN_MS, usableStart } from './loading-timing';
 
 const doneAt = (readyMs: number): number => {
   for (let t = 0; t < 60_000; t += 5) if (loadingMotion(t, readyMs).done) return t;
@@ -51,5 +51,22 @@ describe('usableStart（前のページから引き継ぐか）', () => {
     expect(usableStart(0, 200_000)).toBe(false);
     expect(usableStart(9_000, 5_000)).toBe(false);
     expect(usableStart(Number.NaN, 5_000)).toBe(false);
+  });
+});
+
+describe('isSafeUfoImageUrl（覚えた UFO 画像の検証）', () => {
+  it('安全な PNG/WebP/JPEG の data URI のみ通す', () => {
+    expect(isSafeUfoImageUrl('data:image/png;base64,iVBORw0KGgo=')).toBe(true);
+    expect(isSafeUfoImageUrl('data:image/webp;base64,UklGRg==')).toBe(true);
+    expect(isSafeUfoImageUrl('data:image/jpeg;base64,/9j/4AAQ')).toBe(true);
+  });
+
+  it('javascript:・HTML data URI・引用符混入・巨大文字列を拒否する', () => {
+    expect(isSafeUfoImageUrl('javascript:alert(1)')).toBe(false);
+    expect(isSafeUfoImageUrl('data:text/html;base64,PHNjcmlwdD4=')).toBe(false);
+    expect(isSafeUfoImageUrl('data:image/svg+xml;base64,PHN2Zz4=')).toBe(false);
+    expect(isSafeUfoImageUrl('data:image/png;base64,AAAA" onerror="alert(1)')).toBe(false);
+    expect(isSafeUfoImageUrl(`data:image/png;base64,${'A'.repeat(200_001)}`)).toBe(false);
+    expect(isSafeUfoImageUrl(null)).toBe(false);
   });
 });

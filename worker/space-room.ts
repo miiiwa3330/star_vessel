@@ -18,19 +18,37 @@ import {
   type ShipSnapshot,
   type ShipState,
 } from '../src/world/ship-schema';
-import { nearestIndices, shipPositionKm } from '../src/world/ships';
+import { nearestIndices } from '../src/world/ships';
 import { lookOrNone } from '../src/world/ship-schema';
 import type { ShipLook } from '../src/world/ship-design';
 import { CHAT_MIN_INTERVAL_MS, cleanChatText, isStampText } from '../src/world/chat';
 import { isUsername } from '../src/world/account';
 import { PRESENCE_REFRESH_MS, presenceStatement } from '../src/world/presence';
+import { heliocentricPositionKm } from '../src/world/solar-system';
+import { add, type Vec3 } from '../src/world/vec';
 
 const BROADCAST_MS = 1000 / SHIP_SEND_HZ;
 const MAX_MESSAGE_BYTES = 2048;
+/** 1 つの部屋と 1 アカウントあたりの WebSocket 同時接続上限 */
+const MAX_CONNECTIONS_PER_ROOM = 200;
+const MAX_CONNECTIONS_PER_USER = 4;
+
+function userHash(id: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x9e3779b9;
+  for (let i = 0; i < id.length; i++) {
+    const ch = id.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 0x01000193);
+    h2 = Math.imul(h2 ^ (ch + i), 0x85ebca6b);
+  }
+  return `${(h1 >>> 0).toString(16).padStart(8, '0')}${(h2 >>> 0).toString(16).padStart(8, '0')}`;
+}
 
 /** 接続ごとに覚えておくこと。休止しても消えないよう、WebSocket に付けて保存する */
 interface Attachment {
   sid: string;
+  /** アカウント ID の不可逆ハッシュ（接続数制限のみに使い、外へは出さない） */
+  uidHash?: string;
   /** 部屋の名前（恒星系の記号）。休止すると部屋の名前を忘れるので、接続ごとに覚えておく（人数を書くため。要件 F50） */
   room: string;
   hue: number;
@@ -47,14 +65,20 @@ interface Attachment {
 
 /**
  * 近い船を選ぶための位置。サーバーは太陽系の主な天体の位置しか計算できない（衛星・小惑星・系外惑星の一覧を持たない）ので、
- * それ以外を基準にしている船は、基準の天体からの相対位置で代わりにする（同じ天体のまわりの船どうしは正しく並ぶ）
+ * それ以外を基準にしている船は、基準の天体からの相対位置で代わりにする（同じ天体のまわりの船どうしは正しく並ぶ）。
+ * 1 ティック内で同じ基準天体の位置を何度も計算しないよう anchorCache を使う
  */
-function roughPositionKm(s: ShipState, date: Date) {
-  try {
-    return shipPositionKm(s, date);
-  } catch {
-    return s.offsetKm;
+function roughPositionKm(s: ShipState, date: Date, anchorCache: Map<string, Vec3 | null>): Vec3 {
+  let base = anchorCache.get(s.anchor);
+  if (base === undefined) {
+    try {
+      base = heliocentricPositionKm(s.anchor, date);
+    } catch {
+      base = null;
+    }
+    anchorCache.set(s.anchor, base);
   }
+  return base ? add(base, s.offsetKm) : s.offsetKm;
 }
 
 export class SpaceRoom extends DurableObject<Env> {
@@ -67,10 +91,22 @@ export class SpaceRoom extends DurableObject<Env> {
     const userId = request.headers.get('x-user-id');
     if (!userId) return new Response('unauthorized', { status: 401 });
 
+    const uidHash = userHash(userId);
+    const sockets = this.ctx.getWebSockets();
+    if (sockets.length >= MAX_CONNECTIONS_PER_ROOM) return new Response('room full', { status: 429 });
+    let sameUser = 0;
+    for (const s of sockets) {
+      const att = s.deserializeAttachment() as Attachment | null;
+      if (att?.uidHash === uidHash && ++sameUser >= MAX_CONNECTIONS_PER_USER) {
+        return new Response('too many connections', { status: 429 });
+      }
+    }
+
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
     const attachment: Attachment = {
       sid: crypto.randomUUID().slice(0, 8),
+      uidHash,
       room: request.headers.get('x-room') ?? '',
       hue: hueFromId(userId),
       name: ((n) => (isUsername(n) ? n : null))(request.headers.get('x-user-name')),
@@ -124,6 +160,16 @@ export class SpaceRoom extends DurableObject<Env> {
     }
   }
 
+  async webSocketError(ws: WebSocket): Promise<void> {
+    const a = ws.deserializeAttachment() as Attachment | null;
+    if (a) this.reportPresence(a.room, ws, Date.now());
+    try {
+      ws.close(1011, 'socket error');
+    } catch {
+      // すでに閉じている
+    }
+  }
+
   /**
    * いま状態が届いている船（要件 F53。タイトル画面の背景のため）。Worker から呼ぶ（RPC）。
    * 配る相手に合わせた絞り込みはしない。アカウントの ID は、もともと持っていない（接続ごとの短い ID だけ）
@@ -166,10 +212,11 @@ export class SpaceRoom extends DurableObject<Env> {
     if (rawTo !== undefined && (typeof rawTo !== 'string' || !isStampText(text))) return;
     if (a.chatAt !== undefined && now - a.chatAt < CHAT_MIN_INTERVAL_MS) return;
     const date = new Date(now);
+    const anchorCache = new Map<string, Vec3 | null>();
     // 位置の古さは問わない（タブを一時的に裏に回した直後などでも届くように）。最後に受け取った位置で近さを決める
     const all = this.ctx.getWebSockets().map((s) => ({ ws: s, a: s.deserializeAttachment() as Attachment }));
     const active = all.filter((e) => e.a.state);
-    const positions = active.map((e) => roughPositionKm(e.a.state as ShipState, date));
+    const positions = active.map((e) => roughPositionKm(e.a.state as ShipState, date, anchorCache));
     if (typeof rawTo === 'string') {
       const targetIndex = active.findIndex((e) => e.a.sid === rawTo && e.a.sid !== a.sid);
       if (targetIndex < 0) return;
@@ -219,10 +266,13 @@ export class SpaceRoom extends DurableObject<Env> {
   /** 1 人ずつ、その人から近い船を最大 MAX_SHIPS_SENT 隻、まとめて 1 通で送る */
   private broadcast(now: number): void {
     const date = new Date(now);
+    const anchorCache = new Map<string, Vec3 | null>();
     const sockets = this.ctx.getWebSockets();
     const all = sockets.map((ws) => ({ ws, a: ws.deserializeAttachment() as Attachment }));
     const active = all.filter((e) => e.a.state && now - e.a.at < SHIP_STALE_MS);
-    const positions = active.map((e) => roughPositionKm(e.a.state as ShipState, date));
+    const indexBySid = new Map<string, number>();
+    active.forEach((e, i) => indexBySid.set(e.a.sid, i));
+    const positions = active.map((e) => roughPositionKm(e.a.state as ShipState, date, anchorCache));
     const snaps: ShipSnapshot[] = active.map((e) => ({
       id: e.a.sid,
       hue: e.a.hue,
@@ -233,7 +283,7 @@ export class SpaceRoom extends DurableObject<Env> {
     }));
 
     for (const { ws, a } of all) {
-      const selfIndex = active.findIndex((e) => e.a.sid === a.sid);
+      const selfIndex = indexBySid.get(a.sid) ?? -1;
       // まだ自分の状態を送っていない人（つないだ直後）には、部屋の最初の船から近い順に送る
       const from = selfIndex >= 0 ? positions[selfIndex] : (positions[0] ?? { x: 0, y: 0, z: 0 });
       const ships = nearestIndices(from, positions, MAX_SHIPS_SENT, selfIndex).map((i) => snaps[i]);

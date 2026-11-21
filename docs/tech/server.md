@@ -22,22 +22,32 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 
 | メソッド・パス | 中身 | ログイン |
 |----------------|------|----------|
-| `GET /api/warps` | 全員のワープホール（最大 1,000 個）。自分のものには `mine: true` | 不要 |
-| `POST /api/warps` | ワープホールを置く。送るのは置く場所（`WarpPlacement`）。住所の番号はサーバーが振って返す | 必要（匿名でよい） |
+| `GET /api/warps` | 全員のワープホール（新しい順に最大 1,000 個）。自分のものには `mine: true`（`private, no-store`） | 不要 |
+| `POST /api/warps` | ワープホールを置く（上限 4 KB）。送るのは置く場所（`WarpPlacement`）。住所の番号はサーバーが振って返す | 必要（匿名でよい） |
 | `DELETE /api/warps/:id` | 消す。置いた本人だけ | 必要 |
 | `/api/auth/*` | Better Auth（匿名のログイン・ユーザー名での登録とログイン・パスキー・ログアウト・セッション。下の「アカウント」「パスキー」） | — |
-| `GET /api/satellites` | 人工衛星の軌道要素（SatNOGS DB から取り、6 時間キャッシュ。取れなければ 503。[`satellites.md`](satellites.md)） | 不要 |
-| `GET /api/ship` ・ `PUT /api/ship` | 自分の宇宙船の設計を読む・保存する（[`ships.md`](ships.md)） | 必要（匿名でよい） |
-| `GET /api/ship/blocks/:ref` | 自分で作った船のブロック（宇宙の部屋では印 ref だけを配るため。2026-11-21） | 要らない |
-| `GET /api/visits` ・ `POST /api/visits` | 訪れた天体のコレクションを読む・記録する（[`../product/info-and-collection.md`](../product/info-and-collection.md)） | 必要（匿名でよい） |
-| `GET /api/presence` | いま遊んでいる人数 `{ "online": 人数 }`。15 秒だけ Cache-Control で覚えさせる（下の「いま遊んでいる人数」） | 不要 |
+| `GET /api/satellites` | 人工衛星の軌道要素（SatNOGS DB から 4 秒タイムアウト付きで取り、6 時間キャッシュ。取れなければ 503。[`satellites.md`](satellites.md)） | 不要 |
+| `GET /api/ship` ・ `PUT /api/ship` | 自分の宇宙船の設計を読む・保存する（上限 256 KB、`private, no-store`、[`ships.md`](ships.md)） | 必要（匿名でよい） |
+| `GET /api/ship/blocks/:ref` | 自分で作った船のブロック（宇宙の部屋では印 ref だけを配るため。`caches.default` で 200 を 1 年・404 を 60 秒キャッシュ） | 要らない |
+| `GET /api/visits` ・ `POST /api/visits` | 訪れた天体のコレクションを読む・記録する（上限 4 KB、`private, no-store`、[`../product/info-and-collection.md`](../product/info-and-collection.md)） | 必要（匿名でよい） |
+| `GET /api/presence` | いま遊んでいる人数 `{ "online": 人数 }`。`caches.default` と `Cache-Control` で 15 秒覚えさせる（下の「いま遊んでいる人数」） | 不要 |
 | `GET /api/recovery/status` | 自分の回復コードの有無（下の「回復コード」） | 必要（登録したアカウント） |
-| `POST /api/recovery/code` | 回復コードを作る・作り直す。パスワードを送って本人確認する | 必要（登録したアカウント） |
-| `POST /api/recovery/lookup` ・ `POST /api/recovery/reset` | コードからユーザー名を教える ・ コードで新しいパスワードを決める | 不要 |
+| `POST /api/recovery/code` | 回復コードを作る・作り直す（上限 4 KB）。パスワードを送って本人確認する | 必要（登録したアカウント） |
+| `POST /api/recovery/lookup` ・ `POST /api/recovery/reset` | コードからユーザー名を教える ・ コードで新しいパスワードを決める（上限 4 KB） | 不要 |
 | `GET /api/earth-ships` | 地球のまわりの船（タイトル画面の背景。下の「地球のまわりの船」） | 不要 |
-| `GET /api/space/:system`（WebSocket） | 宇宙の部屋（恒星系ごと。例 `/api/space/SOL`）。下の「宇宙船の位置のやりとり」 | 必要（匿名でよい） |
+| `GET /api/space/:system`（WebSocket） | 宇宙の部屋（恒星系ごと。例 `/api/space/SOL`）。1 部屋 200 接続・1 アカウント 4 接続まで。下の「宇宙船の位置のやりとり」 | 必要（匿名でよい） |
 
-エラーは `{ "error": "..." }`：`invalid_code`（400・回復コードが違う）、`wrong_password`（403）、`unauthorized`（401）、`invalid`（400・形が正しくない）、`limit`（409・3 個まで）、`not_found`（404・無い、または自分のものではない）。
+エラーは `{ "error": "..." }`：`invalid_code`（400・回復コードが違う）、`wrong_password`（403）、`forbidden_origin`（403）、`unauthorized`（401）、`invalid`（400・形が正しくない）、`limit`（409・3 個まで）、`not_found`（404・無い、または自分のものではない）、`too_large`（413）、`rate_limited`（429）。
+
+## セキュリティ・負荷保護（2026-11-22 強化）
+
+- **HTTP セキュリティヘッダと静的キャッシュ**（[`public/_headers`](../../public/_headers) と `src/world/http-security.ts`）：すべての画面・API に `X-Content-Type-Options: nosniff`・`X-Frame-Options: DENY`・`Referrer-Policy: strict-origin-when-cross-origin`・`Permissions-Policy` を付け、HTML/静的配信には `Content-Security-Policy`（WebGPU/WebGL2 WASM と Web Worker のため `wasm-unsafe-eval` と `worker-src 'self' blob:` を許可）を付与する。静的データ（`/data/*`）・惑星テクスチャ（`/textures/*`）は 7 日間キャッシュ（`stale-while-revalidate=1日`）、ハッシュ済み `/assets/*` は 1 年 `immutable` とする
+- **送信元オリジン（`Origin`）検証**（`worker/index.ts`・`src/world/http-security.ts`）：`/api/auth/*`（Better Auth 自体が検証）以外の状態変更リクエスト（`POST`・`PUT`・`DELETE` 等）と WebSocket 接続で `Origin` を `BETTER_AUTH_URL` と照合する（`localhost` 開発時のみポート違いの `http://localhost:*` を許可）。不一致は 403 を返す
+- **Workers Rate Limiting バインディング**（`wrangler.jsonc` の `ratelimits`・`worker/index.ts`）：IP（`cf-connecting-ip`）単位で、匿名ログイン（`ANON_LIMITER`：10 回/分）・サインイン/登録/パスキー/回復コード（`AUTH_LIMITER`：20 回/分）・書き込み API と WebSocket 接続（`API_WRITE_LIMITER`：60 回/分）を制限し、超過時は `429` と `Retry-After: 60` を返す
+- **パスワードハッシュの軽量化**（`src/world/password.ts`・`worker/auth-options.ts`）：Better Auth 既定の `scrypt`（`N=16384, r=16` で 1 回約 33.5 MB・CPU 負荷大）が無料プランの CPU 10 ms・メモリ 128 MB 上限に達する恐れを避けるため、新規ハッシュは Web Crypto `PBKDF2-HMAC-SHA-256`（100,000 回。Workers 本番上限に合わせる）を使う。検証時は `pbkdf2:` 形式以外を旧 `scrypt` 検証へフォールバックして互換を保つ
+- **リクエスト上限・保存効率**：各 POST/PUT には `readJsonWithLimit` で 4 KB（シップ設計のみ 256 KB）の上限を設ける。`PUT /api/ship` は一時配列 1 回の `canonicalizeShipDesign` で検証と並び正規化を行い、従来の二重デコード（最大 32 MB 確保）を 2 MB に抑えた。コレクション記録の上限は `MAX_VISITS_PER_PLAYER = 35,000` とした
+- **認証付き応答のキャッシュ防止**：`/api/warps`・`/api/ship`・`/api/visits` には `Cache-Control: private, no-store` を付ける
+- **パスキーログイン時の誤リンク防止**（`worker/auth.ts`・`src/net/auth.ts`）：入力された宇宙船名を `x-passkey-username` で送り、別アカウントのパスキーが選ばれたときは `onLinkAccount` が匿名データの引き継ぎを止め、新しいセッションを破棄して 403（`PASSKEY_USERNAME_MISMATCH`）を返す
 
 ## ワープホールの保存
 
@@ -48,7 +58,7 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 - **置く場所の確かめ**：サーバーは受け取った置く場所を `isWarpPlacement` で確かめる（天体の名前・数が有限か・正面の向きが単位ベクトルか・太陽系の外の恒星系は太陽を基準にしているときだけ）。住所の番号の前までは、サーバーが天体と恒星系から組み立てる
 - **腕の確かめ**：太陽系はオリオン腕、自動で作った星（`G…`）はマス目の中心の腕でなければ受け付けない（`knownSystemArm`）。本物の星（`H…`）はサーバーが位置のデータを持たないので、ブラウザの値を信じる
 - **信用していること（いまの制限）**：置く場所が「本当に今いる場所か」と、恒星系の記号（どの星に近いか）は、ブラウザが送ったものを信じている。サーバーは宇宙の部屋で各プレイヤーの位置を受け取るようになったので、今後はそれと照らし合わせられる
-- **一覧は全員分を返す**：ワープホールが少ないうち（1 人 3 個 × 数百人）だけの作り。増えたら、近いものだけ・ページごとに返す形にする
+- **一覧は新しい順で最大 1,000 件を返す**（`ORDER BY created_at DESC LIMIT 1000`）：古い匿名スパムで新しいワープが追い出されないように新しい順にしつつ、件数が増えたら近いものだけ・ページごとに返す形にする
 - **一覧を取り直すのは、一覧を開いたとき**。一定の間隔で取りに行くと、人数が増えたときに Workers の無料の上限（1 日 10 万リクエスト）をすぐ使い切るため
 
 ## 宇宙船の位置のやりとり
@@ -73,6 +83,7 @@ summary: サーバー（Cloudflare Workers・D1・Better Auth）の構成、API�
 - **チャット**（2026-11-12 にスタンプから置き換え）：`{ t: 'chat', text }` を受け取ると、文を `cleanChatText` で確かめ、送った人の船が見えている人と本人に `{ t: 'chat', from, hue, name, text }` を送る。1 秒に 1 回まで。name は宇宙船名（Worker が `x-user-name` で渡す。匿名の人は null）。文は残さない（[`chat.md`](chat.md)）
 - **サーバーが位置を計算できない基準の天体**：サーバーは太陽系の主な天体の位置しか計算できない（衛星・小惑星・系外惑星の一覧を持たない）。それらを基準にしている船は、近い順を決めるときに基準の天体からの相対位置で代わりにする（`roughPositionKm`）。2026-11-05 まで、これらを基準にした船がいると配る処理が例外で止まっていた
 - 2026-11-05：別々のアカウントの 2 つのブラウザで、片方が動くと、もう片方の画面に航行灯とレーダーの ▲ が出ることを確かめた
+- **同時接続の上限とエラー・計算の節約（2026-11-22）**：1 部屋 200 接続（`MAX_CONNECTIONS_PER_ROOM`）、1 アカウント 4 接続（`MAX_CONNECTIONS_PER_USER`。不可逆な `uidHash` を内部の `Attachment` のみに保持して判定）を上限にし、`webSocketError` でも人数を更新してソケットを閉じる。1 回の配る処理（`broadcast`）では同じ基準天体の位置を `anchorCache` にキャッシュし、送信先の索引には `indexBySid`（`Map`）を使って `O(N²)` 走査をなくした
 - **いまの制限**：1 つの恒星系に数百人が集まると、配る量（32 隻 × 人数 × 1 秒 4 回）が大きくなる。そのときは、基準の天体ごとに部屋を分けるなどを考える
 
 ## アカウント
@@ -166,8 +177,9 @@ npm run dev                      # http://localhost:5173 がタイトル画面�
 - 確かめたこと（2026-11-21）：`/`・`/play`・`/data/stars.bin`・`/api/presence`・`/api/satellites`・`/api/auth/get-session` が 200。**`/api/satellites` は本番では SatNOGS から取れた**（手元の開発では取れず、写しを使っていた）。Chrome（WebGPU）で、タイトル画面と、世界の画面（宇宙の部屋につながり、チャット・ワープホールのボタンが使える状態。読み込みは約 7 秒・約 15 MB）を見た。**パスワードでの登録・ログイン、パスキー、スマホの実機は、まだ確かめていない**
 
 ## 本番で残っていること
-- **匿名のアカウントを大量に作られないようにする**：いまは誰でも何度でも匿名のアカウントを作れる。Cloudflare の Rate Limiting か Turnstile を足す
-- **登録・ログインの試行を制限する（パスワードの総当たり対策）**：Better Auth に標準の制限があるが、Workers でどう効くか（接続ごとに別のメモリで動くので、共有されないかもしれない）は確かめていない。本番の前に、Cloudflare の Rate Limiting などで、`/api/auth/sign-in/*` と `/api/auth/sign-up/*` を制限する。回復コードの `/api/recovery/lookup`・`/reset`・`/code` も同じ（コードは推測できない長さだが、D1 の読み込みとパスワードの確認を無駄に使わせないため）
+- **本番 D1 マイグレーション `0009_ship_blocks.sql` の適用（デプロイ前に必須）**：2026-11-21 時点で本番は `0001`〜`0008` まで適用済み。次回の `npm run deploy` より先に必ず `npm run db:migrate:prod` を実行する
+- **Cloudflare ダッシュボード側のエッジ防御（無料枠）**：コード側では Workers の `ratelimits`（`AUTH_LIMITER`・`ANON_LIMITER`・`API_WRITE_LIMITER`）を実装済みだが、Worker に届く前にエッジで止めて無料リクエスト上限（1 日 10 万回）を守るため、公開前にダッシュボードで以下を設定する
+  - **WAF Rate Limiting ルール（無料プラン 1 ルール）**：`/api/auth/sign-in/*`・`/api/auth/sign-up/*`・`/api/recovery/*` を対象に送信元 IP 単位の閾値を設定し、総当たりを Worker 手前で遮断する
+  - **Cloudflare Turnstile（無料・無制限）**：匿名ログイン（`/api/auth/sign-in/anonymous`）とサインアップでの Bot 量産を防ぐため、ダッシュボードで Turnstile ウィジェット（非対話／Managed）を作成し、サイトキーとシークレットキーを本番環境へ組み込む
 - **パスキーを本物の端末で確かめる**（iPhone・Android・Mac。端末をまたぐ同期も）。手元では Chrome の仮想の認証器でしか確かめていない。HTTPS とドメインが要るので、本番か、それに近い環境で
-- **パスワードのハッシュの計算時間**：Workers の無料プランは、1 回の CPU 時間の上限が短い。登録・ログイン・決め直しのハッシュ（Better Auth の既定は scrypt）が上限に収まるかは、本番で確かめていない
-- **`/api/presence` の悪用**：認証なしで誰でも読める。D1 の読み込みを避けるため 15 秒だけ Cache-Control で覚えさせているが、Cloudflare 側の制限（Rate Limiting）も足す
+- **PBKDF2・`ratelimits`・`caches.default` の本番動作確認**：Web Crypto PBKDF2（100,000 回）への切り替えで Workers 無料枠（CPU 10 ms／メモリ 128 MB）に収まる設計としたため、本番デプロイ後にサインアップ・ログイン・回復コード再設定・`/api/presence`・`/api/ship/blocks/:ref` を実機で確かめる

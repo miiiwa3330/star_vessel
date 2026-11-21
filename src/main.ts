@@ -18,7 +18,7 @@ import { ChatBubbles } from './ui/chat-bubbles';
 import { ShipStampRing, type ShipScreenTarget } from './ui/ship-stamp-ring';
 import { CHAT_LOG_SIZE, CHAT_MIN_INTERVAL_MS, shouldLeaveChatFocus } from './world/chat';
 import { AsteroidField, type AsteroidFile } from './render/asteroid-field';
-import { REQUIRED_TEXTURES, TEXTURE_FILES } from './render/body-looks';
+import { INITIAL_TEXTURES, REQUIRED_TEXTURES, TEXTURE_FILES } from './render/body-looks';
 import { WarpView } from './render/warp-view';
 import { ShipView } from './render/ship-view';
 import { GalaxyView } from './render/galaxy-view';
@@ -34,7 +34,7 @@ import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/obs
 import { radarLayerOfBody, radarBlips, radarRange, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
 import { ShipSmoother, type SmoothedShip } from './world/ship-smoothing';
-import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, unregisterBodies, type BodyInfo, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
+import { allBodies, bodiesVersion, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, unregisterBodies, type BodyInfo, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
 import { decodeExoplanets } from './world/exoplanet-data';
 import { largeAsteroidBodies, moonBodies, smallAsteroidBody, type LargeAsteroid, type MoonRecord } from './world/small-bodies';
 import { findAsteroidByNumber, findNearbyAsteroids } from './world/asteroid-search';
@@ -49,8 +49,8 @@ import { constellationFigures, constellationKey, decodeConstellationArt, type Co
 import { CometField } from './render/comet-field';
 import { activeComets, cometBody, decodeComets, type Comet } from './world/comets';
 import { constellationSegments, decodeConstellations, type Constellation } from './world/constellations';
-import { decodeNebulae, type Nebula } from './world/nebulae';
-import { decodeGalaxies, type Galaxy } from './world/galaxies';
+import { decodeNebulae } from './world/nebulae';
+import { decodeGalaxies } from './world/galaxies';
 import { spacecraftBody, type SpacecraftRecord } from './world/spacecraft';
 import { decodeCompact, type CompactObject } from './world/compact-objects';
 import { clusterAt, decodeClusters, type Cluster } from './world/clusters';
@@ -105,6 +105,12 @@ async function main() {
   const starCamera = new THREE.PerspectiveCamera(FOV, 1, 1e-6, 3e8);
   const starScene = new THREE.Scene();
 
+  // 認証・ワープ・自機設計は静的データの読み込みと同時に並列で始める
+  const sessionTask = ensureSession().then(async () => {
+    const [warpList, saved] = await Promise.all([warpApi.list(), shipApi.get()]);
+    return { warpList, saved };
+  });
+
   const loader = new THREE.TextureLoader();
   const loadTexture = async (url: string) => {
     const t = await loader.loadAsync(url);
@@ -112,8 +118,9 @@ async function main() {
     t.anisotropy = 8;
     return t;
   };
-  // 天体の画像。地球と月は必ずある。ほかは置いてあれば使い、無ければ模様を自動で描く（src/render/body-looks.ts）
-  const textureEntries = Object.entries(TEXTURE_FILES).map(async ([id, file]) => {
+  // 天体の画像。地球・月は最初に読み込み、水星〜海王星は近づいてから遅延読み込みする（src/render/body-looks.ts）
+  const initialTexEntries = INITIAL_TEXTURES.map(async (id) => {
+    const file = TEXTURE_FILES[id];
     try {
       return [id, await loadTexture(`/textures/${file}`)] as const;
     } catch (e) {
@@ -121,6 +128,24 @@ async function main() {
       return null;
     }
   });
+  const deferredTexCache = new Map<string, Promise<THREE.Texture | null>>();
+  const deferredTexture = {
+    has: (id: string) => id in TEXTURE_FILES && !INITIAL_TEXTURES.includes(id),
+    load: (id: string) => {
+      let pending = deferredTexCache.get(id);
+      if (!pending) {
+        const file = TEXTURE_FILES[id];
+        pending = file
+          ? loadTexture(`/textures/${file}`).catch((e: unknown) => {
+              console.warn(`/textures/${file} が読めない`, e);
+              return null;
+            })
+          : Promise.resolve(null);
+        deferredTexCache.set(id, pending);
+      }
+      return pending;
+    },
+  };
   const fetchJson = <T,>(url: string, fallback: T): Promise<T> =>
     fetch(url)
       .then((r) => (r.ok ? (r.json() as Promise<T>) : Promise.reject(new Error(String(r.status)))))
@@ -128,43 +153,71 @@ async function main() {
         console.error(`${url} が読めない`, e);
         return fallback;
       });
-  const [textures, starsBin, starsMotion, exoplanetsJson] = await Promise.all([
-    Promise.all(textureEntries),
-    fetch('/data/stars.bin').then((r) => {
-      if (!r.ok) throw new Error('星のデータ（/data/stars.bin）が読めない。npm run stars で作る');
-      return r.arrayBuffer();
-    }),
+  const fetchRequired = <T,>(url: string, errMsg: string, asBin: boolean): Promise<T> =>
+    fetch(url).then((r) => {
+      if (!r.ok) throw new Error(errMsg);
+      return (asBin ? r.arrayBuffer() : r.json()) as Promise<T>;
+    });
+
+  // 起動に必要な静的データをすべて 1 段階で並列取得する
+  const [
+    textures,
+    starsBin,
+    starsMotion,
+    exoplanetsJson,
+    moonsData,
+    asteroidsLargeData,
+    constellationList,
+    constellationArtData,
+    compactObjects,
+    starInfo,
+    spacecraftRecords,
+    comets,
+    clusters,
+    nebulae,
+    externalGalaxies,
+  ] = await Promise.all([
+    Promise.all(initialTexEntries),
+    fetchRequired<ArrayBuffer>('/data/stars.bin', '星のデータ（/data/stars.bin）が読めない。npm run stars で作る', true),
     fetch('/data/stars-motion.bin')
       .then((r) => (r.ok ? r.arrayBuffer() : null))
       .catch(() => null),
-    fetch('/data/exoplanets.json').then((r) => {
-      if (!r.ok) throw new Error('系外惑星のデータ（/data/exoplanets.json）が読めない。npm run exoplanets で作る');
-      return r.json();
-    }),
+    fetchRequired<Parameters<typeof decodeExoplanets>[0]>('/data/exoplanets.json', '系外惑星のデータ（/data/exoplanets.json）が読めない。npm run exoplanets で作る', false),
+    fetchJson<{ moons: MoonRecord[] }>('/data/moons.json', { moons: [] }),
+    fetchJson<{ large: LargeAsteroid[]; files: AsteroidFile[] }>('/data/asteroids-large.json', { large: [], files: [] }),
+    fetchJson<{ constellations: Constellation[] }>('/data/constellations.json', { constellations: [] }).then(decodeConstellations),
+    fetchJson<{ art: Record<string, ConstellationArt> }>('/data/constellation-art.json', { art: {} }).then(decodeConstellationArt),
+    fetchJson<Parameters<typeof decodeCompact>[0]>('/data/compact.json', { compact: [] } as unknown as Parameters<typeof decodeCompact>[0])
+      .then(decodeCompact)
+      .catch(() => [] as CompactObject[]),
+    fetchJson<{ stars: Parameters<typeof decodeStarInfo>[0]['stars'] }>('/data/star-info.json', { stars: [] }).then(decodeStarInfo),
+    fetchJson<{ spacecraft: SpacecraftRecord[] }>('/data/spacecraft.json', { spacecraft: [] }).then((d) => d.spacecraft),
+    fetchJson<Parameters<typeof decodeComets>[0]>('/data/comets.json', { comets: [] }).then(decodeComets),
+    fetchJson<Parameters<typeof decodeClusters>[0]>('/data/clusters.json', { clusters: [] } as unknown as Parameters<typeof decodeClusters>[0])
+      .then(decodeClusters)
+      .catch(() => [] as Cluster[]),
+    fetchJson<Parameters<typeof decodeNebulae>[0]>('/data/nebulae.json', { nebulae: [] }).then(decodeNebulae),
+    fetchJson<Parameters<typeof decodeGalaxies>[0]>('/data/galaxies.json', { galaxies: [] }).then(decodeGalaxies),
   ]);
-  // 太陽系の衛星と、大きな小惑星・準惑星（要件 F20・F21）。読めなくても宇宙は見られるようにする
-  let asteroidFiles: AsteroidFile[] = [];
+
+  // 太陽系の衛星と大きな小惑星・探査機（要件 F20・F21）
+  let asteroidFiles: AsteroidFile[] = asteroidsLargeData.files;
   /** 仮符号の衛星。親の惑星の近くにいるときだけ、天体の一覧に入れる */
   const provisionalMoons = new Map<string, BodyInfo>();
   const largeAsteroidNumbers = new Set<number>();
-  await Promise.all([
-    fetch('/data/moons.json')
-      .then((r) => r.json())
-      .then((d: { moons: MoonRecord[] }) => {
-        const all = moonBodies(d.moons, { gm: majorGmKm3s2 });
-        for (const b of all) if (/p[0-9]+$/.test(b.id)) provisionalMoons.set(b.id, b);
-        registerBodies(all.filter((b) => !provisionalMoons.has(b.id)));
-      }),
-    fetch('/data/asteroids-large.json')
-      .then((r) => r.json())
-      .then((d: { large: LargeAsteroid[]; files: AsteroidFile[] }) => {
-        registerBodies(largeAsteroidBodies(d.large));
-        d.large.forEach((a) => largeAsteroidNumbers.add(a.number));
-        asteroidFiles = d.files;
-      }),
-  ]).catch((e: unknown) => console.error('衛星・小惑星のデータが読めない', e));
+  if (moonsData.moons.length > 0) {
+    const allMoons = moonBodies(moonsData.moons, { gm: majorGmKm3s2 });
+    for (const b of allMoons) if (/p[0-9]+$/.test(b.id)) provisionalMoons.set(b.id, b);
+    registerBodies(allMoons.filter((b) => !provisionalMoons.has(b.id)));
+  }
+  if (asteroidsLargeData.large.length > 0) {
+    registerBodies(largeAsteroidBodies(asteroidsLargeData.large));
+    asteroidsLargeData.large.forEach((a) => largeAsteroidNumbers.add(a.number));
+  }
+  if (spacecraftRecords.length > 0) registerBodies(spacecraftRecords.map(spacecraftBody));
+
   const asteroids = new AsteroidField();
-  const solar = new SolarSystemView(Object.fromEntries(textures.filter((t) => t !== null)));
+  const solar = new SolarSystemView(Object.fromEntries(textures.filter((t) => t !== null)), deferredTexture);
   const stars = decodeStars(starsBin);
   // 星を今の位置へ（要件 F5）。Barnard 星のように速い星は、J2000.0 から 4 分角以上動いている
   if (starsMotion) applyStarMotion(stars.data, new Float32Array(starsMotion), yearsSinceJ2000(worldNow()));
@@ -174,10 +227,21 @@ async function main() {
     if (new URLSearchParams(location.search).get('stars') === 'hyg') return;
     const index = await fetch('/data/stars-gaia.json').then((r) => (r.ok ? r.json() : null)).catch(() => null) as { files: { name: string; count: number }[] } | null;
     if (!index) return;
-    // スマホ（指で操作する端末）は最初のファイル（本来の明るさの順なので、明るい星）だけ読む。データの量と重さのため
+    // スマホ（指で操作する端末）は先頭 GAIA_MOBILE_STARS 分のバイト範囲だけを HTTP Range で取得し、転送量とメモリを抑える
     const coarse = matchMedia('(pointer: coarse)').matches;
     const files = coarse ? index.files.slice(0, 1) : index.files;
-    const parts = await Promise.all(files.map((f) => fetch(`/data/${f.name}`).then((r) => r.arrayBuffer())));
+    const recordBytes = STAR_STRIDE * Float32Array.BYTES_PER_ELEMENT;
+    const mobileBytes = GAIA_MOBILE_STARS * recordBytes;
+    const parts = await Promise.all(
+      files.map(async (f) => {
+        if (!coarse) return fetch(`/data/${f.name}`).then((r) => r.arrayBuffer());
+        const res = await fetch(`/data/${f.name}`, { headers: { Range: `bytes=0-${mobileBytes - 1}` } });
+        const buf = await res.arrayBuffer();
+        const usable = Math.min(buf.byteLength, mobileBytes);
+        const aligned = usable - (usable % recordBytes);
+        return aligned === buf.byteLength ? buf : buf.slice(0, aligned);
+      }),
+    );
     const gaia = parts.map((b) => new Float32Array(b));
     const merged = new Float32Array(stars.data.length + gaia.reduce((n, g) => n + g.length, 0));
     merged.set(stars.data, 0);
@@ -186,7 +250,6 @@ async function main() {
       merged.set(g, o);
       o += g.length;
     }
-    // スマホは、読んだ星のうちさらに明るいものだけを描く
     const part = { count: (merged.length - stars.data.length) / STAR_STRIDE, data: merged.subarray(stars.data.length) };
     const drawn = coarse ? { count: Math.min(part.count, GAIA_MOBILE_STARS), data: part.data } : part;
     starScene.add(createStarfield(drawn).sprite);
@@ -194,46 +257,35 @@ async function main() {
     stars.count = merged.length / STAR_STRIDE;
     onLoaded();
   };
-  // 星座の線（要件 F40）は、星の今の位置から作る
-  const constellationList = await fetchJson<{ constellations: Constellation[] }>('/data/constellations.json', { constellations: [] }).then(decodeConstellations);
+  // 星座の線（要件 F40）と絵は、今の星の座標から作る
   const constellationSeg = constellationSegments(constellationList, stars.data, STAR_STRIDE);
   const constellationView = new ConstellationView(constellationSeg);
   starScene.add(constellationView.group);
-  // 星座の絵（Stellarium。選んだ星座に重ねる）と、図鑑に出す星座の図
-  const constellationArtData = await fetchJson<{ art: Record<string, ConstellationArt> }>('/data/constellation-art.json', { art: {} }).then(decodeConstellationArt);
   const constellationArt = new ConstellationArtView(constellationArtData);
   starScene.add(constellationArt.group);
   const constellationFigureMap = constellationFigures(constellationList, stars.data, STAR_STRIDE);
-  // 系外惑星（要件 F22）。いる恒星系の恒星と惑星を、天体の一覧に入れ替えて登録する
+  // 系外惑星（要件 F22）と実在の星の燃えかす
   const realSystems = decodeExoplanets(exoplanetsJson);
-  // 実在の星の燃えかす（白色矮星・パルサー・ブラックホール）。読めなくても宇宙は見られるようにする
-  const compactObjects = await fetch('/data/compact.json')
-    .then((r) => r.json())
-    .then(decodeCompact)
-    .catch((e: unknown) => {
-      console.error('白色矮星・パルサー・ブラックホールのデータが読めない', e);
-      return [] as CompactObject[];
-    });
   const systems = new StarSystems(stars, realSystems, compactObjects);
-  // 恒星の名前と見え方（固有名のある恒星・系外惑星のある恒星。図鑑と情報のカード）。読めなくても動く
-  const starInfo = await fetchJson<{ stars: Parameters<typeof decodeStarInfo>[0]['stars'] }>('/data/star-info.json', { stars: [] }).then(decodeStarInfo);
   void loadGaiaStars(() => systems.catalogChanged()).catch((e: unknown) => console.error('Gaia の星のデータが読めない', e));
-  // 人工衛星（ISS など）。サーバーが最新の軌道要素を取ってくる。取れなければ同梱の写し（古くなる）を使う
-  const satRecords = await fetch('/api/satellites')
+
+  // 人工衛星（ISS など）は外部 TLE 取得を待たずに画面を出し、届き次第シーンへ追加する
+  let satellites: SatelliteCatalog | null = null;
+  let satelliteField: SatelliteField | null = null;
+  void fetch('/api/satellites')
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
     .catch(() => fetch('/data/satellites.json').then((r) => r.json()))
-    .then((d: { satellites: SatelliteRecord[] }) => d.satellites)
-    .catch((e: unknown) => {
-      console.error('人工衛星のデータが読めない', e);
-      return [] as SatelliteRecord[];
-    });
-  const satellites = new SatelliteCatalog(satRecords);
-  satellites.update(worldNow(), true);
-  const satelliteField = new SatelliteField(satellites);
-  // 探査機（ボイジャーなど）と彗星。読めなくても宇宙は見られるようにする
-  const spacecraftRecords = await fetchJson<{ spacecraft: SpacecraftRecord[] }>('/data/spacecraft.json', { spacecraft: [] }).then((d) => d.spacecraft);
-  registerBodies(spacecraftRecords.map(spacecraftBody));
-  const comets = await fetchJson<Parameters<typeof decodeComets>[0]>('/data/comets.json', { comets: [] }).then(decodeComets);
+    .then((d: { satellites: SatelliteRecord[] }) => {
+      const catalog = new SatelliteCatalog(d.satellites);
+      catalog.update(worldNow(), true);
+      const field = new SatelliteField(catalog);
+      field.pxPerRadian = window.innerHeight / 2 / Math.tan((FOV * Math.PI) / 360);
+      satellites = catalog;
+      satelliteField = field;
+      solar.scene.add(field.sprite);
+    })
+    .catch((e: unknown) => console.error('人工衛星のデータが読めない', e));
+
   const cometByCode = new Map<string, Comet>(comets.map((c) => [c.code, c]));
   const cometField = new CometField(comets);
 
@@ -247,7 +299,7 @@ async function main() {
     const comet = cometByCode.get(id);
     if (comet) return cometBody(comet);
     const sat = /^N([0-9]+)$/.exec(id);
-    if (sat) {
+    if (sat && satellites) {
       const i = satellites.indexOfId(Number(sat[1]));
       return i >= 0 ? satellites.body(i) : null;
     }
@@ -278,28 +330,16 @@ async function main() {
   });
   const galaxy = new GalaxyView();
   starScene.add(galaxy.group);
-  // 星団（Hunt & Reffert 2023）。読めなくても宇宙は見られるようにする
-  const clusters = await fetch('/data/clusters.json')
-    .then((r) => r.json())
-    .then(decodeClusters)
-    .catch((e: unknown) => {
-      console.error('星団のデータが読めない', e);
-      return [] as Cluster[];
-    });
   const clusterView = new ClusterView(clusters);
   starScene.add(clusterView.group);
-  // 星雲と、天の川銀河の外の銀河。読めなくても宇宙は見られるようにする
-  const nebulae: Nebula[] = await fetchJson<Parameters<typeof decodeNebulae>[0]>('/data/nebulae.json', { nebulae: [] }).then(decodeNebulae);
   const nebulaView = new NebulaView(nebulae);
   starScene.add(nebulaView.group);
-  const externalGalaxies: Galaxy[] = await fetchJson<Parameters<typeof decodeGalaxies>[0]>('/data/galaxies.json', { galaxies: [] }).then(decodeGalaxies);
   const extragalactic = new ExtragalacticView(externalGalaxies);
   starScene.add(extragalactic.group);
   /** いる場所の恒星系と腕（本物の星・系外惑星のデータの星・自動で作った星のうち、いちばん近い星） */
   const systemAt = (posKm: { x: number; y: number; z: number }) =>
     nearestSystem(posKm, stars.data, STAR_STRIDE, [...galaxy.localStars, ...extraStars]);
   solar.scene.add(asteroids.group);
-  solar.scene.add(satelliteField.sprite);
   solar.scene.add(cometField.sprite);
   // 小惑星の光の点は、起動してから裏で読み込む。スマホ（指で操作する端末）は明るいものだけ
   // （?asteroids=bright を付けると、PC でも明るいものだけにする。重さの確かめ用）
@@ -378,12 +418,10 @@ async function main() {
   let myShape: ShipShape = presetShape('saucer');
   let online = false;
   try {
-    await ensureSession();
+    const { warpList, saved } = await sessionTask;
     online = true;
-    await refreshWarps();
+    setWarps(warpList);
     hudStore.set({ warpsReady: true });
-    // 自分の宇宙船の設計（宇宙船はタイトル画面の出発前に選ぶ。まだ無ければ仮のソーサーのまま）
-    const saved = await shipApi.get();
     // 自分で作った船を使っているなら、そのブロック（ほかの人には印だけを配る）
     const used = usedCustom(saved.design);
     const ownBlocks = used ? decodeBlocks(used) : null;
@@ -543,6 +581,24 @@ async function main() {
     hudStore.set({ mapPoints: points, mapSelfKm: absolutePositionKm(observer, d) });
   };
   let lastMapUpdate = 0;
+  const bubblesCamForward = new THREE.Vector3();
+  const bubblesUp = new THREE.Vector3();
+  const hudForward = new THREE.Vector3();
+  let readingBodiesVersion = -1;
+  const warpReadingCache = new Map<string, string>();
+  const warpReadingOf = (code: string): string => {
+    const v = bodiesVersion();
+    if (v !== readingBodiesVersion) {
+      readingBodiesVersion = v;
+      warpReadingCache.clear();
+    }
+    let r = warpReadingCache.get(code);
+    if (r === undefined) {
+      r = readAddress(code);
+      warpReadingCache.set(code, r);
+    }
+    return r;
+  };
 
   // 視点（要件 F28）と自分の宇宙船（要件 F27）
   const chase = new ChaseCamera();
@@ -733,7 +789,7 @@ async function main() {
     {
       const ppr = h / 2 / Math.tan((FOV * Math.PI) / 360);
       solar.setViewport(h, FOV);
-      satelliteField.pxPerRadian = ppr;
+      if (satelliteField) satelliteField.pxPerRadian = ppr;
       shipView.pxPerRadian = ppr;
     }
     camera.updateProjectionMatrix();
@@ -891,7 +947,20 @@ async function main() {
   if (import.meta.env.DEV) {
     const devTools = {
       /** 動きの滑らかさを測るための入口（描いている物を直接読む） */
-      debug: { shipView, cometField, satelliteField, solar, asteroids, starScene, chase, controls, camera, stampRing },
+      debug: {
+        shipView,
+        cometField,
+        get satelliteField() {
+          return satelliteField;
+        },
+        solar,
+        asteroids,
+        starScene,
+        chase,
+        controls,
+        camera,
+        stampRing,
+      },
       /** 太陽中心の EQJ（pc）の場所へ行き、lookAtPc の方を向く */
       teleportPc(p: { x: number; y: number; z: number }, lookAtPc = { x: 0, y: 0, z: 0 }) {
         observer = reanchor({ anchor: 'Sun', offsetKm: { x: p.x * KM_PER_PC, y: p.y * KM_PER_PC, z: p.z * KM_PER_PC } }, worldNow());
@@ -960,8 +1029,10 @@ async function main() {
     const abs = absolutePositionKm(observer, date);
     solar.update(date, abs);
     asteroids.update(date, abs);
-    satellites.update(date);
-    satelliteField.update(sub(heliocentricPositionKm('Earth', date), abs));
+    if (satellites && satelliteField) {
+      satellites.update(date);
+      satelliteField.update(sub(heliocentricPositionKm('Earth', date), abs));
+    }
     cometField.update(date, abs);
     warpView.update(date, abs, nowMs / 1000);
 
@@ -985,11 +1056,11 @@ async function main() {
       add.forEach((b) => shownSmallAsteroids.add(b.id));
       // 近くの人工衛星（3,000 km 以内の近い順 8 機）も、模型の天体として一覧に入れる
       const fromEarth = sub(abs, heliocentricPositionKm('Earth', date));
-      const nearSat = system === SYSTEM_SOL ? satellites.nearby(fromEarth, 3_000, 8) : [];
-      const nextSat = new Set(nearSat.map((i) => `N${satellites.records[i].id}`));
+      const nearSat = system === SYSTEM_SOL && satellites ? satellites.nearby(fromEarth, 3_000, 8) : [];
+      const nextSat = new Set(nearSat.map((i) => `N${satellites!.records[i].id}`));
       const dropSat = [...shownSatellites].filter((id) => !nextSat.has(id) && id !== observer.anchor);
       if (dropSat.length > 0) unregisterBodies(dropSat);
-      const addSat = nearSat.filter((i) => !shownSatellites.has(`N${satellites.records[i].id}`)).map((i) => satellites.body(i));
+      const addSat = nearSat.filter((i) => !shownSatellites.has(`N${satellites!.records[i].id}`)).map((i) => satellites!.body(i));
       if (addSat.length > 0) registerBodies(addSat);
       dropSat.forEach((id) => shownSatellites.delete(id));
       addSat.forEach((b) => shownSatellites.add(b.id));
@@ -1076,7 +1147,7 @@ async function main() {
     const ringEnabled = hud.overlay === null && !hud.photoMode && hud.chatReady && (!controls.usesPointerLock || hud.locked);
     stampRing.update(ringEnabled, w / 2, h / 2, w, h, screenShips);
 
-    const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    bubblesCamForward.set(0, 0, -1).applyQuaternion(camera.quaternion);
     bubbles.update(nowMs, (id) => {
       let rel: { x: number; y: number; z: number };
       let size: number;
@@ -1090,11 +1161,11 @@ async function main() {
         rel = sub(o.positionKm, abs);
         size = shipView.lengthKmOf(o.id) ?? shapeLengthKm(shipView.shapeOf(o.design, o.id));
       }
-      const up = new THREE.Vector3(0, size * 0.8, 0).applyQuaternion(camera.quaternion);
-      const wx = rel.x + up.x;
-      const wy = rel.y + up.y;
-      const wz = rel.z + up.z;
-      if ((wx - camera.position.x) * camForward.x + (wy - camera.position.y) * camForward.y + (wz - camera.position.z) * camForward.z <= 0) return null;
+      bubblesUp.set(0, size * 0.8, 0).applyQuaternion(camera.quaternion);
+      const wx = rel.x + bubblesUp.x;
+      const wy = rel.y + bubblesUp.y;
+      const wz = rel.z + bubblesUp.z;
+      if ((wx - camera.position.x) * bubblesCamForward.x + (wy - camera.position.y) * bubblesCamForward.y + (wz - camera.position.z) * bubblesCamForward.z <= 0) return null;
       projected.set(wx, wy, wz).project(camera);
       if (projected.z > 1 || Math.abs(projected.x) > 1.2 || Math.abs(projected.y) > 1.2) return null;
       const x = ((projected.x + 1) / 2) * w;
@@ -1143,6 +1214,7 @@ async function main() {
       const radarRangeKm = hudStore.get().radarRangeKm;
       const bodies = allBodies();
       const bodyIds = new Set(bodies.map((b) => b.id));
+      const activeWarps = warps.filter((w) => findBody(w.anchor) !== null);
       const targets: RadarTarget[] = [
         // 天体が多いので、半径 200 km 以上か、1,000 万 km（レーダーの範囲が狭ければ、その範囲）より近い天体だけを出す
         // 探査機は小さいが、どこにいても探せるように出す
@@ -1165,7 +1237,7 @@ async function main() {
           .map((t) => ({ kind: 'star' as const, id: t.key, label: t.name, positionKm: t.positionKm })),
         ...others.map((o) => ({ kind: 'ship' as const, id: o.id, label: '', positionKm: o.positionKm })),
         // レーダーは狭いので、住所の恒星系から後ろだけを出す（例：SOL-3-0-001）
-        ...warps.filter((w) => findBody(w.anchor) !== null).map((w) => ({
+        ...activeWarps.map((w) => ({
           kind: 'warp' as const,
           id: w.id,
           label: w.code.split('-').slice(2).join('-'),
@@ -1174,12 +1246,11 @@ async function main() {
       ];
       const inCluster = clusterAt(clusters, { x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });
       {
-        const f = new THREE.Vector3();
-        camera.getWorldDirection(f);
-        info.updateHud(nowMs, abs, date, observer.anchor, inCluster, { x: f.x, y: f.y, z: f.z }, false);
+        camera.getWorldDirection(hudForward);
+        info.updateHud(nowMs, abs, date, observer.anchor, inCluster, { x: hudForward.x, y: hudForward.y, z: hudForward.z }, false);
         scan.updateAvailability();
         // 照準の先の星座（線を出しているときだけ）。明るくして、名前を照準の下に出す
-        const aimedConstellation = constellationView.aim({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, { x: f.x, y: f.y, z: f.z });
+        const aimedConstellation = constellationView.aim({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, { x: hudForward.x, y: hudForward.y, z: hudForward.z });
         const aimName = aimedConstellation?.nameJa ?? null;
         if (hudStore.get().aimConstellation !== aimName) hudStore.set({ aimConstellation: aimName });
       }
@@ -1202,10 +1273,10 @@ async function main() {
         region: inCluster ? `${inCluster.kind === 'globular' ? 'Globular cluster' : 'Open cluster'}: ${inCluster.name}` : null,
         radar: radarBlips(abs, controls.orientation, targets, radarRange(radarRangeKm)),
         // 基準の天体が分からないワープホール（読み込み前の星の惑星など）は、まだ出さない
-        warps: warps.filter((w) => findBody(w.anchor) !== null).map((w) => ({
+        warps: activeWarps.map((w) => ({
           id: w.id,
           code: w.code,
-          reading: readAddress(w.code),
+          reading: warpReadingOf(w.code),
           distanceKm: length(sub(warpPositionKm(w, date), abs)),
           mine: w.mine,
         })),

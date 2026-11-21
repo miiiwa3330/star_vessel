@@ -23,8 +23,8 @@ export const VISIT_KINDS: readonly InfoKind[] = [
   'constellation',
 ];
 
-/** 1 人が記録できる数の上限（サーバーの容量のため） */
-export const MAX_VISITS_PER_PLAYER = 100_000;
+/** 1 人が記録できる数の上限（実在天体図鑑 26,216 件＋余裕、サーバーの容量保護のため） */
+export const MAX_VISITS_PER_PLAYER = 35_000;
 
 export interface Visit {
   /** 天体の記号（InfoTarget の key） */

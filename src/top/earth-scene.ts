@@ -7,6 +7,7 @@ import { snapshotUfo } from '../render/ufo-look';
 import * as THREE from 'three/webgpu';
 import { dot, max, normalWorld, smoothstep, texture, vec3 } from 'three/tsl';
 import { createAtmosphereMesh, createBodyUniforms } from '../render/body-effects';
+import { TEXTURE_FILES } from '../render/body-looks';
 import { sphereToEqj, toMatrix4 } from '../render/orientation';
 import { bodyFixedToEqj, bodyInfo, heliocentricPositionKm } from '../world/solar-system';
 import type { EarthShipsSnapshot } from '../world/earth-ships-schema';
@@ -75,8 +76,8 @@ const PREPARE_MOON_DELAY_MS = 5200;
 const PREPARE_MARS_DELAY_MS = 7000;
 /** 行き先の天体（StageView の地球以外）。id は天体の一覧のもの */
 const DESTINATIONS: Record<Exclude<StageView, 'earth'>, { id: string; texture: string }> = {
-  moon: { id: 'Moon', texture: '/textures/2k_moon.jpg' },
-  mars: { id: 'Mars', texture: '/textures/2k_mars.jpg' },
+  moon: { id: 'Moon', texture: `/textures/${TEXTURE_FILES.Moon}` },
+  mars: { id: 'Mars', texture: `/textures/${TEXTURE_FILES.Mars}` },
 };
 type Destination = keyof typeof DESTINATIONS;
 /** 奥行きの範囲（km）。2 つの天体の間（200 万 km）と、そのさらに先まで見える。手前の近さは、天体までの距離に合わせて変える（updateDepthRange） */
@@ -84,7 +85,11 @@ const NEAR_KM = 100;
 const FAR_KM = 1e7;
 
 
-const TEXTURES = { day: '/textures/2k_earth_daymap.jpg', night: '/textures/2k_earth_nightmap.jpg', clouds: '/textures/2k_earth_clouds.jpg' };
+const TEXTURES = {
+  day: `/textures/${TEXTURE_FILES.Earth}`,
+  night: `/textures/${TEXTURE_FILES.EarthNight}`,
+  clouds: `/textures/${TEXTURE_FILES.EarthClouds}`,
+};
 
 export class EarthScene {
   private readonly renderer: THREE.WebGPURenderer;

@@ -53,6 +53,12 @@ describe('nearestSystem', () => {
     expect(r.system).toBe(star.system);
     expect(r.arm).toBe(knownSystemArm(star.system));
   });
+
+  it('太陽近傍の早期判定が有効でも太陽より近い合成星を正しく選ぶ', () => {
+    const closeGen = { position: { x: 0.2, y: 0, z: 0 }, system: 'G0000000000A' };
+    expect(nearestSystem({ x: 0.15 * KM_PER_PC, y: 0, z: 0 }, stars, 6, [closeGen]).system).toBe('G0000000000A');
+    expect(nearestSystem({ x: 0.05 * KM_PER_PC, y: 0, z: 0 }, stars, 6, [closeGen]).system).toBe('SOL');
+  });
 });
 
 describe('knownSystemArm', () => {

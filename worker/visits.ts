@@ -5,13 +5,16 @@
  * POST /api/visits  訪れた（初めてなら記録する。2 回目以降は何もしない）
  */
 import { Hono } from 'hono';
+import { PRIVATE_NO_STORE, readJsonWithLimit } from '../src/world/http-security';
 import { isVisitInput, MAX_VISITS_PER_PLAYER, type Visit } from '../src/world/visits';
 import type { InfoKind } from '../src/world/info';
 import type { AppEnv } from './index';
 
 export const visits = new Hono<AppEnv>();
+const MAX_VISIT_BODY_BYTES = 4_096;
 
 visits.get('/', async (c) => {
+  c.header('cache-control', PRIVATE_NO_STORE);
   const userId = c.get('userId');
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const { results } = await c.env.DB.prepare('SELECT key, kind, name, first_at FROM visits WHERE user_id = ? ORDER BY first_at')
@@ -22,9 +25,12 @@ visits.get('/', async (c) => {
 });
 
 visits.post('/', async (c) => {
+  c.header('cache-control', PRIVATE_NO_STORE);
   const userId = c.get('userId');
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json().catch(() => null);
+  const read = await readJsonWithLimit(c.req.raw, MAX_VISIT_BODY_BYTES);
+  if (!read.ok) return c.json({ error: read.reason }, read.reason === 'too_large' ? 413 : 400);
+  const body = read.data;
   if (!isVisitInput(body)) return c.json({ error: 'invalid' }, 400);
   const firstAt = new Date().toISOString();
   // 上限を超えていなければ記録する。すでにあれば何もしない（初めて訪れた時刻を残す）

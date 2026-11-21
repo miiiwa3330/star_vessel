@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encodeBlocks } from './ship-blocks';
-import { defaultHullFor, HULL_TYPES, isShipDesign, lookOf, MAX_CUSTOM_SHIPS, parseShipDesign, parseShipLook, usedCustom } from './ship-design';
+import { canonicalizeShipDesign, defaultHullFor, HULL_TYPES, isShipDesign, lookOf, MAX_CUSTOM_SHIPS, parseShipDesign, parseShipLook, usedCustom } from './ship-design';
 import { lookOrNone, isShipState } from './ship-schema';
 
 const blocks = encodeBlocks([{ x: 0, y: 0, z: 0, s: 1, c: 0 }]);
@@ -54,5 +54,30 @@ describe('宇宙船の設計', () => {
     expect(lookOrNone({ v: 1, hull: '<script>' })).toBeUndefined();
     expect(lookOrNone({ v: 2, use: 0, customs: [blocks] })).toBeUndefined(); // ブロックそのものは部屋では受け付けない
     expect(isShipState({ anchor: 'Earth', offsetKm: { x: 1, y: 0, z: 0 }, velocityKmS: { x: 0, y: 0, z: 0 }, orientation: { x: 0, y: 0, z: 0, w: 1 } })).toBe(true);
+  });
+
+  it('canonicalizeShipDesign は一度のチェックで全カスタム船の並びをそろえる', () => {
+    const a = { x: 10, y: 0, z: 0, s: 1 as const, c: 5 };
+    const b = { x: 2, y: 0, z: 0, s: 1 as const, c: 1 };
+    const normalized = encodeBlocks([a, b]);
+    // 並び順が逆でも同じ正規化結果になる
+    const uncanonical = Buffer.from(
+      (() => {
+        const p = (k: typeof a) => (k.x | (k.y << 7) | (k.z << 14) | (k.s << 21) | (k.c << 23)) >>> 0;
+        const arr = [p(a), p(b)];
+        const buf = new Uint8Array(8);
+        arr.forEach((v, i) => {
+          buf[i * 4] = v & 255;
+          buf[i * 4 + 1] = (v >>> 8) & 255;
+          buf[i * 4 + 2] = (v >>> 16) & 255;
+          buf[i * 4 + 3] = (v >>> 24) & 255;
+        });
+        return buf;
+      })(),
+    ).toString('base64');
+    expect(uncanonical).not.toBe(normalized);
+    expect(canonicalizeShipDesign({ v: 2, use: 0, customs: [uncanonical] })).toEqual({ v: 2, use: 0, customs: [normalized] });
+    expect(canonicalizeShipDesign({ v: 1, hull: 'bell' })).toEqual({ v: 2, use: 'bell' });
+    expect(canonicalizeShipDesign({ v: 2, use: 0 })).toBeNull();
   });
 });

@@ -30,10 +30,10 @@ summary: 使っている外部のデータ・画像・ライブラリと、そ�
 | NASA Exoplanet Archive（系外惑星） | `public/data/exoplanets.json` に足した | https://exoplanetarchive.ipac.caltech.edu/ | 公開データ。使ったことの表記を求められる | 画面に「系外惑星（追加）：NASA Exoplanet Archive」とリンク |
 | Hunt & Reffert (2023) の星団のメンバー（Gaia DR3 の星） | `public/data/cluster-members/`（変換したもの） | VizieR J/A+A/673/A114/members（ハーバード大学のミラー） | 出典を書けば使える（CDS の利用の条件）。もとの Gaia のデータは下の行 | 画面の星団のクレジットに含む |
 | ESA Gaia DR3（近くの星） | `public/data/stars-gaia-*.bin`（変換したもの。`stars-gaia.LICENSE.txt`） | GAVO の TAP（https://dc.g-vo.org/tap。`gcns.main`・`gaia.dr3lite`）。もとは ESA と Gaia Collaboration, Smart ほか 2021 | CC BY-SA 3.0 IGO | 画面に「星（近く）：ESA Gaia DR3（CC BY-SA 3.0 IGO）」とリンク。[`gaia-stars.md`](gaia-stars.md) |
-| 地球の夜の灯りと雲の画像（2k_earth_nightmap.jpg・2k_earth_clouds.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク。タイトル画面の背景でも使うので、詳細の「CREDITS」に出している |
-| 地球の画像（2k_earth_daymap.jpg） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク |
-| 月の画像（2k_moon.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上。タイトル画面の月の画面（SIGN IN・SIGN UP）でも使う。火星の画像（2k_mars.jpg）も、同じ配布元・条件で、ユーザー情報の画面で使う（詳細の「CREDITS」の「地球・天体の画像」に含まれる） |
-| 水星・金星・火星・木星・土星・天王星・海王星の画像（2k_*.jpg） | `public/textures/` | 同上 | CC BY 4.0 | 同上 |
+| 地球の夜の灯りと雲の画像（2k_earth_nightmap.webp・2k_earth_clouds.webp） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク。タイトル画面の背景でも使うので、詳細の「CREDITS」に出している（元の JPG から WebP に変換） |
+| 地球の画像（2k_earth_daymap.webp） | `public/textures/` | https://www.solarsystemscope.com/textures/ | CC BY 4.0 | 画面に「天体の画像：Solar System Scope（CC BY 4.0）」とリンク（元の JPG から WebP に変換） |
+| 月の画像（2k_moon.webp） | `public/textures/` | 同上 | CC BY 4.0 | 同上。タイトル画面の月の画面（SIGN IN・SIGN UP）でも使う。火星の画像（2k_mars.webp）も、同じ配布元・条件で、ユーザー情報の画面で使う（詳細の「CREDITS」の「地球・天体の画像」に含まれる） |
+| 水星・金星・火星・木星・土星・天王星・海王星の画像（2k_*.webp） | `public/textures/` | 同上 | CC BY 4.0 | 同上（元の JPG から WebP に変換） |
 
 - 2026-11-04 に、それぞれの配布元でライセンスの文を確かめた（Open Exoplanet Catalogue は 2026-11-05 に README の License の節で確かめた）
 - 惑星の画像（`src/render/body-looks.ts` の `TEXTURE_FILES`）は、2026-11-05 に Solar System Scope から取得して置いた（配布元のページで CC BY 4.0 と確かめた）
