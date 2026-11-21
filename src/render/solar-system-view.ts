@@ -38,11 +38,19 @@ import { createRingMesh, ringTexture } from './surface-texture';
 
 export type BodyTextures = Partial<Record<BodyId, THREE.Texture>>;
 
+/** 起動後に天体へ近づいたタイミングで読み込むテクスチャの提供元 */
+export interface DeferredTextureSource {
+  has: (id: BodyId) => boolean;
+  load: (id: BodyId) => Promise<THREE.Texture | null>;
+}
+
 /** 天体の光の点の数の上限・大きさ（ピクセル） */
 const MAX_POINTS = 1024;
 const POINT_SIZE_PX = 4;
 /** 本物の大きさ（半径）が画面でこれ（ピクセル）より大きくなったら、点を消す */
 const POINT_MAX_PX = 1.5;
+/** 遅延読み込みの画像を取得し始める、画面上の半径（ピクセル） */
+const DEFERRED_TEXTURE_PX = 0.5;
 /** 本物の大きさがこれ（ピクセル）より小さいときは、点も描かない（とても遠く・とても小さい） */
 const POINT_MIN_PX = 1e-5;
 
@@ -67,6 +75,9 @@ interface Drawn {
   /** 彗星の尾と、まわりの光（コマ） */
   tail: THREE.Mesh | null;
   coma: THREE.Sprite | null;
+  /** 遅延読み込み用のテクスチャ差し替え先 */
+  mapNode: ReturnType<typeof texture> | null;
+  textureState: 'ready' | 'deferred' | 'loading';
   /** この天体のために作った物（作り直すときに捨てる） */
   owned: { dispose(): void }[];
   removed: boolean;
@@ -100,7 +111,10 @@ export class SolarSystemView {
   private readonly pointColorAttr = new THREE.InstancedBufferAttribute(this.pointColor, 3);
   private readonly points: THREE.Sprite;
 
-  constructor(private readonly textures: BodyTextures) {
+  constructor(
+    private readonly textures: BodyTextures,
+    private readonly deferredTexture?: DeferredTextureSource,
+  ) {
     this.scene.add(this.starLight, new THREE.AmbientLight(0xffffff, 0.03));
     this.pointPosAttr.setUsage(THREE.DynamicDrawUsage);
     this.pointColorAttr.setUsage(THREE.DynamicDrawUsage);
@@ -131,7 +145,19 @@ export class SolarSystemView {
     const big = info.radiusKm > 1_000;
     const geometry = new THREE.SphereGeometry(info.radiusKm, big ? 96 : 32, big ? 48 : 16);
     owned.push(geometry);
-    const d: Drawn = { mesh: null as unknown as THREE.Mesh, info, uniforms, glow: null, beams: null, tail: null, coma: null, owned, removed: false };
+    const d: Drawn = {
+      mesh: null as unknown as THREE.Mesh,
+      info,
+      uniforms,
+      glow: null,
+      beams: null,
+      tail: null,
+      coma: null,
+      mapNode: null,
+      textureState: 'ready',
+      owned,
+      removed: false,
+    };
 
     let material: THREE.Material;
     if (info.compact?.kind === 'black-hole') {
@@ -172,20 +198,14 @@ export class SolarSystemView {
       const mapNode = texture(given ?? placeholderTexture());
       const standard = new THREE.MeshStandardNodeMaterial({ roughness: 1, metalness: 0 });
       standard.colorNode = mapNode;
+      d.mapNode = mapNode;
       if (!given) {
-        // 模様は Worker で描き、できたら差し替える（恒星系に入ったときに画面が止まらないように）
-        const look = info.surface?.look ?? SURFACE_LOOKS[info.id] ?? DEFAULT_LOOK;
-        const seed = info.surface?.seed ?? seedOf(info.id);
-        const size = big && info.kind !== 'exoplanet' ? [512, 256] : info.radiusKm > 300 ? [256, 128] : [128, 64];
         owned.push(mapNode.value as THREE.Texture);
-        void this.painter.paint(look, seed, size[0], size[1]).then((t) => {
-          if (d.removed) {
-            t.dispose();
-            return;
-          }
-          mapNode.value = t;
-          owned.push(t);
-        });
+        if (this.deferredTexture?.has(info.id)) {
+          d.textureState = 'deferred';
+        } else {
+          this.paintSurface(d);
+        }
       }
       if (info.rings) {
         const ringMap = ringTexture(info.rings, info.ringColor ?? RING_COLOR, seedOf(info.id));
@@ -291,24 +311,66 @@ export class SolarSystemView {
     }
   }
 
+  private paintSurface(d: Drawn): void {
+    const { info, mapNode, owned } = d;
+    if (!mapNode) return;
+    // 模様は Worker で描き、できたら差し替える（恒星系に入ったときに画面が止まらないように）
+    const big = info.radiusKm > 1_000;
+    const look = info.surface?.look ?? SURFACE_LOOKS[info.id] ?? DEFAULT_LOOK;
+    const seed = info.surface?.seed ?? seedOf(info.id);
+    const size = big && info.kind !== 'exoplanet' ? [512, 256] : info.radiusKm > 300 ? [256, 128] : [128, 64];
+    void this.painter.paint(look, seed, size[0], size[1]).then((t) => {
+      if (d.removed) {
+        t.dispose();
+        return;
+      }
+      mapNode.value = t;
+      owned.push(t);
+    });
+  }
+
+  private startDeferredTexture(id: BodyId, d: Drawn): void {
+    if (!this.deferredTexture || d.textureState !== 'deferred') return;
+    d.textureState = 'loading';
+    void this.deferredTexture.load(id).then((tex) => {
+      if (tex) {
+        this.textures[id] = tex;
+        if (!d.removed && d.mapNode) {
+          d.mapNode.value = tex;
+          d.textureState = 'ready';
+        }
+      } else {
+        d.textureState = 'ready';
+        if (!d.removed) this.paintSurface(d);
+      }
+    });
+  }
+
   /** 天体の光の点を置く。恒星・ブラックホール（自分の光の広がりがある）と人工衛星（別に点で描く）は除く */
   private updatePoints(rels: Map<BodyId, Vec3>): void {
     let n = 0;
     for (const [id, d] of this.drawn) {
-      if (n >= MAX_POINTS) break;
       const k = d.info.kind;
-      if (k === 'star' || k === 'blackhole' || k === 'satellite') continue;
-      // 彗星は光の点の群れの方で描く（src/render/comet-field.ts）
-      if (k === 'comet') continue;
       const rel = rels.get(id)!;
       const dist = Math.hypot(rel.x, rel.y, rel.z);
       const px = (d.info.radiusKm / Math.max(dist, 1e-9)) * this.pxPerRadian;
+      // 近づいたタイミングで、まだ読んでいない惑星の画像を遅延読み込みする
+      if (d.textureState === 'deferred' && px > DEFERRED_TEXTURE_PX) this.startDeferredTexture(id, d);
+      if (n >= MAX_POINTS) continue;
+      if (k === 'star' || k === 'blackhole' || k === 'satellite') continue;
+      // 彗星は光の点の群れの方で描く（src/render/comet-field.ts）
+      if (k === 'comet') continue;
       // 探査機はとても小さいが、探しに行けるよう遠くても点を残す
       if (px > POINT_MAX_PX || (px < POINT_MIN_PX && k !== 'spacecraft')) continue;
       // 小さく遠いほど暗く（1/1000 ピクセルで 0.25、1 ピクセルで 1）。近づいて球が見え始めるところで消えていく
       const b = Math.min(1, 0.25 + 0.25 * Math.max(0, Math.log10(px * 1000))) * Math.min(1, (POINT_MAX_PX - px) / 0.5);
-      this.pointPos.set([rel.x, rel.y, rel.z], n * 3);
-      this.pointColor.set([0.95 * b, 0.92 * b, 0.85 * b], n * 3);
+      const o = n * 3;
+      this.pointPos[o] = rel.x;
+      this.pointPos[o + 1] = rel.y;
+      this.pointPos[o + 2] = rel.z;
+      this.pointColor[o] = 0.95 * b;
+      this.pointColor[o + 1] = 0.92 * b;
+      this.pointColor[o + 2] = 0.85 * b;
       n++;
     }
     this.points.count = n;

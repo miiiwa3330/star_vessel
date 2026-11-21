@@ -6,9 +6,11 @@
  * プラグインを足したら `npm run auth:schema` で SQL を作り直し、migrations/ に新しいファイルとして足す。
  */
 import type { BetterAuthOptions } from 'better-auth';
+import { verifyPassword as verifyLegacyScrypt } from 'better-auth/crypto';
 import { anonymous, username } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
 import { isUsername, PASSWORD_MAX, PASSWORD_MIN, USERNAME_MAX, USERNAME_MIN } from '../src/world/account.ts';
+import { hashPasswordPbkdf2, verifyPasswordHash } from '../src/world/password.ts';
 
 type OnLinkAccount = NonNullable<Parameters<typeof anonymous>[0]>['onLinkAccount'];
 type PasskeySite = { rpID: string; origin: string[] };
@@ -29,6 +31,15 @@ export const authPlugins = (onLinkAccount?: OnLinkAccount, site?: PasskeySite) =
 
 export const authOptions = {
   basePath: '/api/auth',
-  emailAndPassword: { enabled: true, minPasswordLength: PASSWORD_MIN, maxPasswordLength: PASSWORD_MAX, autoSignIn: true },
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: PASSWORD_MIN,
+    maxPasswordLength: PASSWORD_MAX,
+    autoSignIn: true,
+    password: {
+      hash: hashPasswordPbkdf2,
+      verify: ({ hash, password }: { hash: string; password: string }) => verifyPasswordHash(hash, password, verifyLegacyScrypt),
+    },
+  },
   plugins: authPlugins(),
 } satisfies BetterAuthOptions;

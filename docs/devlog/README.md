@@ -44,3 +44,4 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-21 | [作る画面の道具（範囲で消す・塗る・ロック）と、マイ UFO の一覧・BREAK](entries/2026-11-21-builder-tools.md) |
 | 2026-11-22 | [チャットの吹き出し（白）・枠なしスタンプ・一人称カメラ位置・相手 UFO クリック](entries/2026-11-22-chat-bubbles-and-first-person.md) |
 | 2026-11-22 | [訪れた判定をスキャンにした](entries/2026-11-22-scan.md) |
+| 2026-11-22 | [セキュリティ強化とパフォーマンス最適化（本番公開前）](entries/2026-11-22-security-and-performance.md) |

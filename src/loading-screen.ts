@@ -11,7 +11,7 @@
  * React・three.js を使わず、DOM だけで作る（大きなファイルを読む前に、すぐに出すため）
  */
 import './loading-screen.css';
-import { FLY_IN_MS, FLY_OUT_MS, flyOutStartMs, loadingMotion, usableStart } from './loading-timing';
+import { FLY_IN_MS, FLY_OUT_MS, flyOutStartMs, isSafeUfoImageUrl, loadingMotion, usableStart } from './loading-timing';
 
 const ID = 'sv-loading';
 const START_KEY = 'sv-loading-start';
@@ -76,7 +76,9 @@ export function rememberedUfoLook(): { hull: string; hue: number; url: string } 
   if (!v) return null;
   try {
     const o = JSON.parse(v) as { hull?: unknown; hue?: unknown; url?: unknown };
-    return typeof o.url === 'string' && typeof o.hull === 'string' && typeof o.hue === 'number' ? { hull: o.hull, hue: o.hue, url: o.url } : null;
+    return isSafeUfoImageUrl(o.url) && typeof o.hull === 'string' && typeof o.hue === 'number'
+      ? { hull: o.hull, hue: o.hue, url: o.url }
+      : null;
   } catch {
     return null;
   }
@@ -142,12 +144,43 @@ export function showLoading(): void {
     el.className = 'sv-loading';
     el.setAttribute('role', 'status');
     el.setAttribute('aria-label', '読み込み中');
+    const pathEl = document.createElement('div');
+    pathEl.className = 'sv-loading-path';
+    const craftEl = document.createElement('div');
+    craftEl.className = 'sv-loading-craft';
+    const streaksEl = document.createElement('div');
+    streaksEl.className = 'sv-loading-streaks';
+    for (const [y, thick, len] of STREAKS) {
+      const streak = document.createElement('i');
+      streak.className = 'sv-loading-streak';
+      streak.style.setProperty('--sy', String(y));
+      streak.style.setProperty('--st', String(thick));
+      streak.style.setProperty('--sl', String(len));
+      streaksEl.appendChild(streak);
+    }
+    const bankEl = document.createElement('div');
+    bankEl.className = 'sv-loading-bank';
+    const bobEl = document.createElement('div');
+    bobEl.className = 'sv-loading-bob';
     const look = rememberedUfoLook();
-    const craft = look ? `<img class="sv-loading-ufo" src="${look.url}" alt="" draggable="false">` : FALLBACK_SVG;
-    const streaks = STREAKS.map(
-      ([y, thick, len]) => `<i class="sv-loading-streak" style="--sy:${y};--st:${thick};--sl:${len}"></i>`,
-    ).join('');
-    el.innerHTML = `<div class="sv-loading-path"><div class="sv-loading-craft"><div class="sv-loading-streaks">${streaks}</div><div class="sv-loading-bank"><div class="sv-loading-bob">${craft}</div></div></div></div><p class="sv-loading-word" lang="en">LOADING</p>`;
+    if (look) {
+      const img = document.createElement('img');
+      img.className = 'sv-loading-ufo';
+      img.src = look.url;
+      img.alt = '';
+      img.draggable = false;
+      bobEl.appendChild(img);
+    } else {
+      bobEl.innerHTML = FALLBACK_SVG;
+    }
+    const wordEl = document.createElement('p');
+    wordEl.className = 'sv-loading-word';
+    wordEl.lang = 'en';
+    wordEl.textContent = 'LOADING';
+    bankEl.appendChild(bobEl);
+    craftEl.append(streaksEl, bankEl);
+    pathEl.appendChild(craftEl);
+    el.append(pathEl, wordEl);
     document.body.appendChild(el);
   }
   el.classList.remove('is-leaving');

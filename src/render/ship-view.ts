@@ -148,8 +148,13 @@ export class ShipView {
       // 船が画面で 3 ピクセルより大きく見えるなら、航行灯の点は消す（船の模型が見える。要件 F33）
       const px = (lengthKm / 2 / Math.max(Math.hypot(rel.x, rel.y, rel.z), 1e-9)) * this.pxPerRadian;
       const k = Math.max(0, Math.min(1, (3 - px) / 1.5));
-      this.lightPos.set([rel.x, rel.y, rel.z], i * 3);
-      this.lightColor.set([this.color.r * k, this.color.g * k, this.color.b * k], i * 3);
+      const o = i * 3;
+      this.lightPos[o] = rel.x;
+      this.lightPos[o + 1] = rel.y;
+      this.lightPos[o + 2] = rel.z;
+      this.lightColor[o] = this.color.r * k;
+      this.lightColor[o + 1] = this.color.g * k;
+      this.lightColor[o + 2] = this.color.b * k;
     }
     for (const [id, d] of this.drawn) {
       if (seen.has(id)) continue;

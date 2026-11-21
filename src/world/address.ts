@@ -137,6 +137,22 @@ export interface SystemAndArm {
   arm: ArmCode;
 }
 
+/** `stars` 配列ごとに原点からいちばん近い星までの距離（pc）をキャッシュし、太陽近傍での全星走査を省く */
+const minStarDistCache = new WeakMap<Float32Array, number>();
+
+function minStarDistancePc(stars: Float32Array, stride: number): number {
+  const cached = minStarDistCache.get(stars);
+  if (cached !== undefined) return cached;
+  let minD2 = Number.POSITIVE_INFINITY;
+  for (let o = 0; o + stride <= stars.length; o += stride) {
+    const d2 = stars[o] * stars[o] + stars[o + 1] * stars[o + 1] + stars[o + 2] * stars[o + 2];
+    if (d2 < minD2) minD2 = d2;
+  }
+  const minD = Number.isFinite(minD2) ? Math.sqrt(minD2) : Number.POSITIVE_INFINITY;
+  minStarDistCache.set(stars, minD);
+  return minD;
+}
+
 /**
  * いる場所がどの恒星系か。太陽・本物の星（HYG）・自動で作った星のうち、いちばん近い恒星の恒星系にする。
  * 腕は、その恒星のある腕（自動で作った星は、マス目の中心の腕。サーバーと同じ決め方）。
@@ -154,21 +170,40 @@ export function nearestSystem(
   let bestD2 = x * x + y * y + z * z; // 太陽は原点
   let best: SystemAndArm = { system: SYSTEM_SOL, arm: SUN_ARM };
   let bestHyg = -1;
-  for (let o = 0; o + stride <= stars.length; o += stride) {
-    const d2 = (stars[o] - x) ** 2 + (stars[o + 1] - y) ** 2 + (stars[o + 2] - z) ** 2;
-    if (d2 < bestD2) {
-      bestD2 = d2;
-      bestHyg = o;
+  // 三角不等式により、原点からの距離が最近星距離の半分未満なら太陽が確実に最小距離となるため走査を省ける
+  const minStarPc = minStarDistancePc(stars, stride);
+  if (bestD2 * 4 >= minStarPc * minStarPc) {
+    for (let o = 0; o + stride <= stars.length; o += stride) {
+      const dx = stars[o] - x;
+      const dx2 = dx * dx;
+      if (dx2 >= bestD2) continue;
+      const dy = stars[o + 1] - y;
+      const dxy2 = dx2 + dy * dy;
+      if (dxy2 >= bestD2) continue;
+      const dz = stars[o + 2] - z;
+      const d2 = dxy2 + dz * dz;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        bestHyg = o;
+      }
     }
   }
   let bestGen = -1;
-  generated.forEach((g, i) => {
-    const d2 = (g.position.x - x) ** 2 + (g.position.y - y) ** 2 + (g.position.z - z) ** 2;
+  for (let i = 0; i < generated.length; i++) {
+    const p = generated[i].position;
+    const dx = p.x - x;
+    const dx2 = dx * dx;
+    if (dx2 >= bestD2) continue;
+    const dy = p.y - y;
+    const dxy2 = dx2 + dy * dy;
+    if (dxy2 >= bestD2) continue;
+    const dz = p.z - z;
+    const d2 = dxy2 + dz * dz;
     if (d2 < bestD2) {
       bestD2 = d2;
       bestGen = i;
     }
-  });
+  }
   if (bestGen >= 0) {
     const system = generated[bestGen].system;
     return { system, arm: knownSystemArm(system) ?? SUN_ARM };

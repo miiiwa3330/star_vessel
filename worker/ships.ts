@@ -8,11 +8,16 @@
  * 決まりは docs/tech/ships.md。
  */
 import { Hono } from 'hono';
-import { canonicalBlocks, isBlocksRef } from '../src/world/ship-blocks';
-import { parseShipDesign, usedCustom, type ShipDesign } from '../src/world/ship-design';
+import { PRIVATE_NO_STORE, readJsonWithLimit } from '../src/world/http-security';
+import { isBlocksRef } from '../src/world/ship-blocks';
+import { canonicalizeShipDesign, parseShipDesign, usedCustom, type ShipDesign } from '../src/world/ship-design';
 import type { AppEnv } from './index';
 
 export const ships = new Hono<AppEnv>();
+const MAX_SHIP_BODY_BYTES = 262_144;
+
+const cacheOf = (): Cache | undefined => (caches as unknown as { default?: Cache }).default;
+const blocksCacheKey = (ref: string) => new Request(`https://cache.star-vessel.invalid/api/ship/blocks/${ref}`);
 
 /** ブロックの文字列の印：SHA-256 の前の 16 バイト（16 進 32 文字） */
 async function blocksRef(blocks: string): Promise<string> {
@@ -21,6 +26,7 @@ async function blocksRef(blocks: string): Promise<string> {
 }
 
 ships.get('/', async (c) => {
+  c.header('cache-control', PRIVATE_NO_STORE);
   const userId = c.get('userId');
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const row = await c.env.DB.prepare('SELECT design, blocks_ref FROM ship_designs WHERE user_id = ?')
@@ -38,15 +44,13 @@ ships.get('/', async (c) => {
 });
 
 ships.put('/', async (c) => {
+  c.header('cache-control', PRIVATE_NO_STORE);
   const userId = c.get('userId');
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json().catch(() => null);
-  const parsed = parseShipDesign(body);
-  if (!parsed) return c.json({ error: 'invalid' }, 400);
-  // 同じ船がいつも同じ印になるよう、ブロックの並びを決まった順にそろえてから保存する
-  const customs = (parsed.customs ?? []).map(canonicalBlocks);
-  if (customs.some((x) => x === null)) return c.json({ error: 'invalid' }, 400);
-  const design: ShipDesign = customs.length > 0 ? { v: parsed.v, use: parsed.use, customs: customs as string[] } : { v: parsed.v, use: parsed.use };
+  const read = await readJsonWithLimit(c.req.raw, MAX_SHIP_BODY_BYTES);
+  if (!read.ok) return c.json({ error: read.reason }, read.reason === 'too_large' ? 413 : 400);
+  const design = canonicalizeShipDesign(read.data);
+  if (!design) return c.json({ error: 'invalid' }, 400);
   // 印は、いま使っている自分の船の分だけ（宇宙の部屋で配るのは、使っている船だけ）
   const used = usedCustom(design);
   const ref = used ? await blocksRef(used) : null;
@@ -56,12 +60,19 @@ ships.put('/', async (c) => {
   )
     .bind(userId, JSON.stringify(design), ref, new Date().toISOString())
     .run();
+  const cache = ref ? cacheOf() : undefined;
+  if (ref && cache) c.executionCtx.waitUntil(cache.delete(blocksCacheKey(ref)).catch(() => false));
   return c.json({ design, ref });
 });
 
 ships.get('/blocks/:ref', async (c) => {
   const ref = c.req.param('ref');
   if (!isBlocksRef(ref)) return c.json({ error: 'invalid' }, 400);
+  const cache = cacheOf();
+  const key = blocksCacheKey(ref);
+  const hit = await cache?.match(key).catch(() => undefined);
+  if (hit) return hit;
+
   const row = await c.env.DB.prepare('SELECT design FROM ship_designs WHERE blocks_ref = ? LIMIT 1').bind(ref).first<{ design: string }>();
   let blocks: string | undefined;
   try {
@@ -69,8 +80,18 @@ ships.get('/blocks/:ref', async (c) => {
   } catch {
     blocks = undefined;
   }
-  if (!blocks) return c.json({ error: 'not_found' }, 404);
+  if (!blocks) {
+    const miss = new Response(JSON.stringify({ error: 'not_found' }), {
+      status: 404,
+      headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' },
+    });
+    if (cache) c.executionCtx.waitUntil(cache.put(key, miss.clone()).catch(() => undefined));
+    return miss;
+  }
   // 印は中身から作るので、同じ印の中身は変わらない
-  c.header('cache-control', 'public, max-age=31536000, immutable');
-  return c.json({ blocks });
+  const res = new Response(JSON.stringify({ blocks }), {
+    headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=31536000, immutable' },
+  });
+  if (cache) c.executionCtx.waitUntil(cache.put(key, res.clone()).catch(() => undefined));
+  return res;
 });

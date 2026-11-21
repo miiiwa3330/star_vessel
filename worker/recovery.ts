@@ -12,6 +12,7 @@
 import { Hono, type Context } from 'hono';
 import { APIError } from 'better-auth/api';
 import { isPassword } from '../src/world/account';
+import { readJsonWithLimit } from '../src/world/http-security';
 import {
   findByCodeStatement,
   generateRecoveryCode,
@@ -24,6 +25,7 @@ import { createAuth } from './auth';
 import type { AppEnv } from './index';
 
 export const recovery = new Hono<AppEnv>();
+const MAX_RECOVERY_BODY_BYTES = 4_096;
 
 recovery.use('*', async (c, next) => {
   await next();
@@ -60,7 +62,9 @@ recovery.get('/status', async (c) => {
 recovery.post('/code', async (c) => {
   const session = await registeredSession(c);
   if (!session) return c.json({ error: 'unauthorized' }, 401);
-  const body = (await c.req.json().catch(() => null)) as { password?: unknown } | null;
+  const read = await readJsonWithLimit(c.req.raw, MAX_RECOVERY_BODY_BYTES);
+  if (!read.ok) return c.json({ error: read.reason }, read.reason === 'too_large' ? 413 : 400);
+  const body = read.data as { password?: unknown } | null;
   if (typeof body?.password !== 'string') return c.json({ error: 'invalid' }, 400);
   // ログインしたままの端末を他人に触られても、コードを作り直されないように、パスワードを確かめる
   try {
@@ -78,14 +82,18 @@ recovery.post('/code', async (c) => {
 });
 
 recovery.post('/lookup', async (c) => {
-  const body = (await c.req.json().catch(() => null)) as { code?: unknown } | null;
+  const read = await readJsonWithLimit(c.req.raw, MAX_RECOVERY_BODY_BYTES);
+  if (!read.ok && read.reason === 'too_large') return c.json({ error: 'too_large' }, 413);
+  const body = (read.ok ? read.data : null) as { code?: unknown } | null;
   const owner = await findOwner(c, body?.code);
   if (!owner) return c.json({ error: 'invalid_code' }, 400);
   return c.json({ username: owner.username });
 });
 
 recovery.post('/reset', async (c) => {
-  const body = (await c.req.json().catch(() => null)) as { code?: unknown; password?: unknown } | null;
+  const read = await readJsonWithLimit(c.req.raw, MAX_RECOVERY_BODY_BYTES);
+  if (!read.ok && read.reason === 'too_large') return c.json({ error: 'too_large' }, 413);
+  const body = (read.ok ? read.data : null) as { code?: unknown; password?: unknown } | null;
   if (!isPassword(body?.password)) return c.json({ error: 'invalid_password' }, 400);
   const owner = await findOwner(c, body.code);
   if (!owner) return c.json({ error: 'invalid_code' }, 400);

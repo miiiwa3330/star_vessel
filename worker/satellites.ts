@@ -18,7 +18,10 @@ satellites.get('/', async (c) => {
   if (hit) return hit;
   let records;
   try {
-    const res = await fetch(SATNOGS_TLE_URL, { headers: { 'user-agent': 'star_vessel (+https://github.com/miiiwa3330/star_vessel)' } });
+    const res = await fetch(SATNOGS_TLE_URL, {
+      headers: { 'user-agent': 'star_vessel (+https://github.com/miiiwa3330/star_vessel)' },
+      signal: AbortSignal.timeout(4_000),
+    });
     if (!res.ok) return c.json({ error: 'upstream' }, 503);
     records = fromSatnogs(await res.json());
   } catch {

@@ -8,7 +8,7 @@
  * 前の版（{ v: 1, hull }）も読める。知らない欄は無視せずに「正しくない」として扱う（版を上げて欄を足す）。
  * 決まりは docs/tech/ships.md。
  */
-import { decodeBlocks, isBlocksRef, MAX_BLOCKS_TEXT } from './ship-blocks';
+import { decodeBlocks, encodeBlocks, GRID, isBlocksRef, MAX_BLOCKS_TEXT } from './ship-blocks';
 
 /** 設計の版。欄を足すときは版を上げ、前の版も読めるようにする */
 export const SHIP_DESIGN_VERSION = 2;
@@ -63,6 +63,30 @@ export function parseShipDesign(v: unknown): ShipDesign | null {
   const okUse = isHullType(use) || (typeof use === 'number' && Number.isInteger(use) && use >= 0 && use < customs.length);
   if (!okUse) return null;
   return customs.length > 0 ? { v: SHIP_DESIGN_VERSION, use, customs: customs as string[] } : { v: SHIP_DESIGN_VERSION, use };
+}
+
+/**
+ * 設計を検証して版 2 にそろえ、customs のブロック並びも一度だけの作業用バッファで正規化して返す。
+ * 正しくなければ null（PUT /api/ship でのメモリ確保と二重デコードを抑えるため）
+ */
+export function canonicalizeShipDesign(v: unknown): ShipDesign | null {
+  if (!plain(v)) return null;
+  if (v.v === 1) return isHullType(v.hull) && onlyKeys(v, ['v', 'hull']) ? { v: SHIP_DESIGN_VERSION, use: v.hull } : null;
+  if (v.v !== SHIP_DESIGN_VERSION || !onlyKeys(v, ['v', 'use', 'customs'])) return null;
+  const rawCustoms = v.customs ?? [];
+  if (!Array.isArray(rawCustoms) || rawCustoms.length > MAX_CUSTOM_SHIPS) return null;
+  const scratch = rawCustoms.length > 0 ? new Int32Array(GRID * GRID * GRID) : undefined;
+  const customs: string[] = [];
+  for (const c of rawCustoms) {
+    if (typeof c !== 'string' || c.length > MAX_BLOCKS_TEXT) return null;
+    const blocks = decodeBlocks(c, scratch);
+    if (!blocks) return null;
+    customs.push(encodeBlocks(blocks));
+  }
+  const use = v.use;
+  const okUse = isHullType(use) || (typeof use === 'number' && Number.isInteger(use) && use >= 0 && use < customs.length);
+  if (!okUse) return null;
+  return customs.length > 0 ? { v: SHIP_DESIGN_VERSION, use, customs } : { v: SHIP_DESIGN_VERSION, use };
 }
 
 export const isShipDesign = (v: unknown): v is ShipDesign => parseShipDesign(v) !== null;
