@@ -21,7 +21,7 @@ import {
 import { nearestIndices, shipPositionKm } from '../src/world/ships';
 import { lookOrNone } from '../src/world/ship-schema';
 import type { ShipLook } from '../src/world/ship-design';
-import { CHAT_MIN_INTERVAL_MS, cleanChatText } from '../src/world/chat';
+import { CHAT_MIN_INTERVAL_MS, cleanChatText, isStampText } from '../src/world/chat';
 import { isUsername } from '../src/world/account';
 import { PRESENCE_REFRESH_MS, presenceStatement } from '../src/world/presence';
 
@@ -96,9 +96,9 @@ export class SpaceRoom extends DurableObject<Env> {
     }
     // 人数は、つながったとき・切れたときのほか、前に書いてから 1 分たったら書き直す（切れたと知らせずに消えた部屋の行を、数えなくするため）
     if (now - this.lastPresence >= PRESENCE_REFRESH_MS) this.reportPresence(a.room, undefined, now);
-    const m = parsed as { t?: unknown; s?: unknown; d?: unknown; text?: unknown };
+    const m = parsed as { t?: unknown; s?: unknown; d?: unknown; text?: unknown; to?: unknown };
     if (m.t === 'chat') {
-      this.chat(ws, a, m.text, now);
+      this.chat(ws, a, m.text, m.to, now);
       return;
     }
     if (now - a.at < SHIP_MIN_INTERVAL_MS) return;
@@ -160,17 +160,49 @@ export class SpaceRoom extends DurableObject<Env> {
    * 文は cleanChatText で確かめ、続けて送れるのは CHAT_MIN_INTERVAL_MS に 1 回まで。まだ自分の状態を送っていない人のものは捨てる。
    * 近さは、届いている最後の位置で決める（ふだんの配る処理と違い、古い位置の船も含める）。文はサーバーに残さない（配るだけ）
    */
-  private chat(ws: WebSocket, a: Attachment, raw: unknown, now: number): void {
+  private chat(ws: WebSocket, a: Attachment, raw: unknown, rawTo: unknown, now: number): void {
     const text = cleanChatText(raw);
     if (text === null || !a.state) return;
+    if (rawTo !== undefined && (typeof rawTo !== 'string' || !isStampText(text))) return;
     if (a.chatAt !== undefined && now - a.chatAt < CHAT_MIN_INTERVAL_MS) return;
-    a.chatAt = now;
-    ws.serializeAttachment(a);
     const date = new Date(now);
     // 位置の古さは問わない（タブを一時的に裏に回した直後などでも届くように）。最後に受け取った位置で近さを決める
     const all = this.ctx.getWebSockets().map((s) => ({ ws: s, a: s.deserializeAttachment() as Attachment }));
     const active = all.filter((e) => e.a.state);
     const positions = active.map((e) => roughPositionKm(e.a.state as ShipState, date));
+    if (typeof rawTo === 'string') {
+      const targetIndex = active.findIndex((e) => e.a.sid === rawTo && e.a.sid !== a.sid);
+      if (targetIndex < 0) return;
+      const target = active[targetIndex];
+      a.chatAt = now;
+      ws.serializeAttachment(a);
+      const msg = JSON.stringify({
+        t: 'chat',
+        now,
+        from: a.sid,
+        hue: a.hue,
+        name: a.name ?? null,
+        to: target.a.sid,
+        toHue: target.a.hue,
+        toName: target.a.name ?? null,
+        text,
+      } satisfies ServerMessage);
+      active.forEach((e, i) => {
+        const sees =
+          e.a.sid === a.sid ||
+          e.a.sid === target.a.sid ||
+          nearestIndices(positions[i], positions, MAX_SHIPS_SENT, i).includes(targetIndex);
+        if (!sees) return;
+        try {
+          e.ws.send(msg);
+        } catch {
+          // 閉じかけの接続は次の機会に消える
+        }
+      });
+      return;
+    }
+    a.chatAt = now;
+    ws.serializeAttachment(a);
     const senderIndex = active.findIndex((e) => e.a.sid === a.sid);
     const msg = JSON.stringify({ t: 'chat', now, from: a.sid, hue: a.hue, name: a.name ?? null, text } satisfies ServerMessage);
     active.forEach((e, i) => {
@@ -194,6 +226,7 @@ export class SpaceRoom extends DurableObject<Env> {
     const snaps: ShipSnapshot[] = active.map((e) => ({
       id: e.a.sid,
       hue: e.a.hue,
+      ...(e.a.name ? { n: e.a.name } : {}),
       s: e.a.state as ShipState,
       d: e.a.design,
       at: e.a.at,

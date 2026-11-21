@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { CHAT_MAX_CHARS, CHAT_STAMPS } from '../world/chat';
+import { CHAT_MAX_CHARS, CHAT_STAMPS, filterChatLog } from '../world/chat';
 import { EMOJI_GROUPS } from './emoji-list';
-import { hudActions, hudStore, type ChatLogItem } from './hud-store';
+import { hudActions, hudStore, type ChatFocus, type ChatLogItem } from './hud-store';
 
 /** ふだん（入力欄を使っていないとき）に出しておく履歴の数（古いものは、入力欄を開くと遡れる） */
 const SHOWN_LINES = 6;
@@ -25,12 +25,14 @@ const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
 export function ChatBox({
   ready,
   log,
+  focus,
   open,
   underPanel = false,
   collapsed = false,
 }: {
   ready: boolean;
   log: ChatLogItem[];
+  focus: ChatFocus | null;
   open: boolean;
   underPanel?: boolean;
   /** スマホで閉じているとき（開閉式。2026-11-21）。PC では使わない（CSS がスマホのときだけ隠す） */
@@ -39,14 +41,18 @@ export function ChatBox({
   const input = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
   const [picker, setPicker] = useState(false);
+  const [liked, setLiked] = useState<string | null>(null);
+  const likeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [now, setNow] = useState(() => Date.now());
+  useEffect(() => () => clearTimeout(likeTimer.current), []);
   useEffect(() => {
     if (open && document.activeElement !== input.current) input.current?.focus();
     // PC では、チャットを閉じたら絵文字の一覧も閉じる
     if (!open && !touchOnly) setPicker(false);
   }, [open]);
+  const visibleLog = filterChatLog(log, focus);
   // ふだんの表示で、古くなった行を消すための時計（消す行が無いときは止める）
-  const latest = log[0]?.at ?? 0;
+  const latest = visibleLog[0]?.at ?? 0;
   useEffect(() => {
     setNow(Date.now());
     if (Date.now() - latest > LINE_HIDE_MS) return;
@@ -62,6 +68,10 @@ export function ChatBox({
   };
   const sendStamp = (t: string) => {
     if (!hudActions.sendChat(t)) return;
+    setLiked(null);
+    requestAnimationFrame(() => setLiked(t));
+    clearTimeout(likeTimer.current);
+    likeTimer.current = setTimeout(() => setLiked(null), 380);
     setPicker(false);
     close();
   };
@@ -70,14 +80,35 @@ export function ChatBox({
     setText(text + e);
     input.current?.focus();
   };
-  const shown = open ? log : log.filter((l) => now - l.at < LINE_HIDE_MS).slice(0, SHOWN_LINES);
+  const shown = open ? visibleLog : visibleLog.filter((l) => now - l.at < LINE_HIDE_MS).slice(0, SHOWN_LINES);
   return (
     <div className={`hud-chat${open ? ' is-open' : ''}${underPanel ? ' is-under-panel' : ''}${collapsed ? ' is-collapsed' : ''}`}>
+      {focus && (
+        <div className="hud-chat-focus">
+          <span className="hud-chat-focus-target">
+            <span className="hud-chat-focus-dot" style={{ background: `hsl(${focus.hue} 80% 70%)` }} aria-hidden="true" />
+            <span className="hud-chat-focus-name" style={{ color: `hsl(${focus.hue} 80% 70%)` }}>
+              {focus.name ?? 'ゲスト'}
+            </span>
+            <span className="hud-chat-focus-label">の会話</span>
+          </span>
+          <button
+            type="button"
+            className="hud-chat-focus-clear"
+            onPointerDown={keepFocus}
+            onMouseDown={keepFocus}
+            onClick={() => hudActions.clearChatFocus()}
+          >
+            解除
+          </button>
+        </div>
+      )}
       {shown.length > 0 && (
         <ol className="hud-chat-log" aria-label="チャットの履歴" aria-live="polite">
           {[...shown].reverse().map((l) => (
             <li key={l.key} className={`hud-chat-line${!open && now - l.at > LINE_FADE_MS ? ' is-fading' : ''}`}>
               <span className="hud-chat-name" style={{ color: `hsl(${l.hue} 80% 70%)` }}>
+                {l.prefix && <span className="hud-chat-dir">{l.prefix}</span>}
                 {l.name ?? 'ゲスト'}
               </span>
               <span className="hud-chat-text">{l.text}</span>
@@ -107,7 +138,7 @@ export function ChatBox({
             <button
               key={t}
               type="button"
-              className="hud-chat-emoji is-stamp"
+              className={`hud-chat-emoji is-stamp${liked === t ? ' is-liked' : ''}`}
               title="押すと送る"
               disabled={!ready}
               onPointerDown={keepFocus}

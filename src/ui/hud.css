@@ -363,39 +363,130 @@
 @keyframes hud-finder-hint { 0%, 70% { opacity: 0.85; } 100% { opacity: 0; } }
 .hud-finder-shutter { width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 5px rgba(0, 0, 0, 0.35); cursor: pointer; }
 .hud-finder-shutter:active { background: rgba(255, 255, 255, 0.4); }
-body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo-mode .target-arrow { display: none !important; }
+body.is-photo-mode .chat-bubbles, body.is-photo-mode .ship-stamp-ring, body.is-photo-mode .target-ring, body.is-photo-mode .target-arrow { display: none !important; }
 .hud-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 400; letter-spacing: 0.08em; color: var(--hud-accent); }
 
-/* 船の上の吹き出し */
+/* 船の上の吹き出し（シンプルな白）と枠なしのスタンプリアクション */
 .chat-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .chat-bubble {
   position: absolute;
   left: 0;
   top: 0;
-  padding: 4px 10px 6px;
-  border-radius: 14px;
-  background: rgba(2, 4, 10, 0.72);
-  border: 1px solid hsl(var(--hue, 200) 75% 60%);
-  font-size: 26px;
-  line-height: 1.2;
-  white-space: nowrap;
   will-change: transform;
 }
-.chat-bubble.is-phrase { font-size: 14px; line-height: 1.5; padding: 6px 12px; letter-spacing: 0.06em; white-space: normal; width: max-content; max-width: 240px; overflow-wrap: anywhere; }
-.chat-bubble::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -7px;
-  margin-left: -6px;
-  border: 6px solid transparent;
-  border-top-color: hsl(var(--hue, 200) 75% 60%);
-  border-bottom: 0;
+.chat-bubble-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 3px 10px rgba(2, 6, 18, 0.34)) drop-shadow(0 0 1px rgba(2, 6, 18, 0.14));
 }
-.chat-bubble.is-pop { animation: chat-pop 0.25s ease-out; }
-@keyframes chat-pop { from { opacity: 0; margin-top: 8px; } to { opacity: 1; margin-top: 0; } }
+.chat-bubble-body {
+  padding: 8px 15px;
+  border-radius: 15px;
+  background: #fff;
+  color: #161b26;
+  border: 0;
+  font-family: system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: normal;
+  min-width: 58px;
+  width: max-content;
+  max-width: min(248px, calc(100vw - 32px));
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.chat-bubble-tail {
+  display: block;
+  width: 22px;
+  height: 11px;
+  margin-top: -3px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.chat-bubble.is-pop .chat-bubble-inner {
+  animation: chat-pop 0.24s cubic-bezier(0.22, 1.15, 0.36, 1);
+}
+@keyframes chat-pop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.88); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.chat-reaction { position: absolute; left: 0; top: 0; will-change: transform; }
+.chat-reaction-inner {
+  display: inline-block;
+  font-size: 32px;
+  line-height: 1;
+  white-space: nowrap;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+  animation: chat-reaction-float 2.4s cubic-bezier(0.22, 0.7, 0.36, 1) forwards;
+}
+@keyframes chat-reaction-float {
+  0% { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.35) rotate(0deg); }
+  12% { opacity: 1; transform: translate3d(0, -6px, 0) scale(1.28) rotate(calc(var(--rot, 10deg) * -0.5)); }
+  24% { opacity: 1; transform: translate3d(calc(var(--sway, 12px) * 0.45), -18px, 0) scale(1) rotate(var(--rot, 10deg)); }
+  55% { opacity: 0.95; transform: translate3d(calc(var(--sway, 12px) * -0.75 + var(--dx, 0px) * 0.4), calc(var(--rise, 90px) * -0.55), 0) scale(1.04) rotate(calc(var(--rot, 10deg) * -0.6)); }
+  80% { opacity: 0.55; transform: translate3d(calc(var(--sway, 12px) * 0.5 + var(--dx, 0px) * 0.8), calc(var(--rise, 90px) * -0.85), 0) scale(0.95) rotate(calc(var(--rot, 10deg) * 0.35)); }
+  100% { opacity: 0; transform: translate3d(var(--dx, 0px), calc(var(--rise, 90px) * -1), 0) scale(0.8) rotate(0deg); }
+}
+@keyframes chat-reaction-fade {
+  0% { opacity: 0; }
+  15%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* もらったスタンプ（UFO のまわりにふわふわ浮かぶ演出） */
+.chat-gift { position: absolute; left: 0; top: 0; will-change: transform; }
+.chat-gift-inner {
+  display: inline-block;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.55)) drop-shadow(0 2px 5px rgba(0, 0, 0, 0.35));
+  animation: chat-gift-fuwafuwa 3.5s ease-in-out forwards;
+}
+@keyframes chat-gift-fuwafuwa {
+  0% { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.4) rotate(0deg); }
+  18% { opacity: 0.95; transform: translate3d(calc(var(--bob-x, 10px) * 0.5), calc(var(--bob-y, 20px) * -0.25), 0) scale(1.08) rotate(var(--tilt, 8deg)); }
+  45% { opacity: 0.9; transform: translate3d(calc(var(--bob-x, 10px) * -0.8), calc(var(--bob-y, 20px) * -0.55), 0) scale(0.98) rotate(calc(var(--tilt, 8deg) * -0.8)); }
+  72% { opacity: 0.72; transform: translate3d(calc(var(--bob-x, 10px) * 0.65), calc(var(--bob-y, 20px) * -0.82), 0) scale(1.04) rotate(calc(var(--tilt, 8deg) * 0.6)); }
+  100% { opacity: 0; transform: translate3d(calc(var(--bob-x, 10px) * -0.2), calc(var(--bob-y, 20px) * -1.05), 0) scale(0.82) rotate(0deg); }
+}
+
+/* UFO にエイムを合わせたときに出る機体周囲のスタンプリング（枠なし・照準で選択） */
+.ship-stamp-ring { position: absolute; inset: 0; pointer-events: none; overflow: hidden; display: none; z-index: 2; }
+.ship-stamp-ring.is-open { display: block; }
+.ship-stamp-slot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 24px;
+  line-height: 1;
+  opacity: 0.78;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+  transition: opacity 0.14s ease, filter 0.14s ease;
+  will-change: transform;
+}
+.ship-stamp-slot.is-aimed {
+  opacity: 1;
+  font-size: 32px;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.75));
+}
+.ship-stamp-slot.is-sent { animation: ship-stamp-sent 0.34s ease-out; }
+@keyframes ship-stamp-sent {
+  0% { font-size: 32px; }
+  45% { font-size: 40px; }
+  100% { font-size: 32px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .chat-bubble.is-pop { animation: none; }
+  .chat-bubble.is-pop .chat-bubble-inner { animation: none; }
+  .chat-reaction-inner { animation: chat-reaction-fade 2.4s ease-out forwards; }
+  .chat-gift-inner { animation: chat-reaction-fade 3.5s ease-out forwards; }
+  .ship-stamp-slot { transition: none; }
+  .ship-stamp-slot.is-sent { animation: none; }
   .hud-shutter { animation: none; }
   .hud-finder-hint { animation: none; opacity: 0.85; }
   .hud-radar-sweep { animation: none; display: none; }
@@ -512,9 +603,37 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
   text-shadow: 0 0 3px rgba(2, 4, 10, 0.8);
 }
 .hud-chat.is-open .hud-chat-log { max-height: min(40vh, 320px); overflow-y: auto; pointer-events: auto; }
+.hud-chat-focus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(232, 236, 244, 0.18);
+  font-size: 12px;
+  pointer-events: auto;
+}
+.hud-chat-focus-target { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.hud-chat-focus-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.hud-chat-focus-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0.06em; }
+.hud-chat-focus-label { color: var(--hud-quiet); font-size: 11px; flex: none; }
+.hud-chat-focus-clear {
+  flex: none;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--hud-quiet);
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hud-chat-focus-clear:focus-visible { outline: 1px solid var(--hud-accent); outline-offset: 1px; }
 .hud-chat-line { transition: opacity 1.2s ease; }
 .hud-chat-line.is-fading { opacity: 0; }
 .hud-chat-name { margin-right: 0.6em; font-size: 12px; letter-spacing: 0.08em; }
+.hud-chat-dir { margin-right: 0.25em; font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 11px; letter-spacing: 0.08em; opacity: 0.85; }
 .hud-chat-name::after { content: '：'; opacity: 0.6; }
 .hud-chat-text { color: var(--hud-ink); }
 /* 履歴と、スタンプ・入力欄の間の細い線 */
@@ -563,6 +682,13 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
 }
 .hud-chat-emoji:disabled { opacity: 0.4; cursor: default; }
 .hud-chat-emoji:active:not(:disabled) { background: rgba(255, 255, 255, 0.2); transform: scale(0.92); }
+.hud-chat-emoji.is-liked { animation: chat-stamp-like 0.35s cubic-bezier(0.22, 1.4, 0.36, 1); }
+@keyframes chat-stamp-like {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.36); }
+  65% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
 /* ☺：もっと多くの絵文字から選ぶ（選ぶと入力欄に足す） */
 .hud-chat-picker-toggle {
   flex: none;
@@ -587,11 +713,12 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
 .hud-chat-picker-name { padding: 4px 4px 0; font-size: 10px; letter-spacing: 0.2em; color: var(--hud-orange); }
 .hud-chat-emoji-grid { display: flex; flex-wrap: wrap; gap: 2px; }
 @media (hover: hover) {
-  .hud-chat-picker-toggle:hover:not(:disabled) { color: #fff; }
+  .hud-chat-picker-toggle:hover:not(:disabled), .hud-chat-focus-clear:hover { color: #fff; }
   .hud-chat-emoji:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
 }
 @media (prefers-reduced-motion: reduce) {
   .hud-chat-line, .hud-chat-emoji { transition: none; }
+  .hud-chat-emoji.is-liked { animation: none; }
   .hud-pause, .hud-lock-hint { animation-duration: 0.01s; animation-delay: 0s; }
 }
 @media (max-width: 720px), (pointer: coarse) {
