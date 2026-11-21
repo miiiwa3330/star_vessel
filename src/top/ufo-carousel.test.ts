@@ -7,7 +7,7 @@ import {
   FLY_STAGGER_MS,
   flyIn,
   flyOut,
-  hullOfTarget,
+  slotsFor,
   indexOfTarget,
   SIDE_SCALE,
   settleTarget,
@@ -20,35 +20,42 @@ import {
 
 describe('UFO の列の位置', () => {
   it('真ん中からの距離は、輪の上で近い方の向きに収まる', () => {
-    expect(wrapOffset(0)).toBe(0);
-    expect(wrapOffset(1)).toBe(1);
-    expect(wrapOffset(2)).toBe(-1);
-    expect(wrapOffset(-1)).toBe(-1);
-    expect(wrapOffset(4)).toBe(1);
-    expect(wrapOffset(0.4)).toBeCloseTo(0.4);
-    expect(wrapOffset(1.6)).toBeCloseTo(-1.4);
+    // 船が 4 つ（最初から選べる 3 つと「＋」）
+    expect(wrapOffset(0, 4)).toBe(0);
+    expect(wrapOffset(1, 4)).toBe(1);
+    expect(wrapOffset(3, 4)).toBe(-1);
+    expect(wrapOffset(2, 4)).toBe(-2); // 真裏
+    expect(wrapOffset(-1, 4)).toBe(-1);
+    expect(wrapOffset(5, 4)).toBe(1);
+    expect(wrapOffset(0.4, 4)).toBeCloseTo(0.4);
+    expect(wrapOffset(2.6, 4)).toBeCloseTo(-1.4);
+    // 6 つ（マイ UFO が 2 つ）
+    expect(wrapOffset(5, 6)).toBe(-1);
+    expect(wrapOffset(3, 6)).toBe(-3);
   });
 
   it('目標の整数から、どの船かが決まる（負の数や、何周していても）', () => {
-    expect(indexOfTarget(0)).toBe(0);
-    expect(indexOfTarget(3)).toBe(0);
-    expect(indexOfTarget(4)).toBe(1);
-    expect(indexOfTarget(-1)).toBe(2);
-    expect(indexOfTarget(-3)).toBe(0);
-    expect(hullOfTarget(1)).toBe('bell');
+    expect(indexOfTarget(0, 4)).toBe(0);
+    expect(indexOfTarget(4, 4)).toBe(0);
+    expect(indexOfTarget(5, 4)).toBe(1);
+    expect(indexOfTarget(-1, 4)).toBe(3);
+    expect(indexOfTarget(-4, 4)).toBe(0);
+    expect(indexOfTarget(-1, 6)).toBe(5);
+    expect(slotsFor(0)).toEqual([{ kind: 'preset', hull: 'saucer' }, { kind: 'preset', hull: 'bell' }, { kind: 'preset', hull: 'ring' }, { kind: 'new' }]);
+    expect(slotsFor(2).slice(3)).toEqual([{ kind: 'custom', index: 0 }, { kind: 'custom', index: 1 }, { kind: 'new' }]);
   });
 
   it('船を指定して真ん中へ持ってくる目標は、いまの目標に近い方へ回る', () => {
-    expect(targetForIndex(0, 0)).toBe(0);
-    expect(targetForIndex(1, 0)).toBe(1);
-    expect(targetForIndex(2, 0)).toBe(-1); // 2 へ行くより、左へ 1 つ戻る方が近い
-    expect(targetForIndex(0, 2)).toBe(3);
-    // どの組み合わせでも、目標が指す船は指定した船で、動きは 1 つ以内
+    expect(targetForIndex(0, 0, 4)).toBe(0);
+    expect(targetForIndex(1, 0, 4)).toBe(1);
+    expect(targetForIndex(3, 0, 4)).toBe(-1); // 3 へ行くより、左へ 1 つ戻る方が近い
+    expect(targetForIndex(0, 3, 4)).toBe(4);
+    // どの組み合わせでも、目標が指す船は指定した船で、動きは 2 つ以内（真裏は 2）
     for (let cur = -7; cur <= 7; cur++) {
-      for (let i = 0; i < 3; i++) {
-        const t = targetForIndex(i, cur);
-        expect(indexOfTarget(t)).toBe(i);
-        expect(Math.abs(t - cur)).toBeLessThanOrEqual(1);
+      for (let i = 0; i < 4; i++) {
+        const t = targetForIndex(i, cur, 4);
+        expect(indexOfTarget(t, 4)).toBe(i);
+        expect(Math.abs(t - cur)).toBeLessThanOrEqual(2);
       }
     }
   });
@@ -74,8 +81,8 @@ describe('UFO の大きさ', () => {
   });
 
   it('輪の裏側の船が左右で入れ替わる瞬間は、見えない', () => {
-    // pos = 0.5 のとき、番号 2 の船は −1.5 にいる
-    expect(slotLook(wrapOffset(2 - 0.5)).alpha).toBeCloseTo(0);
+    // 船が 4 つで pos = 0.5 のとき、番号 2 の船は 1.5 にいる
+    expect(slotLook(wrapOffset(2 - 0.5, 4)).alpha).toBeCloseTo(0);
   });
 });
 
@@ -166,12 +173,12 @@ describe('出入り', () => {
     expect(ufoFlight('in', 2, 10).visible).toBe(false);
     expect(ufoFlight('in', 2, 2 * FLY_STAGGER_MS + 10).visible).toBe(true);
     // 全部が終わる時間には、全部が元の場所
-    const done = flightDuration('in');
+    const done = flightDuration('in', 3);
     for (const rank of [0, 1, 2]) expect(ufoFlight('in', rank, done).offset).toBe(0);
     // 退場：左の船が先に消える
     expect(ufoFlight('out', 0, FLY_OUT_MS + 1).visible).toBe(false);
     expect(ufoFlight('out', 2, FLY_OUT_MS + 1).visible).toBe(true);
-    for (const rank of [0, 1, 2]) expect(ufoFlight('out', rank, flightDuration('out')).visible).toBe(false);
+    for (const rank of [0, 1, 2]) expect(ufoFlight('out', rank, flightDuration('out', 3)).visible).toBe(false);
   });
 
   it('隠れているときは見えず、止まっているときは元の場所', () => {

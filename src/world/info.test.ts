@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clusterKey, describeHost, nearestStars, pickAimed, starKey, type InfoTarget } from './info';
+import { clusterKey, describeHost, facing, nearestStars, pickAimed, starKey, type InfoTarget } from './info';
 import type { Cluster } from './clusters';
 
 const target = (key: string, x: number, y: number, z: number, radiusKm?: number): InfoTarget => ({
@@ -72,5 +72,15 @@ describe('記号と説明', () => {
     const lines = describeHost({ system: 'G1-2-3.4', positionPc: { x: 100, y: 0, z: 0 }, absMag: 5, bv: 0.6 }, '恒星 G', 0);
     expect(lines[0]).toContain('自動で作った星');
     expect(lines).toContain('惑星は無い');
+  });
+});
+
+describe('F キーの「もう向いている」', () => {
+  it('1 度以内なら向いている', () => {
+    const fwd = { x: 0, y: 0, z: -1 };
+    expect(facing({ x: 0, y: 0, z: -1000 }, fwd)).toBe(true);
+    expect(facing({ x: Math.tan((0.5 * Math.PI) / 180) * 1000, y: 0, z: -1000 }, fwd)).toBe(true);
+    expect(facing({ x: Math.tan((2 * Math.PI) / 180) * 1000, y: 0, z: -1000 }, fwd)).toBe(false);
+    expect(facing({ x: 0, y: 0, z: 1000 }, fwd)).toBe(false);
   });
 });

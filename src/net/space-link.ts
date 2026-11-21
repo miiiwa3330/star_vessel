@@ -5,7 +5,7 @@
 import { reportServerTime } from '../world/clock';
 import type { ChatMessage, ServerMessage, ShipSnapshot, ShipState, StateMessage } from '../world/ship-schema';
 import { cleanChatText } from '../world/chat';
-import type { ShipDesign } from '../world/ship-design';
+import type { ShipLook } from '../world/ship-design';
 
 const MAX_RETRY_MS = 10_000;
 
@@ -38,7 +38,7 @@ export class SpaceLink {
     this.connect();
   }
 
-  send(state: ShipState, design?: ShipDesign): void {
+  send(state: ShipState, design?: ShipLook): void {
     if (!this.connected) return;
     const msg: StateMessage = { t: 'state', s: state, d: design };
     this.ws?.send(JSON.stringify(msg));

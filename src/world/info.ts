@@ -275,3 +275,11 @@ export function nearestStars(
   }
   return best;
 }
+
+
+/** 向き rel（自分から相手へ）が、いま見ている向き forward とほぼ同じか（F キーで「もう向いている」とみなす。1 度以内） */
+export function facing(rel: Vec3, forward: Vec3): boolean {
+  const d = Math.hypot(rel.x, rel.y, rel.z);
+  if (d === 0) return true;
+  return (rel.x * forward.x + rel.y * forward.y + rel.z * forward.z) / d > Math.cos((1 * Math.PI) / 180);
+}

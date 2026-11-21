@@ -19,8 +19,8 @@ import {
   type ShipState,
 } from '../src/world/ship-schema';
 import { nearestIndices, shipPositionKm } from '../src/world/ships';
-import { designOrNone } from '../src/world/ship-schema';
-import type { ShipDesign } from '../src/world/ship-design';
+import { lookOrNone } from '../src/world/ship-schema';
+import type { ShipLook } from '../src/world/ship-design';
 import { CHAT_MIN_INTERVAL_MS, cleanChatText } from '../src/world/chat';
 import { isUsername } from '../src/world/account';
 import { PRESENCE_REFRESH_MS, presenceStatement } from '../src/world/presence';
@@ -35,8 +35,8 @@ interface Attachment {
   room: string;
   hue: number;
   state: ShipState | null;
-  /** 船の設計（最後に受け取ったもの） */
-  design?: ShipDesign;
+  /** 船の見た目の印（最後に受け取ったもの） */
+  design?: ShipLook;
   /** 状態を受け取った時刻（ms） */
   at: number;
   /** 宇宙船名（チャットに出す。サインアップしていない人は null） */
@@ -104,7 +104,7 @@ export class SpaceRoom extends DurableObject<Env> {
     if (now - a.at < SHIP_MIN_INTERVAL_MS) return;
     if (m.t !== 'state' || !isShipState(m.s)) return;
     a.state = m.s;
-    a.design = designOrNone(m.d) ?? a.design;
+    a.design = lookOrNone(m.d) ?? a.design;
     a.at = now;
     ws.serializeAttachment(a);
 

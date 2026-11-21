@@ -287,6 +287,8 @@ export const hudActions = {
   selectTarget: (_key: string | null): void => {},
   /** 選んだ天体の方を向く */
   faceTarget: (): void => {},
+  /** F キー：選んでいるものの方を向く。もう向いていれば、選ぶのをやめる。何も選んでいなければ照準の先を選んで向く。main.ts が中身を入れる */
+  toggleFocus: (): void => {},
   /** 左上の表示（座標など）を出す・消す（F3 キー） */
   /** ゲームメニューの「タイトルへ」（ローディング画面をはさんで、タイトル画面へ）。main.ts が中身を入れる */
   goTitle: (): void => {

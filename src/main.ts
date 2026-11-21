@@ -10,9 +10,10 @@ import { SpaceLink } from './net/space-link';
 import { createStarfield } from './render/starfield';
 import { SolarSystemView } from './render/solar-system-view';
 import { ChaseCamera } from './controls/chase-camera';
-import { hullLengthKm } from './render/ship-models';
-import { shipApi } from './net/ship-repository';
-import { defaultDesignFor, SHIP_DESIGN_VERSION, type ShipDesign } from './world/ship-design';
+import { customKey, presetShape, shapeLengthKm, type ShipShape } from './render/ship-models';
+import { customBlocks, rememberCustomBlocks, shipApi } from './net/ship-repository';
+import { decodeBlocks } from './world/ship-blocks';
+import { lookOf, usedCustom, type ShipLook } from './world/ship-design';
 import { ChatBubbles } from './ui/chat-bubbles';
 import { CHAT_LOG_SIZE, CHAT_MIN_INTERVAL_MS } from './world/chat';
 import { AsteroidField, type AsteroidFile } from './render/asteroid-field';
@@ -60,6 +61,7 @@ import { starLimitMag } from './render/star-sprites';
 import { nearestSystem, readAddress, setAddressNameLookup, SYSTEM_SOL } from './world/address';
 import { KM_PER_AU, KM_PER_PC } from './world/units';
 import { add, length, mulVec, normalize, scale, sub, type Vec3 } from './world/vec';
+import { facing } from './world/info';
 import { arriveAt, planWarpHere, removableWarpHere, warpPositionKm } from './world/warp';
 import { MAX_WARPS_PER_PLAYER, type WarpHole } from './world/warp-schema';
 
@@ -304,7 +306,7 @@ async function main() {
     .catch((e: unknown) => console.error('小惑星のデータが読めない', e));
   const warpView = new WarpView();
   solar.scene.add(warpView.group);
-  const shipView = new ShipView();
+  const shipView = new ShipView(customBlocks);
   solar.scene.add(shipView.group);
   const link = new SpaceLink();
   const shipSmoother = new ShipSmoother();
@@ -341,8 +343,12 @@ async function main() {
     warpView.setWarps(warps);
   };
   const refreshWarps = async () => setWarps(await warpApi.list());
-  /** 自分の宇宙船の設計（要件 F27）。サーバーから読むまでは仮にソーサー */
-  let myDesign: ShipDesign = { v: SHIP_DESIGN_VERSION, hull: 'saucer' };
+  /**
+   * 自分の宇宙船（要件 F27）。myLook は宇宙の部屋で配る見た目の印、myShape は自分で描く形。
+   * サーバーから読むまでは仮にソーサー
+   */
+  let myLook: ShipLook = lookOf(null, null);
+  let myShape: ShipShape = presetShape('saucer');
   let online = false;
   try {
     await ensureSession();
@@ -351,7 +357,16 @@ async function main() {
     hudStore.set({ warpsReady: true });
     // 自分の宇宙船の設計（宇宙船はタイトル画面の出発前に選ぶ。まだ無ければ仮のソーサーのまま）
     const saved = await shipApi.get();
-    if (saved) myDesign = saved;
+    // 自分で作った船を使っているなら、そのブロック（ほかの人には印だけを配る）
+    const used = usedCustom(saved.design);
+    const ownBlocks = used ? decodeBlocks(used) : null;
+    myLook = lookOf(saved.design, ownBlocks ? saved.ref : null);
+    if ('ref' in myLook && ownBlocks) {
+      rememberCustomBlocks(myLook.ref, ownBlocks);
+      myShape = { key: customKey(myLook.ref), blocks: ownBlocks };
+    } else {
+      myShape = presetShape('hull' in myLook ? myLook.hull : 'saucer');
+    }
   } catch (e) {
     console.error(e);
     hudStore.set({ status: 'Offline: warp holes are unavailable' });
@@ -474,6 +489,7 @@ async function main() {
     if (!hudStore.get().photoMode) f();
   };
   controls.onToggleRadar = unlessMenu(unlessPhoto(() => hudActions.toggleOverlay('radar')));
+  controls.onToggleFocus = unlessMenu(unlessPhoto(() => hudActions.toggleFocus()));
   controls.onToggleMap = unlessMenu(unlessPhoto(() => hudActions.toggleOverlay('map')));
   controls.onHotbar = (n) =>
     unlessMenu(() => {
@@ -590,10 +606,9 @@ async function main() {
   };
   // ゲームメニューの「タイトルへ」：ローディング画面を飛ぶ UFO を、いまの自分の船の絵にしてから移る（長くても 0.3 秒だけ待つ）
   hudActions.goTitle = async () => {
-    const hull = myDesign.hull;
     const hue = link.hue ?? 200;
-    const url = await Promise.race([snapshotUfo(renderer, hull, hue), new Promise<null>((r) => setTimeout(() => r(null), 300))]);
-    if (url) rememberUfoLook(hull, hue, url);
+    const url = await Promise.race([snapshotUfo(renderer, myShape), new Promise<null>((r) => setTimeout(() => r(null), 300))]);
+    if (url) rememberUfoLook(myShape.key, hue, url);
     beginLoading();
     window.location.assign('/');
   };
@@ -737,6 +752,21 @@ async function main() {
     controls.lookAt({ x: -w.facing.x, y: -w.facing.y, z: -w.facing.z }, controls.up());
     hudStore.set({ selectedWarp: null });
     showNotice(`${w.code} へワープしました`);
+  };
+  // F キー・カードの「F」（2026-11-21）：選んでいるワープホールか天体の方を向く。もう向いていれば、選ぶのをやめる。
+  // 何も選んでいなければ、照準の先の天体を選んで向く
+  hudActions.toggleFocus = () => {
+    const forward = controls.forward();
+    const warpId = hudStore.get().selectedWarp;
+    const w = warpId ? warps.find((x) => x.id === warpId) : undefined;
+    if (w && findBody(w.anchor) !== null) {
+      const d = worldNow();
+      const rel = sub(warpPositionKm(w, d), absolutePositionKm(observer, d));
+      if (facing(rel, forward)) hudActions.selectWarp(null);
+      else controls.lookAt(rel, controls.up());
+      return;
+    }
+    info.toggleFocus(forward);
   };
   hudActions.faceWarp = (id) => {
     const w = warps.find((x) => x.id === id);
@@ -890,16 +920,16 @@ async function main() {
       if (nowMs - lastSend > 1000 / SHIP_SEND_HZ) {
         lastSend = nowMs;
         const q = controls.orientation;
-        link.send({ ...observer, velocityKmS, orientation: { x: q.x, y: q.y, z: q.z, w: q.w } }, myDesign);
+        link.send({ ...observer, velocityKmS, orientation: { x: q.x, y: q.y, z: q.z, w: q.w } }, myLook);
       }
     }
     const others = shipSmoother.update(link.ships, date, dt);
     shipView.update(others, abs, dt);
 
-    const shownHull = myDesign.hull;
-    chase.pose(controls.orientation, hullLengthKm(shownHull), camera.position, camera.quaternion);
+    const ownLengthKm = shapeLengthKm(myShape);
+    chase.pose(controls.orientation, ownLengthKm, camera.position, camera.quaternion);
     const q = controls.orientation;
-    shipView.setOwn(chase.mode !== 'first', { v: SHIP_DESIGN_VERSION, hull: shownHull }, link.hue ?? 200, { x: q.x, y: q.y, z: q.z, w: q.w }, velocityKmS, controls.speedKmS, dt);
+    shipView.setOwn(chase.mode !== 'first', myShape, { x: q.x, y: q.y, z: q.z, w: q.w }, velocityKmS, controls.speedKmS, dt);
     starCamera.quaternion.copy(camera.quaternion);
 
     // チャットの吹き出しを、船の少し上に置く。自分の船は、一人称のときは画面の下の方に出す
@@ -912,12 +942,12 @@ async function main() {
       if (id === SELF_BUBBLE) {
         if (chase.mode === 'first') return { x: w / 2, y: h * 0.72 };
         rel = { x: 0, y: 0, z: 0 };
-        size = hullLengthKm(shownHull);
+        size = ownLengthKm;
       } else {
         const o = others.find((x) => x.id === id);
         if (!o) return null;
         rel = sub(o.positionKm, abs);
-        size = hullLengthKm((o.design ?? defaultDesignFor(o.id)).hull);
+        size = shipView.lengthKmOf(o.id) ?? shapeLengthKm(shipView.shapeOf(o.design, o.id));
       }
       const up = new THREE.Vector3(0, size * 0.8, 0).applyQuaternion(camera.quaternion);
       projected.set(rel.x + up.x, rel.y + up.y, rel.z + up.z).project(camera);

@@ -25,15 +25,23 @@ export function InfoCard({ card, docked = false }: { card: InfoCardState; docked
       </ul>
       {card.source === 'selected' && (
         <div className="hud-info-actions">
-          <button type="button" className="hud-button hud-button-small" onClick={() => hudActions.faceTarget()}>
-            その方を向く
-          </button>
-          <button type="button" className="hud-button hud-button-small hud-button-quiet" onClick={() => hudActions.selectTarget(null)}>
-            選ぶのをやめる
-          </button>
+          <FocusKey />
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * F キーの印（2026-11-21。オーナーの指示で「その方を向く」「選ぶのをやめる」のボタンをやめ、F キーにした）。
+ * F で選んでいるものの方を向き、向いているときにもう一度 F で選ぶのをやめる。キーの無いスマホのために、押しても同じ
+ */
+function FocusKey() {
+  return (
+    <button type="button" className="hud-key-hint" onClick={() => hudActions.toggleFocus()} title="F：その方を向く。向いているときにもう一度で、選ぶのをやめる">
+      <kbd>F</kbd>
+      <span>向く・もう一度でやめる</span>
+    </button>
   );
 }
 
@@ -64,12 +72,7 @@ export function WarpCard({ warp, docked = false }: { warp: WarpListItem; docked?
         >
           ワープ
         </button>
-        <button type="button" className="hud-button hud-button-small" onClick={() => hudActions.faceWarp(warp.id)}>
-          その方を向く
-        </button>
-        <button type="button" className="hud-button hud-button-small hud-button-quiet" onClick={() => hudActions.selectWarp(null)}>
-          選ぶのをやめる
-        </button>
+        <FocusKey />
       </div>
     </div>
   );

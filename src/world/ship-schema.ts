@@ -7,7 +7,7 @@ import type { BodyId } from './solar-system';
 import { KM_PER_LY } from './units';
 import type { Vec3 } from './vec';
 import { isBodyId } from './warp-schema';
-import { isShipDesign, type ShipDesign } from './ship-design';
+import { parseShipLook, type ShipLook } from './ship-design';
 
 /** ブラウザが自分の状態を送る回数（1 秒あたり） */
 export const SHIP_SEND_HZ = 4;
@@ -37,11 +37,14 @@ export interface ChatMessage {
   text: string;
 }
 
-/** ブラウザ → サーバー。d は自分の船の設計（形。見た目だけなので、サーバーは形が正しいかだけを確かめる） */
+/**
+ * ブラウザ → サーバー。d は自分の船の見た目の印（最初から選べる船の名前か、自分で作った船の印〈ref〉。
+ * 見た目だけなので、サーバーは形が正しいかだけを確かめる。前の版の設計 { v: 1, hull } も受け付ける）
+ */
 export interface StateMessage {
   t: 'state';
   s: ShipState;
-  d?: ShipDesign;
+  d?: ShipLook;
 }
 
 export interface ShipSnapshot {
@@ -50,8 +53,8 @@ export interface ShipSnapshot {
   /** 船の色（色相 0〜359）。アカウントごとに決まる */
   hue: number;
   s: ShipState;
-  /** 船の設計（送ってこない人は無し。受け取った側が決まった船で描く） */
-  d?: ShipDesign;
+  /** 船の見た目の印（送ってこない人は無し。受け取った側が決まった船で描く） */
+  d?: ShipLook;
   /** サーバーがこの状態を受け取った時刻（ms・サーバーの時計） */
   at: number;
 }
@@ -86,8 +89,8 @@ export function isShipState(v: unknown): v is ShipState {
   return len(s.offsetKm) < 3e5 * KM_PER_LY && len(s.velocityKmS) <= MAX_SPEED_KM_S * 1.5;
 }
 
-/** 受け取った設計として正しければそれを、でなければ undefined */
-export const designOrNone = (v: unknown): ShipDesign | undefined => (isShipDesign(v) ? v : undefined);
+/** 受け取った見た目の印として正しければ、それを（版 2 の形にして）、でなければ undefined */
+export const lookOrNone = (v: unknown): ShipLook | undefined => parseShipLook(v) ?? undefined;
 
 /** アカウントの ID から船の色相を決める（FNV-1a）。同じアカウントはいつも同じ色 */
 export function hueFromId(id: string): number {

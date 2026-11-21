@@ -201,6 +201,13 @@
 .top-ufo-name { font-size: 12px; letter-spacing: 0.08em; opacity: 0.55; padding: 6px 4px; }
 .top-ufo-zone.is-center .top-ufo-name { opacity: 1; font-weight: 600; color: var(--top-accent); }
 .top-go-error { text-align: center; }
+/* 船を選ぶ段階の「BREAK」（真ん中のマイ UFO を消す。最初からある UFO では押せない。2026-11-21）。UFO の列と「-Go!-」の間 */
+.top-build { height: 0; overflow: visible; opacity: 0; pointer-events: none; display: flex; flex-direction: column; align-items: center; transition: height 0.55s ease, opacity 0.3s ease, transform 0.55s ease; }
+.top-build.is-open { height: 44px; opacity: 1; pointer-events: auto; transform: translateY(clamp(26px, 5vh, 50px)); transition: height 0.55s ease, opacity 0.4s ease 0.5s, transform 0.55s ease; }
+.top-break-button { padding: 7px 18px 7px calc(18px + 0.22em); min-height: 32px; font-size: 11px; }
+.top-break-button:disabled { opacity: 0.22; }
+.top-break-button.is-armed { color: #ff8a1f; border-color: #ff8a1f; }
+.top-break-hint { margin: 6px 0 0; font-size: 11px; letter-spacing: 0.06em; color: #ff8a1f; text-shadow: 0 0 6px rgba(2, 4, 10, 0.9); white-space: nowrap; }
 
 /* 右下の X と Miiiwa のアイコン（2026-11-06 に、右上から右下へ移した）。丸い背景は付けない。ふだんは少し透かし、マウスを乗せると透過を解く（アイコン自体の色の変化だけ） */
 .top-social { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); right: 14px; z-index: 5; display: flex; gap: 4px; }
@@ -569,3 +576,82 @@
 /* ---- パスキー（要件 F52） ---- */
 .top-passkey { align-items: center; }
 .top-passkey > span { flex: 0 1 auto; }
+
+/* ---- 宇宙船を作る画面（ShipBuilder。要件 F27。2026-11-21） ----
+ * 画面いっぱいの 3D に、すりガラスの道具（角は角）を重ねる。文字は Josefin Sans の 300 と system-ui（日本語）。
+ * 見出しはオレンジの英字（BUILD）。選んでいる道具は、白い線と文字
+ */
+.sb { position: fixed; inset: 0; z-index: 20; background: #05070d; color: var(--top-ink); font-family: 'Josefin Sans', system-ui, sans-serif; font-weight: 300; user-select: none; -webkit-user-select: none; }
+.sb-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.sb-failed { position: absolute; top: 45%; left: 16px; right: 16px; text-align: center; font-size: 13px; opacity: 0.7; }
+.sb-glass { background: rgba(12, 16, 28, 0.42); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(232, 236, 244, 0.12); border-radius: 0; }
+.sb-top { position: absolute; top: calc(14px + env(safe-area-inset-top)); left: 16px; right: 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; pointer-events: none; }
+.sb-top > * { pointer-events: auto; }
+.sb-heading { margin: 0; font-size: 13px; font-weight: 300; letter-spacing: 0.45em; color: #ff8a1f; }
+.sb-count { margin: 6px 0 0; font-size: 12px; letter-spacing: 0.12em; color: rgba(232, 236, 244, 0.5); }
+.sb-count-now { color: #fff; font-size: 15px; }
+.sb-count.is-full .sb-count-now { color: #ff8a1f; }
+.sb-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.sb-save { color: #fff; border-color: rgba(255, 255, 255, 0.7); }
+
+.sb-tools { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+.sb-group { display: flex; flex-direction: column; gap: 6px; }
+.sb-group + .sb-group { padding-top: 12px; border-top: 1px solid rgba(232, 236, 244, 0.14); }
+.sb-chip {
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: rgba(232, 236, 244, 0.62);
+  background: none;
+  border: 1px solid rgba(232, 236, 244, 0.22);
+  border-radius: 999px;
+  padding: 6px 12px;
+  min-height: 32px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.sb-chip.is-on { color: #fff; border-color: #fff; background: rgba(255, 255, 255, 0.08); }
+.sb-chip:disabled { opacity: 0.3; cursor: default; }
+.sb-chip:focus-visible, .sb-swatch:focus-visible, .sb-menu-item:focus-visible { outline: 1px solid var(--top-accent); outline-offset: 2px; }
+@media (hover: hover) {
+  .sb-chip:hover:not(:disabled) { color: #fff; border-color: rgba(255, 255, 255, 0.6); }
+  .sb-menu-item:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+  .sb-swatch:hover { transform: scale(1.12); }
+}
+.sb-size { justify-content: flex-start; }
+.sb-size-box { display: inline-block; border: 1px solid currentColor; flex: none; }
+.sb-group-row { flex-direction: row; flex-wrap: wrap; }
+.sb-icon { width: 15px; height: 15px; flex: none; }
+.sb.is-locked .sb-canvas { cursor: cell; }
+.sb-menu { position: fixed; display: flex; flex-direction: column; width: 200px; box-sizing: border-box; padding: 4px 0; z-index: 2; }
+.sb-menu-item { font: inherit; font-size: 13px; text-align: left; color: rgba(232, 236, 244, 0.8); background: none; border: 0; padding: 9px 14px; cursor: pointer; }
+
+.sb-bottom { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: calc(100vw - 32px); }
+.sb-message { margin: 0; font-size: 12px; letter-spacing: 0.06em; color: #ffd38a; text-shadow: 0 0 6px rgba(2, 4, 10, 0.9); }
+.sb-palette { display: grid; grid-template-columns: repeat(24, 24px); gap: 5px; padding: 8px; }
+.sb-swatch { width: 24px; height: 24px; padding: 0; border: 1px solid rgba(0, 0, 0, 0.4); border-radius: 0; background: var(--sb-swatch); cursor: pointer; position: relative; transition: transform 0.15s ease; -webkit-tap-highlight-color: transparent; }
+.sb-swatch.is-glow { box-shadow: 0 0 8px 1px var(--sb-swatch); }
+.sb-swatch.is-glow::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: rgba(255, 255, 255, 0.85); }
+.sb-swatch.is-on { outline: 2px solid #fff; outline-offset: 2px; }
+.sb-hint { margin: 0; font-size: 11px; letter-spacing: 0.06em; color: rgba(232, 236, 244, 0.42); font-family: system-ui, sans-serif; text-shadow: 0 0 6px rgba(2, 4, 10, 0.9); }
+.sb-hint-touch { display: none; }
+@media (hover: none), (pointer: coarse) {
+  .sb-hint-mouse { display: none; }
+  .sb-hint-touch { display: block; }
+}
+
+/* スマホ：道具は上の下に横 1 列（はみ出す分は横に流す）、色は 12 × 2 */
+@media (max-width: 720px) {
+  .sb-tools { top: calc(66px + env(safe-area-inset-top)); left: 0; right: 0; transform: none; flex-direction: row; gap: 10px; padding: 8px 12px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; border-left: 0; border-right: 0; }
+  .sb-tools::-webkit-scrollbar { display: none; }
+  .sb-group { flex-direction: row; flex: none; }
+  .sb-group + .sb-group { padding-top: 0; border-top: 0; padding-left: 10px; border-left: 1px solid rgba(232, 236, 244, 0.14); }
+  .sb-chip { padding: 5px 10px; min-height: 32px; font-size: 12px; }
+  .sb-palette { grid-template-columns: repeat(12, 24px); gap: 4px; padding: 6px; }
+}
