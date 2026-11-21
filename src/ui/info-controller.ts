@@ -34,6 +34,7 @@ import { formatDistance } from './format';
 import { hudActions, hudStore, type InfoCardState } from './hud-store';
 import { TargetMarker } from './target-marker';
 import { bodyAddress } from '../world/address';
+import { inScanRange, nearestScannable } from '../world/scan';
 
 /** 近づいたときのカードを出しておく時間 */
 const NEAR_CARD_MS = 8_000;
@@ -133,8 +134,8 @@ export class InfoController {
     for (const v of this.pending.splice(0)) this.send(v);
   }
 
-  /** クリック・タップした場所の近くの相手を選ぶ。選んだら true。何も無ければ何もせず false */
-  tap(x: number, y: number, w: number, h: number): boolean {
+  /** クリック・タップした場所の近くの相手を選ぶ。選んだ相手を返す。何も無ければ何もせず null */
+  tap(x: number, y: number, w: number, h: number): InfoTarget | null {
     let best: InfoTarget | null = null;
     let bestD = Infinity;
     const pxPerRad = h / 2 / Math.tan((this.deps.camera.fov * Math.PI) / 360);
@@ -154,7 +155,27 @@ export class InfoController {
       this.selected = best;
       hudStore.set({ selectedKey: best.key, selectedWarp: null });
     }
-    return best !== null;
+    return best;
+  }
+
+  /**
+   * スキャン（2026-11-22）：いまスキャンできる範囲にある天体のうち、表面がいちばん近いもの（レーダーの上の SCAN: OK）。
+   * 1 秒に 10 回入れ直す相手の一覧から探す
+   */
+  scannable(): InfoTarget | null {
+    return nearestScannable(this.targets, this.observer);
+  }
+
+  /** その相手が、いまスキャンできる範囲にあるか */
+  canScan(t: InfoTarget): boolean {
+    return inScanRange(t, this.observer);
+  }
+
+  /** スキャンが終わった：コレクションに記録する（＝訪れた）。はじめてなら true。近づいたときのカードも出し直す */
+  completeScan(t: InfoTarget, nowMs: number): boolean {
+    const first = this.record(t);
+    if (!this.selected) this.near = { target: t, until: nowMs + NEAR_CARD_MS, firstVisit: first };
+    return first;
   }
 
   /** 場所の無いもの（星座）をコレクションに記録する。はじめてなら true */
@@ -189,12 +210,9 @@ export class InfoController {
     // 近づいたとき（要件 F37）：基準の天体が変わった・恒星系に入った・星団に入った
     const sys = this.deps.systems.currentSystem;
     const now = { anchor, system: sys, cluster: cluster ? clusterKey(cluster) : null, deep: this.inside?.key ?? null };
-    if (!this.last) {
-      // 起動したときにいる場所は、カードを出さずに記録だけする
-      this.record(this.bodyTarget(findBody(anchor) ?? findBody('Sun')!, date));
-      const star = this.starTarget(sys);
-      if (star) this.record(star);
-    } else {
+    // 天体・恒星は、近づいただけでは記録しない。スキャンして記録する（2026-11-22。src/world/scan.ts）。
+    // 起動したときにいる場所も、記録しない（前は地球と太陽を記録していた）
+    if (this.last) {
       const hits: InfoTarget[] = [];
       if (now.system !== this.last.system) {
         const star = this.starTarget(now.system);
@@ -206,9 +224,11 @@ export class InfoController {
       }
       if (now.cluster && now.cluster !== this.last.cluster && cluster) hits.push(this.clusterTarget(cluster));
       if (now.deep && now.deep !== this.last.deep && this.inside) hits.push(this.inside);
-      // いちばん近いもの（あとに足したもの）をカードに出す。どれも記録する
+      // いちばん近いもの（あとに足したもの）をカードに出す。
+      // 記録するのは、スキャンできない星団・星雲・銀河だけ（中に入ったら記録。天体・恒星はスキャンで記録する）
       for (const t of hits) {
-        const first = this.record(t);
+        const byEntering = t.kind === 'cluster' || t.kind === 'nebula' || t.kind === 'galaxy';
+        const first = byEntering ? this.record(t) : false;
         this.near = { target: t, until: nowMs + NEAR_CARD_MS, firstVisit: first };
       }
     }

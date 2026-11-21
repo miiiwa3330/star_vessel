@@ -63,6 +63,8 @@ import { nearestSystem, readAddress, setAddressNameLookup, SYSTEM_SOL } from './
 import { KM_PER_AU, KM_PER_PC } from './world/units';
 import { add, length, mulVec, normalize, scale, sub, type Vec3 } from './world/vec';
 import { facing } from './world/info';
+import { ScanBeam } from './render/scan-beam';
+import { ScanController } from './ui/scan-controller';
 import { arriveAt, planWarpHere, removableWarpHere, warpPositionKm } from './world/warp';
 import { MAX_WARPS_PER_PLAYER, type WarpHole } from './world/warp-schema';
 
@@ -413,6 +415,23 @@ async function main() {
     face: (rel) => controls.lookAt(rel, controls.up()),
     starName: (system) => starNameJa(starInfo.get(system)),
   });
+  // スキャン（訪れた判定。2026-11-22）：近づいて天体を押すと、UFO から緑の光が出て上から下へなぞる。終わるとコレクションに記録する
+  const scanBeam = new ScanBeam();
+  solar.scene.add(scanBeam.group);
+  const scan = new ScanController(info, scanBeam);
+  const camForwardV = new THREE.Vector3();
+  const camUpV = new THREE.Vector3();
+  /** カメラの前・上の向きと、いまの視点（スキャンの失敗を見分けるため） */
+  const scanView = () => {
+    camForwardV.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    camUpV.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    return {
+      nowMs: performance.now(),
+      forward: { x: camForwardV.x, y: camForwardV.y, z: camForwardV.z },
+      up: { x: camUpV.x, y: camUpV.y, z: camUpV.z },
+      view: chase.mode,
+    };
+  };
   // クリック・タップ：他の船があればその相手との会話だけに絞る。無ければ天体、さらに無ければ星座を選ぶ
   let lastObserverPc = { x: 0, y: 0, z: 0 };
   let lastOthers: SmoothedShip[] = [];
@@ -469,7 +488,12 @@ async function main() {
       }
       return;
     }
-    if (info.tap(x, y, w, h)) return;
+    const tapped = info.tap(x, y, w, h);
+    if (tapped) {
+      // スキャンできる範囲の天体なら、選ぶのと一緒にスキャンを始める
+      scan.tryStart(tapped, scanView());
+      return;
+    }
     tapDirection.set((x / w) * 2 - 1, 1 - (y / h) * 2, 0.5).unproject(camera).sub(camera.position).normalize();
     const c = constellationView.pick(lastObserverPc, { x: tapDirection.x, y: tapDirection.y, z: tapDirection.z });
     if (!c) return;
@@ -1022,6 +1046,8 @@ async function main() {
     const q = controls.orientation;
     shipView.setOwn(chase.mode !== 'first', myShape, { x: q.x, y: q.y, z: q.z, w: q.w }, velocityKmS, controls.speedKmS, dt);
     starCamera.quaternion.copy(camera.quaternion);
+    scanBeam.pixelRatio = renderer.getPixelRatio();
+    scan.frame({ ...scanView(), nowMs, date, abs, pxPerRad: window.innerHeight / 2 / Math.tan((FOV * Math.PI) / 360) });
 
     // 相手の UFO に照準を合わせたときのスタンプリングと、吹き出し・スタンプの配置（一人称では自分のものを隠す）
     camera.updateMatrixWorld();
@@ -1151,6 +1177,7 @@ async function main() {
         const f = new THREE.Vector3();
         camera.getWorldDirection(f);
         info.updateHud(nowMs, abs, date, observer.anchor, inCluster, { x: f.x, y: f.y, z: f.z }, false);
+        scan.updateAvailability();
         // 照準の先の星座（線を出しているときだけ）。明るくして、名前を照準の下に出す
         const aimedConstellation = constellationView.aim({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC }, { x: f.x, y: f.y, z: f.z });
         const aimName = aimedConstellation?.nameJa ?? null;

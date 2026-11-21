@@ -10,6 +10,7 @@ import type { ViewMode } from '../controls/chase-camera';
 import type { Visit } from '../world/visits';
 import type { InfoKind } from '../world/info';
 import type { Vec3 } from '../world/vec';
+import type { ScanPhase } from '../world/scan';
 
 /** スマホの画面のボタンで押せるキー */
 export type MoveKeyCode = 'KeyW' | 'KeyA' | 'KeyS' | 'KeyD' | 'Space' | 'ShiftLeft' | 'ControlLeft';
@@ -80,6 +81,15 @@ export interface ChatFocus {
   since: number;
   /** クリックしたときの距離（km）。離れたかを測る基準 */
   clickedDistanceKm: number;
+}
+
+/** スキャン（2026-11-22）の表示：レーダーの上の「SCAN: OK」 */
+export interface ScanHud {
+  /** いまスキャンできる天体が範囲にあるか（OK が光る） */
+  available: boolean;
+  phase: ScanPhase;
+  /** スキャンの進み具合（0〜100。5 ずつ。スキャンの最中だけ） */
+  percent: number;
 }
 
 export interface WarpListItem {
@@ -171,6 +181,8 @@ export interface HudState {
   chatOpen: boolean;
   /** スマホの左下の「＋」を開いて、アイコンを出しているか（2026-11-21。最初はしまっておく） */
   itemsOpen: boolean;
+  /** スキャンの表示（レーダーの上。2026-11-22） */
+  scan: ScanHud;
 }
 
 const radarPrefs = loadRadarPrefs();
@@ -219,6 +231,7 @@ let state: HudState = {
   photoMode: false,
   chatOpen: false,
   itemsOpen: false,
+  scan: { available: false, phase: 'idle', percent: 0 },
 };
 const listeners = new Set<() => void>();
 
