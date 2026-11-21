@@ -39,3 +39,4 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-13 | [図鑑：すべての天体・黒いシルエット・回せる絵・滑る詳細](entries/2026-11-13-collection-encyclopedia.md) |
 | 2026-11-13 | [図鑑の絵を、天体ごとのデータに合わせる](entries/2026-11-13-collection-data-looks.md) |
 | 2026-11-13 | [三人称・ベイパー・写真の構え・星座の絵](entries/2026-11-13-third-person-vapor-photo-constellations.md) |
+| 2026-11-21 | [ローディングの UFO を滑らかに飛ばす](entries/2026-11-21-loading-ufo.md) |

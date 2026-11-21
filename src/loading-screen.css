@@ -1,7 +1,7 @@
 /*
- * 「-Go!-」から世界の画面が動き出すまでのローディング画面（2026-11-21。オーナーの指示）。
- * 黒い宇宙の中を、UFO が左から右へ、ふらふらと進む。下にオレンジの LOADING。
- * タイトル画面で「-Go!-」を押した瞬間に出し、ページが /play に変わっても、世界の最初の 1 枚が描けるまで出しておく
+ * ローディング画面（2026-11-21。オーナーの指示）。「-Go!-」から世界まで、世界の「タイトルへ」からタイトル画面まで。
+ * 黒い宇宙の中を、選んだ UFO が、タイトル画面で船が飛んでくるときと同じ動きで渡る（loading-screen.ts が動かす）。
+ * 速いあいだだけ、後ろに光の筋（ベイパー）。下にオレンジの LOADING
  */
 .sv-loading {
   position: fixed;
@@ -13,11 +13,13 @@
   font-family: 'Josefin Sans', system-ui, -apple-system, 'Hiragino Sans', sans-serif;
   font-weight: 300;
   opacity: 1;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.25s ease;
   pointer-events: auto;
+  /* UFO の幅：PC は 120px、スマホは小さく（2026-11-21） */
+  --sv-ufo: min(120px, 16vw);
 }
 .sv-loading.is-leaving { opacity: 0; pointer-events: none; }
-/* 小さな星（同じ並びを 2 枚重ねて、ゆっくり流す） */
+/* 小さな星（同じ並びを敷き詰めて、ゆっくり流す） */
 .sv-loading::before {
   content: '';
   position: absolute;
@@ -35,35 +37,50 @@
   animation: sv-loading-stars 40s linear infinite;
 }
 @keyframes sv-loading-stars { to { transform: translateX(-340px); } }
-/* UFO：左の外から右の外へ（3.6 秒で横切る）。中で、上下に揺れ、左右に傾く（ふらふら） */
+/* UFO の通り道：画面の真ん中を 0 にして、loading-screen.ts が横へ動かす */
 .sv-loading-path {
   position: absolute;
-  left: 0;
+  left: 50%;
   top: 44%;
-  width: 100%;
-  animation: sv-loading-fly 3.6s linear infinite;
+  width: 0;
+  height: 0;
+  transform: translateX(-200vw);
+  will-change: transform;
 }
-@keyframes sv-loading-fly {
-  from { transform: translateX(-140px); }
-  to { transform: translateX(calc(100vw + 20px)); }
+.sv-loading-craft {
+  position: absolute;
+  left: calc(var(--sv-ufo) / -2);
+  top: calc(var(--sv-ufo) * -0.375);
+  width: var(--sv-ufo);
+  height: calc(var(--sv-ufo) * 0.75);
 }
-.sv-loading-ufo {
-  display: block;
-  width: 120px;
-  height: auto;
-  animation: sv-loading-bob 1.15s ease-in-out infinite alternate, sv-loading-sway 1.7s ease-in-out infinite alternate;
-  filter: drop-shadow(0 0 10px rgba(116, 230, 255, 0.35));
+/* 進む向きへの傾き（速さに合わせて。loading-screen.ts） */
+.sv-loading-bank { position: absolute; inset: 0; will-change: transform; }
+/* 止まっているときの、ごくゆっくりした上下の揺れ（タイトル画面と同じ：直径の 3%・約 4.5 秒で 1 往復） */
+.sv-loading-bob { position: absolute; inset: 0; animation: sv-loading-bob 2.25s ease-in-out infinite alternate; }
+@keyframes sv-loading-bob { from { translate: 0 calc(var(--sv-ufo) * -0.03); } to { translate: 0 calc(var(--sv-ufo) * 0.03); } }
+.sv-loading-ufo { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+/* 光の筋：船の真ん中から、後ろ（左）へ伸びる。長さと明るさは速さに合わせる（loading-screen.ts）。タイトル画面と同じ 3 本 */
+.sv-loading-streaks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.sv-loading-streak {
+  position: absolute;
+  right: 0;
+  top: calc(var(--sy) * var(--sv-ufo) * -1 - var(--st) * var(--sv-ufo) / 2);
+  width: calc(var(--sl) * var(--sv-ufo));
+  height: calc(var(--st) * var(--sv-ufo));
+  transform-origin: 100% 50%;
+  transform: scaleX(0.001);
+  opacity: 0;
+  border-radius: 999px;
+  background: linear-gradient(to left, rgba(184, 230, 255, 1), rgba(184, 230, 255, 0.35) 45%, rgba(184, 230, 255, 0));
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
 }
-@keyframes sv-loading-bob { from { translate: 0 -14px; } to { translate: 0 14px; } }
-@keyframes sv-loading-sway { from { rotate: -9deg; } to { rotate: 7deg; } }
-/* 下の光の点（推進の光）は、少し明滅する */
-.sv-loading-glow { animation: sv-loading-blink 0.9s ease-in-out infinite alternate; }
-@keyframes sv-loading-blink { from { opacity: 0.45; } to { opacity: 1; } }
 .sv-loading-word {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(44% + 110px);
+  top: calc(44% + var(--sv-ufo) * 0.55 + 24px);
   margin: 0;
   text-align: center;
   font-size: 12px;
@@ -72,6 +89,5 @@
   color: #ff8a1f;
 }
 @media (prefers-reduced-motion: reduce) {
-  .sv-loading::before, .sv-loading-path, .sv-loading-ufo, .sv-loading-glow { animation: none; }
-  .sv-loading-path { transform: translateX(calc(50vw - 60px)); }
+  .sv-loading::before, .sv-loading-bob { animation: none; }
 }

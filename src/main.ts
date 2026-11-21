@@ -1,5 +1,6 @@
 import * as THREE from 'three/webgpu';
-import { hideLoading } from './loading-screen';
+import { beginLoading, finishLoading, hideLoading, rememberUfoLook } from './loading-screen';
+import { snapshotUfo } from './render/ufo-look';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FlightControls } from './controls/flight';
@@ -444,7 +445,7 @@ async function main() {
   // 開いている画面（ゲームメニュー・レーダー・マップ・チャット・コレクション・写真）。どれか 1 つだけ。
   // PC では、開くとカーソルを出し、閉じると操縦に戻る（カーソルを消す）。入ったばかりのときは何も開かず、クリックを待つ
   controls.isBlocked = () => hudStore.get().overlay !== null;
-  hudActions.setOverlay = (overlay) => {
+  hudActions.setOverlay = (overlay, opts) => {
     const prev = hudStore.get();
     if (overlay === prev.overlay) return;
     // ワープはレーダーから（2026-11-12）。開くたびに、全員のワープホールを取り直す
@@ -460,7 +461,9 @@ async function main() {
       hudStore.set({ photo: null });
     }
     hudStore.set({ overlay });
-    if (overlay === null) controls.requestLock();
+    if (overlay === null) {
+      if (opts?.lock !== false) controls.requestLock();
+    }
     else controls.exitLock();
   };
   // ゲームメニューの間は、メニューのボタンのほかは受け付けない（R・M・1〜6 で別の画面に切り替えない）
@@ -495,7 +498,10 @@ async function main() {
       setPhotoMode(false);
       return;
     }
-    hudActions.setOverlay(hudStore.get().overlay === null ? 'menu' : null);
+    // Esc：何も開いていなければゲームメニュー、開いていれば閉じる（2026-11-21。もう一度押すと元に戻る）。
+    // 閉じても、ブラウザは Esc では操縦（カーソルを消す）に戻らせてくれないので、「クリックで操縦をはじめる」を出してクリックを待つ
+    if (hudStore.get().overlay === null) hudActions.setOverlay('menu');
+    else hudActions.setOverlay(null, { lock: false });
   };
   // Enter・T でチャットの入力欄を開く
   controls.onOpenChat = () => {
@@ -581,6 +587,15 @@ async function main() {
       controls.dragMode = 'steer';
     }
     hudStore.set({ viewMode: mode, orbitDrag: false });
+  };
+  // ゲームメニューの「タイトルへ」：ローディング画面を飛ぶ UFO を、いまの自分の船の絵にしてから移る（長くても 0.3 秒だけ待つ）
+  hudActions.goTitle = async () => {
+    const hull = myDesign.hull;
+    const hue = link.hue ?? 200;
+    const url = await Promise.race([snapshotUfo(renderer, hull, hue), new Promise<null>((r) => setTimeout(() => r(null), 300))]);
+    if (url) rememberUfoLook(hull, hue, url);
+    beginLoading();
+    window.location.assign('/');
   };
   hudActions.toggleOrbitDrag = () => {
     controls.dragMode = controls.dragMode === 'orbit' ? 'steer' : 'orbit';
@@ -801,8 +816,8 @@ async function main() {
   const shownProvisional = new Set<string>();
   let velocityKmS = { x: 0, y: 0, z: 0 };
   hudStore.set({ status: null });
-  // ローディング画面（src/loading-screen.ts）は、最初の 1 枚を描いてから消す（真っ黒な画面が見えないように）
-  requestAnimationFrame(() => requestAnimationFrame(() => hideLoading()));
+  // ローディング画面（src/loading-screen.ts）は、最初の 1 枚を描いてから、UFO が右の端に着いたときに消す
+  requestAnimationFrame(() => requestAnimationFrame(() => finishLoading()));
 
   renderer.setAnimationLoop(() => {
     const nowMs = performance.now();

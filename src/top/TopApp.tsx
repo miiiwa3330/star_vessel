@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { hideLoading, showLoading } from '../loading-screen';
+import { beginLoading, hideLoading, rememberUfoLook } from '../loading-screen';
 import { currentAccount, ensureSession } from '../net/auth';
 import { shipApi } from '../net/ship-repository';
 import { defaultDesignFor, HULL_TYPES, SHIP_DESIGN_VERSION, type HullType } from '../world/ship-design';
@@ -221,8 +221,14 @@ export function TopApp() {
     goingRef.current = true;
     setGoing(true);
     setError(null);
-    // 押したらすぐローディング画面（ページが /play に変わっても、世界が動き出すまで続けて出す。src/loading-screen.ts）
-    showLoading();
+    // ローディング画面を飛ぶ UFO は、選んだ船そのもの：いまの見た目で絵にして覚えておく（長くても 0.3 秒だけ待つ）
+    const pickedHull = hullOfTarget(shared.target);
+    const url = shared.snapshotUfo
+      ? await Promise.race([shared.snapshotUfo(pickedHull, shared.hue), new Promise<null>((r) => setTimeout(() => r(null), 300))])
+      : null;
+    if (url) rememberUfoLook(pickedHull, shared.hue, url);
+    // ローディング画面（ページが /play に変わっても、UFO は続きから。世界が動き出して、UFO が右の外へ消えたら切り替わる）
+    beginLoading();
     try {
       await loading.current;
       const hull = hullOfTarget(shared.target);

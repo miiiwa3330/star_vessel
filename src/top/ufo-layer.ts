@@ -8,6 +8,7 @@
 import * as THREE from 'three/webgpu';
 import { float, pow, uniform, uv, vec3 } from 'three/tsl';
 import { createShipModel, type ShipModel } from '../render/ship-models';
+import { addUfoLights, UFO_TILT, UFO_YAW } from '../render/ufo-look';
 import { HULL_TYPES, HULLS, type HullType } from '../world/ship-design';
 import type { TopStage } from './top-stage';
 import { flightDuration, slotLook, SPACING_OF_WIDTH, stepSpring, ufoFlight, wrapOffset, type UfoPhase } from './ufo-carousel';
@@ -16,8 +17,8 @@ const FOV = 30;
 /** 真ん中の船の直径（箱の高さ・幅に対する割合） */
 const SIZE_OF_HEIGHT = 0.95;
 const SIZE_OF_WIDTH = 0.36;
-/** 船を斜め上から見る角度（ラジアン） */
-const TILT = 0.42;
+/** 船を斜め上から見る角度（ローディング画面の UFO と同じ。src/render/ufo-look.ts） */
+const TILT = UFO_TILT;
 /** 滑って動くばねの速さ（rad/s）。大きいほど速く着く */
 const SPRING_OMEGA = 11;
 /** 光の筋の長さ（船の直径に対する倍率）：止まっているとき 0、最も速いとき最大 */
@@ -48,12 +49,7 @@ export class UfoLayer {
   private lastRect: { left: number; top: number; width: number; height: number } | null = null;
 
   constructor(hue: number) {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(2, 3, 2.5);
-    const rim = new THREE.DirectionalLight(0x74e6ff, 1.2);
-    rim.position.set(-3, 1, -2);
-    this.scene.add(key, rim);
+    addUfoLights(this.scene);
 
     const geometry = new THREE.PlaneGeometry(1, 1);
     geometry.translate(0.5, 0, 0); // 船の位置から右（後ろ）へ伸びる
@@ -63,7 +59,7 @@ export class UfoLayer {
       const model = createShipModel(hull, hue);
       const wrap = new THREE.Group();
       const pivot = new THREE.Group();
-      pivot.rotation.y = -0.6;
+      pivot.rotation.y = UFO_YAW;
       pivot.add(model.group);
       wrap.add(pivot);
       wrap.rotation.x = TILT;

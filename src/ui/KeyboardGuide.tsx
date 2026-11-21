@@ -23,9 +23,9 @@ const ROWS: KeyDef[][] = [
   [
     ['Esc', 'Esc', 1, true],
     ['', '', 0.5],
-    ['F1', 'F1', 1], ['F2', 'F2', 1, true], ['F3', 'F3', 1, true], ['F4', 'F4', 1],
+    ['F1', 'F1', 1], ['F2', 'F2', 1], ['F3', 'F3', 1], ['F4', 'F4', 1],
     ['', '', 0.25],
-    ['F5', 'F5', 1, true], ['F6', 'F6', 1], ['F7', 'F7', 1], ['F8', 'F8', 1],
+    ['F5', 'F5', 1], ['F6', 'F6', 1], ['F7', 'F7', 1], ['F8', 'F8', 1],
     ['', '', 0.25],
     ['F9', 'F9', 1], ['F10', 'F10', 1], ['F11', 'F11', 1], ['F12', 'F12', 1],
   ],
@@ -42,11 +42,11 @@ const ROWS: KeyDef[][] = [
     ['H', 'H', 1], ['J', 'J', 1], ['K', 'K', 1], ['L', 'L', 1], [';', ';', 1], ["'", "'", 1], ['Enter', 'Enter', 2.25, true],
   ],
   [
-    ['Shift', 'Shift', 2.25, true], ['Z', 'Z', 1], ['X', 'X', 1], ['C', 'C', 1, true], ['V', 'V', 1, true], ['B', 'B', 1],
+    ['Shift', 'Shift', 2.25, true], ['Z', 'Z', 1], ['X', 'X', 1, true], ['C', 'C', 1, true], ['V', 'V', 1, true], ['B', 'B', 1],
     ['N', 'N', 1], ['M', 'M', 1, true], [',', ',', 1], ['.', '.', 1], ['/', '/', 1], ['Shift2', 'Shift', 2.75],
   ],
   [
-    ['Ctrl', 'Ctrl', 1.5, true], ['Alt', 'Alt', 1.25, true], ['Cmd', '⌘', 1.25], ['Space', 'Space', 5.75, true],
+    ['Ctrl', 'Ctrl', 1.5, true], ['Alt', 'Alt', 1.25], ['Cmd', '⌘', 1.25], ['Space', 'Space', 5.75, true],
     ['Cmd2', '⌘', 1.25], ['Alt2', 'Alt', 1.25], ['Fn', 'Fn', 1.25], ['Ctrl2', 'Ctrl', 1.5],
   ],
 ];
@@ -114,16 +114,12 @@ const toRight = (k: Key, gy: number, ly: number): [number, number][] => [
 const downVia = (k: Key, gy: number, x: number, y: number): [number, number][] => [[k.cx, k.bottom], [k.cx, gy], [x, gy], [x, y]];
 
 const BOTTOM1 = 404;
-const BOTTOM2 = 438;
 const TOP1 = 92;
 
 const CALLOUTS: Callout[] = [
   // 上：1 段目
-  { lines: [upTo(key('Esc'), TOP1 + 6)], text: ['メニュー'], x: key('Esc').cx, y: TOP1, anchor: 'middle' },
-  // F2 と F3 は隣どうしなので、F2 の説明は一段上に出す（名前が重ならないように）
-  { lines: [upTo(key('F2'), TOP1 - 26, key('F2').cx - 18)], text: ['写真'], x: key('F2').cx - 18, y: TOP1 - 32, anchor: 'middle' },
-  { lines: [upTo(key('F3'), TOP1 + 6, key('F3').cx + 12)], text: ['左上の表示'], x: key('F3').cx + 12, y: TOP1, anchor: 'middle' },
-  { lines: [upTo(key('F5'), TOP1 + 6)], text: ['視点（V でも）'], x: key('F5').cx + 20, y: TOP1, anchor: 'middle' },
+  // F キーは使わない（2026-11-21。写真は 5、左上の表示は X、視点は V）
+  { lines: [upTo(key('Esc'), TOP1 + 6)], text: ['メニュー', 'もう一度で戻る'], x: key('Esc').cx + 14, y: TOP1 - 17, anchor: 'start' },
   // 左：1〜6・Q・W・A・Shift・Ctrl
   {
     lines: [
@@ -153,10 +149,20 @@ const CALLOUTS: Callout[] = [
   { lines: [[[key('Enter').right, key('Enter').cy], [RX - 6, 272]]], text: ['チャット（T でも）', '写真の構えではシャッター'], x: RX, y: 276, anchor: 'start' },
   { lines: [toRight(key('S'), gapBelow(3), 308)], text: ['後ろへ'], x: RX, y: 312, anchor: 'start' },
   // 下：C・Space・M・Alt。R（レーダー）は、線を通せるすき間が無い（上は 1〜6 の線、左右は Q・E・D の線）ので、M の説明に並べて書く
-  { lines: [downVia(key('C'), gapBelow(4), key('Cmd').cx, BOTTOM1 - 16)], text: ['星座'], x: key('Cmd').cx, y: BOTTOM1, anchor: 'middle' },
+  // X・C・V は並んでいるので、1 つの説明にまとめる
+  {
+    lines: [
+      downVia(key('C'), gapBelow(4), key('Cmd').cx, BOTTOM1 - 16),
+      [[key('X').cx, key('X').bottom], [key('X').cx, gapBelow(4)]],
+      [[key('V').cx, key('V').bottom], [key('V').cx, gapBelow(4)], [key('C').cx, gapBelow(4)]],
+    ],
+    text: ['C：星座', 'V：視点・X：左上の表示'],
+    x: key('Cmd').cx,
+    y: BOTTOM1,
+    anchor: 'middle',
+  },
   { lines: [[[key('Space').cx, key('Space').bottom], [key('Space').cx, BOTTOM1 - 16]]], text: ['上昇'], x: key('Space').cx, y: BOTTOM1, anchor: 'middle' },
   { lines: [downVia(key('M'), gapBelow(4), key('Cmd2').cx, BOTTOM1 - 16)], text: ['マップ', 'R：レーダー'], x: key('Cmd2').cx, y: BOTTOM1, anchor: 'middle' },
-  { lines: [[[key('Alt').cx, key('Alt').bottom], [key('Alt').cx, BOTTOM2 - 16]]], text: ['＋ホイール：視点の距離'], x: key('Alt').cx, y: BOTTOM2, anchor: 'middle' },
 ];
 
 /** マウスの絵（別の図）。中心 MX、上の端 MY */
@@ -165,7 +171,8 @@ const MY = 150;
 const MW = 104;
 const MH = 176;
 const MOUSE_CALLOUTS: Callout[] = [
-  { lines: [[[MX, MY + 38], [MX, 86]]], text: ['ホイール：速さ', 'Ctrl＋ホイール：10 倍ずつ'], x: MX, y: 50, anchor: 'middle' },
+  // Alt＋ホイール（視点の距離）も、ここにまとめる（キーボードの図の下の説明が重ならないように。2026-11-21）
+  { lines: [[[MX, MY + 38], [MX, 86]]], text: ['ホイール：速さ', 'Ctrl＋ホイール：10 倍ずつ', 'Alt＋ホイール：視点の距離'], x: MX, y: 33, anchor: 'middle' },
   { lines: [[[MX - 26, MY + 30], [MX - 70, MY + 30], [MX - 84, MY + 14]]], text: ['クリック', '照準の先を選ぶ'], x: MX - 88, y: MY + 2, anchor: 'end' },
   { lines: [[[MX + 26, MY + 30], [MX + 70, MY + 30], [MX + 84, MY + 14]]], text: ['右ドラッグ', '回り込む（三人称）'], x: MX + 88, y: MY + 2, anchor: 'start' },
   { lines: [[[MX, MY + MH], [MX, 372]]], text: ['動かす：向きを変える'], x: MX, y: 392, anchor: 'middle' },

@@ -160,7 +160,7 @@ git rev-list --left-right --count main...origin/main   # 「0　0」なら同期
 ```
 src/
   entry.ts                ブラウザの入口。URL が /play なら世界（main.ts）、それ以外ならタイトル画面（top/）を動的 import で読み込む。横向きのスワイプで前のページへ戻らないようにする
-  loading-screen.ts       「-Go!-」から世界が動き出すまでのローディング画面（UFO が左から右へ。DOM だけで作る）
+  loading-screen.ts       ローディング画面（「-Go!-」→世界、世界の「タイトルへ」→タイトル画面。UFO が左の端から右の端へ。DOM だけで作る）。loading-timing.ts は UFO の飛び方（タイトル画面の船と同じ flyIn・flyOut。いつも 2 秒以上・右の外で切り替え。テストあり）
   main.ts                 世界の起動と毎フレームのループ（世界の更新 → 描画 → 画面の表示）。/play で動く
   world/                  世界の計算。three.js も React も使わない純粋な関数（テストはここに集める）
     solar-system.ts       天体の一覧（registry）と、位置と向き。astronomy-engine はこのファイルの中だけで使う
@@ -205,7 +205,7 @@ src/
     units.ts / vec.ts     単位と、倍精度のベクトル・行列
   render/                 three.js での描画（太陽系・星・銀河・ワープホール・他の船）。body-looks.ts は天体の画像のファイル名と模様の色、
                           body-effects.ts は大気・恒星の光・環の影、surface-worker.ts は模様を描く Web Worker、
-                          asteroid-field.ts は小惑星の光の点（GPU でケプラーの方程式を解く）、ship-models.ts は 3 種類の UFO、vapor-trail.ts は動いたときのベイパー、
+                          asteroid-field.ts は小惑星の光の点（GPU でケプラーの方程式を解く）、ship-models.ts は 3 種類の UFO、ufo-look.ts はタイトル画面の UFO の角度・光と、それを 1 枚の絵にする snapshotUfo（ローディング画面で使う）、vapor-trail.ts は動いたときのベイパー、
                           satellite-field.ts は人工衛星の光の点、cluster-view.ts は星団、constellation-view.ts は星座の線、constellation-art-view.ts は選んだ星座の絵、
                           comet-field.ts は彗星の光の点、nebula-view.ts は星雲、extragalactic-view.ts はほかの銀河
   controls/flight.ts      操縦（PC の Pointer Lock・スマホのボタン）。movement.ts は慣性・ダッシュの計算（テストあり）、chase-camera.ts は一人称・後ろから・前からの視点、touch-stick.ts はスマホのパッド・速さのバーの計算（テストあり）

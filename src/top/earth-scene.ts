@@ -3,6 +3,7 @@
  * いまの時刻の地球を描く。太陽の向きも本物なので、昼と夜の境目は、いまの本物の位置にある。
  * 世界の描画（src/render/solar-system-view.ts）の部品を再利用し、天体の一覧（registry）は使わない。
  */
+import { snapshotUfo } from '../render/ufo-look';
 import * as THREE from 'three/webgpu';
 import { dot, max, normalWorld, smoothstep, texture, vec3 } from 'three/tsl';
 import { createAtmosphereMesh, createBodyUniforms } from '../render/body-effects';
@@ -124,6 +125,8 @@ export class EarthScene {
   private ufoPreparing: Promise<void> | null = null;
   private ufoReady = false;
   private ufoHue = Number.NaN;
+  /** renderer.init() が済んだか（済むまでは、船の絵を作れない） */
+  private rendererReady = false;
   private width = 1;
   private height = 1;
   private readonly timers: number[] = [];
@@ -190,6 +193,7 @@ export class EarthScene {
     const scene = new EarthScene(canvas, { day, night, clouds });
     await scene.renderer.init();
     scene.renderer.setClearColor(0x000000, 0);
+    scene.rendererReady = true;
     // 描くのに要る処理（シェーダーのコンパイル）を、見せる前に済ませる。済ませないと、現れる最初の動きが引っかかる
     try {
       await scene.renderer.compileAsync(scene.scene, scene.camera);
@@ -283,6 +287,8 @@ export class EarthScene {
    * 1 を超えた分は、地球を画面の外へ送る）。stage は、画面の部品と共有する状態（行き先のカメラ・船を選ぶ列）
    */
   render(nowMs: number, motion: boolean, scroll: number, stage: TopStage): void {
+    // ローディング画面で使う船の絵を、この描画で作れるようにする（src/render/ufo-look.ts）
+    if (this.rendererReady && !stage.snapshotUfo) stage.snapshotUfo = (hull, hue) => snapshotUfo(this.renderer, hull, hue);
     if (this.disposed) return;
     if (this.introStartMs === 0) this.introStartMs = nowMs;
     const dt = this.lastFrameMs === 0 ? 0 : Math.min(0.25, Math.max(0, (nowMs - this.lastFrameMs) / 1000));

@@ -7,7 +7,7 @@
  * どの URL も同じ index.html を返す（wrangler.jsonc の assets・開発サーバーの既定）。
  */
 import { isPlayPath } from './top/routes';
-import { showLoading } from './loading-screen';
+import { hasPendingLoading, showLoading } from './loading-screen';
 
 /**
  * 横向きのスワイプ（トラックパッドの二本指など）で、ブラウザが前のページへ戻らないようにする（2026-11-21。オーナーの指示）。
@@ -27,9 +27,11 @@ window.addEventListener(
 );
 
 if (isPlayPath(location.pathname)) {
-  // 世界のデータ（大きい）を読んでいる間は、ローディング画面を出す。最初の 1 枚が描けたら main.ts が消す
+  // 世界のデータ（大きい）を読んでいる間は、ローディング画面を出す（「-Go!-」から来たときは続きから）。最初の 1 枚が描けたら main.ts が消す
   showLoading();
   void import('./main');
 } else {
+  // 世界の「タイトルへ」から来たときは、ローディングの続きを出す（タイトル画面が描けたら top/main.ts が消す）
+  if (hasPendingLoading()) showLoading();
   void import('./top/main');
 }
