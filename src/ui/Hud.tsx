@@ -5,7 +5,7 @@ import '@fontsource/josefin-sans/300.css';
 import '@fontsource/dotgothic16/400.css';
 import { formatCoordinates, formatDistanceEn, formatSpeed } from './format';
 import { STAR_LIMIT_NAMES_JA } from '../world/stars';
-import { hudActions, hudStore } from './hud-store';
+import { hudActions, hudStore, type ScanHud } from './hud-store';
 import { Radar } from './Radar';
 import { RadarPanel } from './RadarPanel';
 import { PhotoView } from './PhotoView';
@@ -82,6 +82,7 @@ export function Hud() {
       {/* レーダー：押すと（R キーでも）画面の真ん中に大きく出す。範囲・出すものは、大きくしたレーダーで変えたものをそのまま使う */}
       {o !== 'radar' && (
         <div className="hud-dock">
+          <ScanStatus scan={s.scan} />
           <button
             type="button"
             className="hud-radar-button"
@@ -311,6 +312,22 @@ function PhotoFinder() {
           <path d="M6 6l12 12M18 6 6 18" />
         </svg>
       </button>
+    </div>
+  );
+}
+
+/**
+ * レーダーの上の「SCAN: OK」（2026-11-22 にオーナーの指示）。字は左上の表示と同じ緑のピクセル調（DotGothic16）。
+ * OK はいつも見えているが、スキャンできる天体が範囲にあるときだけ光る。スキャンの間は SCANNING と進み具合、
+ * 終わると SUCCESS（もうコレクションにある天体なら ALREADY）、視点を変えるなどで失敗すると赤で FAILURE。どちらもしばらくして OK に戻る
+ */
+function ScanStatus({ scan }: { scan: ScanHud }) {
+  const value =
+    scan.phase === 'scanning' ? `SCANNING ${scan.percent}%` : scan.phase === 'success' ? 'SUCCESS' : scan.phase === 'already' ? 'ALREADY' : scan.phase === 'failure' ? 'FAILURE' : 'OK';
+  const lit = scan.phase !== 'idle' || scan.available;
+  return (
+    <div className="hud-scan" lang="en" role="status" aria-live="polite" aria-label={`スキャン：${value}`}>
+      SCAN: <span className={`hud-scan-value is-${scan.phase}${lit ? ' is-lit' : ''}`}>{value}</span>
     </div>
   );
 }
