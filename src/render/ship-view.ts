@@ -13,8 +13,8 @@ import type { Block } from '../world/ship-blocks';
 import { defaultHullFor, type ShipLook } from '../world/ship-design';
 import type { Quat } from '../world/quat';
 import { createShipModel, customKey, presetShape, WORLD_SELF_LIGHT, type ShipModel, type ShipShape } from './ship-models';
-import { sub, type Vec3 } from '../world/vec';
-import { trailStrength, VaporTrail } from './vapor-trail';
+import { scale, sub, type Vec3 } from '../world/vec';
+import { trailStrength, vaporProfileOf, VaporTrail } from './vapor-trail';
 
 const MAX_SHIPS = 64;
 /** 航行灯の大きさ（CSS ピクセル）。ふちをぼかすので、見える大きさはこの 1/3 くらい */
@@ -39,9 +39,12 @@ interface Drawn {
   trail: VaporTrail;
   /** これまでに見たいちばん速い速さ（km/s）。他の船は速さの設定が届かないので、これを「全速」とみなす */
   topSpeed: number;
+  lastPositionKm: Vec3 | null;
+  lastOrientation: Quat;
 }
 
 const ZERO: Vec3 = { x: 0, y: 0, z: 0 };
+const ID_QUAT: Quat = { x: 0, y: 0, z: 0, w: 1 };
 
 export class ShipView {
   readonly group = new THREE.Group();
@@ -94,7 +97,15 @@ export class ShipView {
       current.model.dispose();
     }
     const trail = current?.trail ?? new VaporTrail();
-    const d = { model: createShipModel(shape, WORLD_SELF_LIGHT), key: shape.key, trail, topSpeed: current?.topSpeed ?? 0 };
+    trail.setProfile(vaporProfileOf(shape));
+    const d: Drawn = {
+      model: createShipModel(shape, WORLD_SELF_LIGHT),
+      key: shape.key,
+      trail,
+      topSpeed: current?.topSpeed ?? 0,
+      lastPositionKm: current?.lastPositionKm ?? null,
+      lastOrientation: current?.lastOrientation ?? ID_QUAT,
+    };
     this.group.add(d.model.group);
     if (!current) this.group.add(trail.mesh);
     return d;
@@ -102,16 +113,14 @@ export class ShipView {
 
   /** 自分の船（三人称の視点のときだけ見せる）。自分は原点にいる */
   setOwn(visible: boolean, shape: ShipShape, orientation: Quat, velocityKmS: Vec3 = ZERO, fullSpeedKmS = 0, dt = 0): void {
-    if (!visible) {
-      if (this.own) {
-        this.own.model.group.visible = false;
-        this.own.trail.mesh.visible = false;
-      }
-      return;
-    }
     this.own = this.ensure(this.own, shape);
     const speed = Math.hypot(velocityKmS.x, velocityKmS.y, velocityKmS.z);
-    this.own.trail.update(ZERO, velocityKmS, trailStrength(speed, fullSpeedKmS), this.own.model.lengthKm, dt);
+    this.own.trail.update(ZERO, velocityKmS, trailStrength(speed, fullSpeedKmS), this.own.model.lengthKm, dt, orientation);
+    if (!visible) {
+      this.own.model.group.visible = false;
+      this.own.trail.mesh.visible = false;
+      return;
+    }
     const g = this.own.model.group;
     g.visible = true;
     g.position.set(0, 0, 0);
@@ -137,13 +146,55 @@ export class ShipView {
       this.drawn.set(ship.id, d);
       const rel = sub(ship.positionKm, observerKm);
       const g = d.model.group;
+      g.visible = true;
       g.position.set(rel.x, rel.y, rel.z);
       const q = ship.orientation;
       g.quaternion.copy(this.quat.set(q.x, q.y, q.z, q.w));
       const v = ship.velocityKmS ?? ZERO;
       const speed = Math.hypot(v.x, v.y, v.z);
       d.topSpeed = Math.max(d.topSpeed, speed);
-      d.trail.update(rel, v, trailStrength(speed, d.topSpeed), lengthKm, dt);
+      const strength = trailStrength(speed, d.topSpeed);
+
+      const prevPos = d.lastPositionKm;
+      const stepDt = Math.min(Math.max(dt, 0), 0.1);
+      if (prevPos && stepDt > 0) {
+        const relA = sub(prevPos, observerKm);
+        const seg = sub(rel, relA);
+        const segLenSq = seg.x * seg.x + seg.y * seg.y + seg.z * seg.z;
+        const tClosest = segLenSq > 1e12 ? -(relA.x * seg.x + relA.y * seg.y + relA.z * seg.z) / segLenSq : -1;
+        if (tClosest > 0.02 && tClosest < 0.98) {
+          // 1 フレームで観測者の目前を大きな距離跳んで通り過ぎるとき、最近接点を挟んで遠方圧縮による太さの破綻を防ぐ
+          const segHalf = scale(seg, tClosest);
+          const relMid = { x: relA.x + segHalf.x, y: relA.y + segHalf.y, z: relA.z + segHalf.z };
+          d.trail.update(relMid, v, strength, lengthKm, stepDt * tClosest, ship.orientation, {
+            worldDisplacementKm: segHalf,
+            isOtherShip: true,
+            pxPerRadian: this.pxPerRadian,
+          });
+          const segRest = sub(rel, relMid);
+          d.trail.update(rel, v, strength, lengthKm, stepDt * (1 - tClosest), ship.orientation, {
+            worldDisplacementKm: segRest,
+            isOtherShip: true,
+            pxPerRadian: this.pxPerRadian,
+          });
+        } else {
+          d.trail.update(rel, v, strength, lengthKm, stepDt, ship.orientation, {
+            worldDisplacementKm: seg,
+            isOtherShip: true,
+            pxPerRadian: this.pxPerRadian,
+          });
+        }
+      } else {
+        const worldDisplacementKm = stepDt > 0 ? scale(v, stepDt) : ZERO;
+        d.trail.update(rel, v, strength, lengthKm, stepDt, ship.orientation, {
+          worldDisplacementKm,
+          isOtherShip: true,
+          pxPerRadian: this.pxPerRadian,
+        });
+      }
+      d.lastPositionKm = { ...ship.positionKm };
+      d.lastOrientation = { ...ship.orientation };
+
       this.color.setHSL(ship.hue / 360, 0.75, 0.6);
       // 船が画面で 3 ピクセルより大きく見えるなら、航行灯の点は消す（船の模型が見える。要件 F33）
       const px = (lengthKm / 2 / Math.max(Math.hypot(rel.x, rel.y, rel.z), 1e-9)) * this.pxPerRadian;
@@ -158,6 +209,15 @@ export class ShipView {
     }
     for (const [id, d] of this.drawn) {
       if (seen.has(id)) continue;
+      d.model.group.visible = false;
+      if (d.lastPositionKm && d.trail.state.nodes.length >= 2) {
+        const rel = sub(d.lastPositionKm, observerKm);
+        d.trail.update(rel, ZERO, 0, d.model.lengthKm, dt, d.lastOrientation, {
+          isOtherShip: true,
+          pxPerRadian: this.pxPerRadian,
+        });
+        if (d.trail.state.nodes.length >= 2) continue;
+      }
       this.group.remove(d.model.group, d.trail.mesh);
       d.model.dispose();
       d.trail.dispose();
