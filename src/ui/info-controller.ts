@@ -14,6 +14,7 @@ import {
   galaxyKey,
   nebulaKey,
   describeHost,
+  facing,
   nearestStars,
   pickAimed,
   starKey,
@@ -88,6 +89,29 @@ export class InfoController {
     hudActions.faceTarget = () => {
       if (this.selected) this.deps.face(sub(this.selected.positionKm, this.observer));
     };
+  }
+
+  /** 照準の先（最後に描いたときの） */
+  private aimed: InfoTarget | null = null;
+
+  /**
+   * F キー（2026-11-21。オーナーの指示）：選んでいる天体の方を向く。もう向いているなら、選ぶのをやめる。
+   * 何も選んでいなければ、照準の先を選んで向く。forward：いま見ている向き（単位ベクトル）。何もしなければ false
+   */
+  toggleFocus(forward: Vec3): boolean {
+    const t = this.selected ?? this.aimed;
+    if (!t) return false;
+    const rel = sub(t.positionKm, this.observer);
+    if (this.selected && facing(rel, forward)) {
+      hudActions.selectTarget(null);
+      return true;
+    }
+    if (!this.selected) {
+      this.selected = t;
+      hudStore.set({ selectedKey: t.key, selectedWarp: null });
+    }
+    this.deps.face(rel);
+    return true;
   }
 
   private observer: Vec3 = { x: 0, y: 0, z: 0 };
@@ -196,6 +220,7 @@ export class InfoController {
     if (this.selected) card = this.card(this.selected, 'selected', false);
     else if (this.near) card = this.card(this.near.target, 'near', this.near.firstVisit);
     const aimed = blocked ? null : pickAimed(this.targets, abs, forward);
+    this.aimed = aimed;
     const aimLabel = aimed ? { name: aimed.name, distance: formatDistance(length(sub(aimed.positionKm, abs))) } : null;
     const prev = hudStore.get();
     const patch: Partial<typeof prev> = {};

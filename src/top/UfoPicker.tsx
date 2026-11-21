@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
-import { HULLS } from '../world/ship-design';
+import { customNameJa, HULLS } from '../world/ship-design';
 import type { TopStage } from './top-stage';
-import { dragPosition, hullOfTarget, settleTarget, SPACING_OF_WIDTH } from './ufo-carousel';
+import { dragPosition, indexOfTarget, settleTarget, SPACING_OF_WIDTH, type UfoSlot } from './ufo-carousel';
+
+const nameOf = (slot: UfoSlot): string =>
+  slot.kind === 'preset' ? HULLS[slot.hull].nameJa : slot.kind === 'custom' ? `${customNameJa(slot.index)}（押すと作り直す）` : '新しい UFO を作る';
 
 /** この距離（px）以上動いたら、タップではなく、ドラッグ */
 const DRAG_START_PX = 6;
@@ -15,6 +18,7 @@ const LAYOUT_MS = 560;
 /**
  * 宇宙船を選ぶ列の、操作の部分（要件 F48）。船そのものは 3D（ufo-layer.ts）で描くので、ここは見えない。
  * 同じ場所に、横に 3 つの押せる範囲を置く：左右をタップ（またはキーボード）で隣の船へ、横に引く（スライド）で送る。
+ * 「＋」を押すと新しい UFO を作る画面、真ん中のマイ UFO を押すと、その UFO を作り直す画面が開く（2026-11-21。TopApp が決める）。
  * 3D が使えないときだけ、船の名前を文字で出す。
  */
 export function UfoPicker({
@@ -22,6 +26,8 @@ export function UfoPicker({
   active,
   target,
   onTarget,
+  onActivate,
+  items,
   showNames,
 }: {
   stage: TopStage;
@@ -29,6 +35,10 @@ export function UfoPicker({
   active: boolean;
   target: number;
   onTarget: (target: number) => void;
+  /** 船を押した（offset：真ん中から −1・0・1）。押した船の種類で、選ぶ・作る画面を開くを決める */
+  onActivate: (offset: -1 | 0 | 1) => void;
+  /** 列の並び */
+  items: readonly UfoSlot[];
   showNames: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -131,23 +141,23 @@ export function UfoPicker({
       onWheel={onWheel}
     >
       {slots.map((slot) => {
-        const hull = hullOfTarget(target + slot);
+        const name = nameOf(items[indexOfTarget(target + slot, items.length)]);
         return (
           <button
             key={slot}
             type="button"
             role="radio"
             aria-checked={slot === 0}
-            aria-label={HULLS[hull].nameJa}
-            title={HULLS[hull].nameJa}
+            aria-label={name}
+            title={name}
             tabIndex={active ? 0 : -1}
             className={`top-ufo-zone is-${slot < 0 ? 'left' : slot > 0 ? 'right' : 'center'}`}
             onClick={() => {
-              if (swallowClick.current) return;
-              step(slot);
+              if (swallowClick.current || !active || stage.ufoBusy) return;
+              onActivate(slot);
             }}
           >
-            {showNames && <span className="top-ufo-name">{HULLS[hull].nameJa}</span>}
+            {showNames && <span className="top-ufo-name">{name}</span>}
           </button>
         );
       })}

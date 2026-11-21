@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { MapIcon } from './icons';
 import '@fontsource/monoton/400.css';
 import '@fontsource/josefin-sans/300.css';
 import '@fontsource/dotgothic16/400.css';
@@ -208,13 +209,7 @@ export function Hud() {
           }}
         >
           <HotkeyNumber n={6} />
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <ellipse cx="12" cy="15" rx="9" ry="3.6" />
-            <path d="M12 15V6.5M7 13.6V9.5M17.5 14.2v-6" />
-            <circle cx="12" cy="5.5" r="1.4" fill="currentColor" />
-            <circle cx="7" cy="8.6" r="1.1" fill="currentColor" />
-            <circle cx="17.5" cy="7.2" r="1.1" fill="currentColor" />
-          </svg>
+          <MapIcon />
         </button>
         {/* スマホ：チャットは開閉式。このボタンで開く・閉じる（PC はいつも左下に出している） */}
         <ChatToggle open={s.chatOpen} log={s.chatLog} />

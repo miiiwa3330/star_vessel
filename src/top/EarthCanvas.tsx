@@ -30,7 +30,8 @@ export default function EarthCanvas({ onReady, onFail, getScroll, stage }: { onR
     // 世界の時刻と同じく、いまの本物の時刻で描く
     const frame = () => {
       const now = Date.now();
-      if (now - lastDrawMs >= (coarse.matches && !interacting() ? 30 : 0)) {
+      // 宇宙船を作る画面を開いている間は、後ろの地球は隠れているので描かない（作る画面の 3D を軽くするため）
+      if (!stage.building && now - lastDrawMs >= (coarse.matches && !interacting() ? 30 : 0)) {
         lastDrawMs = now;
         const scroll = scrollRef.current();
         // 詳細の画面より先へスクロールしたら、地球をページと一緒に画面の上へ送る

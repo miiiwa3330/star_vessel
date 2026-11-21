@@ -778,7 +778,10 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
 .hud-collection-row dt { color: var(--hud-faint); }
 .hud-collection-row dd { margin: 0; overflow-wrap: anywhere; }
 .hud-collection-note { margin: 0 0 0.6em; font-size: 13px; line-height: 1.9; }
-.hud-collection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+/* 詳細の絵の左上の「←」（一覧へ戻る）と、左下のアイコン（マップで見る・その方を向く）。2026-11-21 */
+.hud-collection-figure { position: relative; }
+.hud-collection-back { position: absolute; top: 0; left: 0; z-index: 1; }
+.hud-collection-tools { position: absolute; left: 0; bottom: 0; z-index: 1; display: flex; gap: 8px; }
 
 /* ---- 詳細の回せる天体（ObjectViewer） ---- */
 .ov { position: relative; flex: none; display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; will-change: transform; }
@@ -891,6 +894,8 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
   .hud-collection-slider { display: none; }
   /* 詳細：上に天体、下に説明（全体でスクロール） */
   .hud-collection-detail { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
+  /* 左下のアイコン（マップで見る・その方を向く）が「ドラッグで回せます」に重ならないよう、その下にあける */
+  .hud-collection-figure { padding-bottom: 50px; }
   .hud-collection-figure { flex: none; }
   .hud-collection-title { font-size: 21px; }
   .hud-collection-text { overflow: visible; padding-right: 2px; }
@@ -1065,4 +1070,11 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
 @media ((max-width: 720px) or (pointer: coarse)) and (max-height: 520px) {
   .hud-hotbar { gap: 3px; bottom: 12px; }
   .hud-hotbar .hud-icon-button { width: 34px; height: 34px; }
+}
+
+/* F キーの印（TARGET・WARP のカード。2026-11-21）：キーの形の小さな四角と、薄い説明。押しても F と同じ */
+.hud-key-hint { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px; margin: 0; background: none; border: 0; color: var(--hud-faint); font: inherit; font-size: 11px; letter-spacing: 0.08em; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hud-key-hint kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; box-sizing: border-box; padding: 0 5px; border: 1px solid rgba(232, 236, 244, 0.5); border-radius: 4px; font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 12px; color: #fff; }
+@media (hover: hover) {
+  .hud-key-hint:hover { color: #fff; }
 }

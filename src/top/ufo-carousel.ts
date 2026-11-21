@@ -1,13 +1,23 @@
 /**
- * 宇宙船（UFO）を選ぶ、横に 3 つ並んだ列の計算（要件 F48）。純粋な関数にして、テストする（ufo-carousel.test.ts）。
+ * 宇宙船（UFO）を選ぶ、横に並んだ列の計算（要件 F48）。純粋な関数にして、テストする（ufo-carousel.test.ts）。
+ * 並びは、最初から選べる 3 つ・自分で作った船（マイ UFO。いくつでも）・新しく作る「＋」（2026-11-21）。数は count で渡す。
+ * 画面に見えるのは、真ん中と左右の 3 つ。
  *
- * 3 つは輪になっている（右へ送り続けると、また最初の船が来る）。いつも真ん中の 1 つだけ大きく、左右の 2 つは小さい。
+ * 船は輪になっている（右へ送り続けると、また最初の船が来る）。いつも真ん中の 1 つだけ大きく、左右の 2 つは小さい。
  * 位置 pos は小数で、整数のときに、その番号の船が真ん中に来る。pos は輪を何周してもよい（0 → 1 → 2 → 3 …）ので、
- * 「どの船か」は番号を 3 で割った余りで決める。滑らかに動かすため、pos は整数に落とさず、ばねで目標に近づける。
+ * 「どの船か」は番号を船の数で割った余りで決める。滑らかに動かすため、pos は整数に落とさず、ばねで目標に近づける。
  */
 import { HULL_TYPES, type HullType } from '../world/ship-design';
 
-export const SLOT_COUNT = HULL_TYPES.length;
+/** 列の 1 つ：最初から選べる船・自分で作った船（customs の番号）・新しく作る「＋」 */
+export type UfoSlot = { kind: 'preset'; hull: HullType } | { kind: 'custom'; index: number } | { kind: 'new' };
+
+/** 列の並び：最初から選べる 3 つ、自分で作った船、いちばん後ろに「＋」 */
+export const slotsFor = (customCount: number): UfoSlot[] => [
+  ...HULL_TYPES.map((hull): UfoSlot => ({ kind: 'preset', hull })),
+  ...Array.from({ length: customCount }, (_, index): UfoSlot => ({ kind: 'custom', index })),
+  { kind: 'new' },
+];
 
 /** 隣の船との間隔（列の箱の幅に対する割合）。3D の船（ufo-layer.ts）と、押せる範囲（UfoPicker.tsx）が同じ数を使う */
 export const SPACING_OF_WIDTH = 0.37;
@@ -15,16 +25,15 @@ export const SPACING_OF_WIDTH = 0.37;
 /** 真ん中から 1 つ隣の船の大きさ（真ん中の船を 1 としたとき） */
 export const SIDE_SCALE = 0.5;
 
-/** 位置の差 d（輪の上で、船の番号 − pos）を、真ん中からの距離 [-1.5, 1.5) に収める */
-export const wrapOffset = (d: number): number => d - SLOT_COUNT * Math.floor((d + SLOT_COUNT / 2) / SLOT_COUNT);
+/** 位置の差 d（輪の上で、船の番号 − pos）を、真ん中からの距離 [−船の数/2, 船の数/2) に収める */
+export const wrapOffset = (d: number, count: number): number => d - count * Math.floor((d + count / 2) / count);
 
 /** 目標の位置（整数。輪を何周してもよい）が指す船の番号 */
-export const indexOfTarget = (target: number): number => ((Math.round(target) % SLOT_COUNT) + SLOT_COUNT) % SLOT_COUNT;
-
-export const hullOfTarget = (target: number): HullType => HULL_TYPES[indexOfTarget(target)];
+export const indexOfTarget = (target: number, count: number): number => ((Math.round(target) % count) + count) % count;
 
 /** 番号 index の船を真ん中に持ってくる目標のうち、いまの目標 current にいちばん近いもの（遠回りして回さない） */
-export const targetForIndex = (index: number, current: number): number => Math.round(current) + wrapOffset(index - Math.round(current));
+export const targetForIndex = (index: number, current: number, count: number): number =>
+  Math.round(current) + wrapOffset(index - Math.round(current), count);
 
 const smoothstep = (a: number, b: number, x: number): number => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -34,7 +43,7 @@ const smoothstep = (a: number, b: number, x: number): number => {
 /**
  * 真ん中から offset 離れた船の、大きさ（真ん中が 1）と不透明度。
  * 1 つ隣（|offset| = 1）で SIDE_SCALE。そこから 1.5 に向けて小さくなって消える。
- * 3 つの輪の「裏側」の船が、左端から右端へ飛んで見えないようにするため（|offset| = 1.5 で入れ替わる）
+ * 輪の「裏側」の船（2 つ以上離れた船）が、左端から右端へ飛んで見えないようにするため（1.5 より離れた船は見えない）
  */
 export function slotLook(offset: number): { scale: number; alpha: number } {
   const a = Math.abs(offset);
@@ -64,7 +73,7 @@ export function settleTarget(pos: number, velocity: number, origin: number): num
   return Math.max(from - 1, Math.min(from + 1, flick));
 }
 
-/** 船の出入りの時間（ms）と、3 つの船の間の時間差 */
+/** 船の出入りの時間（ms）と、船の間の時間差 */
 export const FLY_IN_MS = 1100;
 export const FLY_OUT_MS = 700;
 export const FLY_STAGGER_MS = 130;
@@ -102,4 +111,4 @@ export function ufoFlight(phase: UfoPhase, rank: number, sinceMs: number): { off
 }
 
 /** 全部の船が出入りを終える時間（ms） */
-export const flightDuration = (phase: 'in' | 'out'): number => (phase === 'in' ? FLY_IN_MS : FLY_OUT_MS) + (SLOT_COUNT - 1) * FLY_STAGGER_MS;
+export const flightDuration = (phase: 'in' | 'out', count: number): number => (phase === 'in' ? FLY_IN_MS : FLY_OUT_MS) + (count - 1) * FLY_STAGGER_MS;

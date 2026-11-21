@@ -4,8 +4,7 @@
  * ローディング画面は three.js を読まずに出すので、ここで描いた絵（PNG の data URL）を使う
  */
 import * as THREE from 'three/webgpu';
-import { createShipModel } from './ship-models';
-import { HULLS, type HullType } from '../world/ship-design';
+import { createShipModel, type ShipShape } from './ship-models';
 
 /** 船を斜め上から見る角度（ラジアン） */
 export const UFO_TILT = 0.42;
@@ -26,13 +25,13 @@ export function addUfoLights(scene: THREE.Scene): void {
 const toSrgb = (c: number): number => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
 
 /**
- * 船 hull・色 hue の UFO を、タイトル画面と同じ角度・光で描いて、PNG の data URL にする（背景は透明）。
+ * 船 shape の UFO を、タイトル画面と同じ角度・光で描いて、PNG の data URL にする（背景は透明）。
  * renderer は、そのページで使っている three.js の描画（新しく作らない）。描けなければ null
  */
-export async function snapshotUfo(renderer: THREE.WebGPURenderer, hull: HullType, hue: number, width = 480, height = 360): Promise<string | null> {
+export async function snapshotUfo(renderer: THREE.WebGPURenderer, shape: ShipShape, width = 480, height = 360): Promise<string | null> {
   const scene = new THREE.Scene();
   addUfoLights(scene);
-  const model = createShipModel(hull, hue);
+  const model = createShipModel(shape);
   const pivot = new THREE.Group();
   pivot.rotation.y = UFO_YAW;
   pivot.add(model.group);
@@ -40,7 +39,7 @@ export async function snapshotUfo(renderer: THREE.WebGPURenderer, hull: HullType
   wrap.rotation.x = UFO_TILT;
   wrap.add(pivot);
   // 直径 1 にそろえる
-  wrap.scale.setScalar(1 / HULLS[hull].lengthKm);
+  wrap.scale.setScalar(1 / model.lengthKm);
   scene.add(wrap);
   const fov = 30;
   const camera = new THREE.PerspectiveCamera(fov, width / height, 0.1, 40);

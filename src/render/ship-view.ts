@@ -3,14 +3,16 @@
  *
  * - 船は本物に近い大きさ（全長 40 m）。遠くでは見えないので、航行灯（いつも数ピクセルの光の点）を付ける
  * - 色はプレイヤーごと（サーバーが決める色相）
- * - 形はプレイヤーが選んだ船体（src/render/ship-models.ts。要件 F27）。選んでいない人は id から決める
+ * - 形はプレイヤーが選んだ船（src/render/ship-models.ts。要件 F27）。選んでいない人は id から決める。
+ *   自分で作った船は、印（ref）からブロックを読む（blocksFor）。読めるまでは、id から決めた船で描く
  * - 自分の船も同じ形で描く（三人称の視点のとき。原点に置く）
  */
 import * as THREE from 'three/webgpu';
 import { float, instancedBufferAttribute, sin, time, uv, exp } from 'three/tsl';
-import { defaultDesignFor, HULLS, type HullType, type ShipDesign } from '../world/ship-design';
+import type { Block } from '../world/ship-blocks';
+import { defaultHullFor, type ShipLook } from '../world/ship-design';
 import type { Quat } from '../world/quat';
-import { createShipModel, type ShipModel } from './ship-models';
+import { createShipModel, customKey, presetShape, WORLD_SELF_LIGHT, type ShipModel, type ShipShape } from './ship-models';
 import { sub, type Vec3 } from '../world/vec';
 import { trailStrength, VaporTrail } from './vapor-trail';
 
@@ -24,15 +26,16 @@ export interface ShipToDraw {
   /** 太陽中心の位置（km・EQJ） */
   positionKm: Vec3;
   orientation: Quat;
-  /** 船の設計（無ければ id から決める） */
-  design?: ShipDesign;
+  /** 船の見た目の印（無ければ id から決める） */
+  design?: ShipLook;
   /** 速度（km/s）。ベイパー（動いたときの尾）に使う */
   velocityKmS?: Vec3;
 }
 
 interface Drawn {
   model: ShipModel;
-  hull: HullType;
+  /** 形の名前（ship-models.ts の presetKey・customKey） */
+  key: string;
   trail: VaporTrail;
   /** これまでに見たいちばん速い速さ（km/s）。他の船は速さの設定が届かないので、これを「全速」とみなす */
   topSpeed: number;
@@ -52,7 +55,8 @@ export class ShipView {
   private readonly quat = new THREE.Quaternion();
   private readonly color = new THREE.Color();
 
-  constructor() {
+  /** blocksFor：自分で作った船の印から、ブロックを読む（まだ読めていなければ null） */
+  constructor(private readonly blocksFor: (ref: string) => readonly Block[] | null = () => null) {
     const m = new THREE.PointsNodeMaterial({
       transparent: true,
       depthWrite: false,
@@ -74,24 +78,30 @@ export class ShipView {
     this.group.add(this.lights);
   }
 
-  private ensure(current: Drawn | undefined | null, hull: HullType, hue: number): Drawn {
-    if (current && current.hull === hull) {
-      current.model.setHue(hue);
-      return current;
+  /** 船の見た目の印から、描く形。自分で作った船のブロックが読めるまでは、id から決めた船 */
+  shapeOf(look: ShipLook | undefined, id: string): ShipShape {
+    if (look && 'ref' in look) {
+      const blocks = this.blocksFor(look.ref);
+      if (blocks) return { key: customKey(look.ref), blocks };
     }
+    return presetShape(look && 'hull' in look ? look.hull : defaultHullFor(id));
+  }
+
+  private ensure(current: Drawn | undefined | null, shape: ShipShape): Drawn {
+    if (current && current.key === shape.key) return current;
     if (current) {
       this.group.remove(current.model.group);
       current.model.dispose();
     }
     const trail = current?.trail ?? new VaporTrail();
-    const d = { model: createShipModel(hull, hue), hull, trail, topSpeed: current?.topSpeed ?? 0 };
+    const d = { model: createShipModel(shape, WORLD_SELF_LIGHT), key: shape.key, trail, topSpeed: current?.topSpeed ?? 0 };
     this.group.add(d.model.group);
     if (!current) this.group.add(trail.mesh);
     return d;
   }
 
   /** 自分の船（三人称の視点のときだけ見せる）。自分は原点にいる */
-  setOwn(visible: boolean, design: ShipDesign, hue: number, orientation: Quat, velocityKmS: Vec3 = ZERO, fullSpeedKmS = 0, dt = 0): void {
+  setOwn(visible: boolean, shape: ShipShape, orientation: Quat, velocityKmS: Vec3 = ZERO, fullSpeedKmS = 0, dt = 0): void {
     if (!visible) {
       if (this.own) {
         this.own.model.group.visible = false;
@@ -99,13 +109,18 @@ export class ShipView {
       }
       return;
     }
-    this.own = this.ensure(this.own, design.hull, hue);
+    this.own = this.ensure(this.own, shape);
     const speed = Math.hypot(velocityKmS.x, velocityKmS.y, velocityKmS.z);
-    this.own.trail.update(ZERO, velocityKmS, trailStrength(speed, fullSpeedKmS), HULLS[design.hull].lengthKm, dt);
+    this.own.trail.update(ZERO, velocityKmS, trailStrength(speed, fullSpeedKmS), this.own.model.lengthKm, dt);
     const g = this.own.model.group;
     g.visible = true;
     g.position.set(0, 0, 0);
     g.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
+  }
+
+  /** 描いている船の大きさ（km）。まだ描いていなければ null（チャットの吹き出しの高さに使う） */
+  lengthKmOf(id: string): number | null {
+    return this.drawn.get(id)?.model.lengthKm ?? null;
   }
 
   /** 1 ピクセルの大きさを決める値（画面の高さの半分 ÷ tan(視野の半分)） */
@@ -117,8 +132,8 @@ export class ShipView {
     for (let i = 0; i < n; i++) {
       const ship = ships[i];
       seen.add(ship.id);
-      const hull = (ship.design ?? defaultDesignFor(ship.id)).hull;
-      const d = this.ensure(this.drawn.get(ship.id), hull, ship.hue);
+      const d = this.ensure(this.drawn.get(ship.id), this.shapeOf(ship.design, ship.id));
+      const lengthKm = d.model.lengthKm;
       this.drawn.set(ship.id, d);
       const rel = sub(ship.positionKm, observerKm);
       const g = d.model.group;
@@ -128,10 +143,10 @@ export class ShipView {
       const v = ship.velocityKmS ?? ZERO;
       const speed = Math.hypot(v.x, v.y, v.z);
       d.topSpeed = Math.max(d.topSpeed, speed);
-      d.trail.update(rel, v, trailStrength(speed, d.topSpeed), HULLS[hull].lengthKm, dt);
+      d.trail.update(rel, v, trailStrength(speed, d.topSpeed), lengthKm, dt);
       this.color.setHSL(ship.hue / 360, 0.75, 0.6);
       // 船が画面で 3 ピクセルより大きく見えるなら、航行灯の点は消す（船の模型が見える。要件 F33）
-      const px = (HULLS[hull].lengthKm / 2 / Math.max(Math.hypot(rel.x, rel.y, rel.z), 1e-9)) * this.pxPerRadian;
+      const px = (lengthKm / 2 / Math.max(Math.hypot(rel.x, rel.y, rel.z), 1e-9)) * this.pxPerRadian;
       const k = Math.max(0, Math.min(1, (3 - px) / 1.5));
       this.lightPos.set([rel.x, rel.y, rel.z], i * 3);
       this.lightColor.set([this.color.r * k, this.color.g * k, this.color.b * k], i * 3);

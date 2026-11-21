@@ -16,6 +16,7 @@ import { ShipLights } from './ship-lights';
 import { ShipTracks } from './ship-tracks';
 import type { StageView, TopStage } from './top-stage';
 import { UfoLayer } from './ufo-layer';
+import { slotsFor } from './ufo-carousel';
 
 /** 画面の縦の画角（度） */
 const FOV = 42;
@@ -124,7 +125,8 @@ export class EarthScene {
   private ufo: UfoLayer | null = null;
   private ufoPreparing: Promise<void> | null = null;
   private ufoReady = false;
-  private ufoHue = Number.NaN;
+  /** UFO の列に入れてある、マイ UFO の版（TopStage.customVersion） */
+  private ufoCustomVersion = -1;
   /** renderer.init() が済んだか（済むまでは、船の絵を作れない） */
   private rendererReady = false;
   private width = 1;
@@ -221,7 +223,7 @@ export class EarthScene {
   prepareUfo(): Promise<void> {
     if (!this.ufoPreparing) {
       this.ufoPreparing = (async () => {
-        const layer = new UfoLayer(Number.isFinite(this.ufoHue) ? this.ufoHue : 200);
+        const layer = new UfoLayer();
         layer.setSize(this.width, this.height);
         await layer.compile(this.renderer);
         if (this.disposed) {
@@ -288,7 +290,7 @@ export class EarthScene {
    */
   render(nowMs: number, motion: boolean, scroll: number, stage: TopStage): void {
     // ローディング画面で使う船の絵を、この描画で作れるようにする（src/render/ufo-look.ts）
-    if (this.rendererReady && !stage.snapshotUfo) stage.snapshotUfo = (hull, hue) => snapshotUfo(this.renderer, hull, hue);
+    if (this.rendererReady && !stage.snapshotUfo) stage.snapshotUfo = (shape) => snapshotUfo(this.renderer, shape);
     if (this.disposed) return;
     if (this.introStartMs === 0) this.introStartMs = nowMs;
     const dt = this.lastFrameMs === 0 ? 0 : Math.min(0.25, Math.max(0, (nowMs - this.lastFrameMs) / 1000));
@@ -353,9 +355,9 @@ export class EarthScene {
     // 1 枚目：地球（と月）。2 枚目：船を選ぶ列（地球の上に重ねる）
     this.renderer.autoClear = true;
     this.renderer.render(this.scene, this.camera);
-    if (stage.hue !== this.ufoHue) {
-      this.ufoHue = stage.hue;
-      this.ufo?.setHue(stage.hue);
+    if (this.ufo && stage.customVersion !== this.ufoCustomVersion) {
+      this.ufoCustomVersion = stage.customVersion;
+      this.ufo.setSlots(slotsFor(stage.customShapes.length), stage.customShapes);
     }
     if (stage.ufoShown && !this.ufoPreparing) void this.prepareUfo();
     if (stage.preloadMars && !this.bodyPreparing.mars && nowMs - this.introStartMs > PREPARE_MARS_DELAY_MS) void this.prepareBody('mars');

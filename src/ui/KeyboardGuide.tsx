@@ -38,7 +38,7 @@ const ROWS: KeyDef[][] = [
     ['Y', 'Y', 1], ['U', 'U', 1], ['I', 'I', 1], ['O', 'O', 1], ['P', 'P', 1], ['[', '[', 1], [']', ']', 1], ['\\', '\\', 1.5],
   ],
   [
-    ['Caps', 'Caps', 1.75], ['A', 'A', 1, true], ['S', 'S', 1, true], ['D', 'D', 1, true], ['F', 'F', 1], ['G', 'G', 1],
+    ['Caps', 'Caps', 1.75], ['A', 'A', 1, true], ['S', 'S', 1, true], ['D', 'D', 1, true], ['F', 'F', 1, true], ['G', 'G', 1],
     ['H', 'H', 1], ['J', 'J', 1], ['K', 'K', 1], ['L', 'L', 1], [';', ';', 1], ["'", "'", 1], ['Enter', 'Enter', 2.25, true],
   ],
   [
@@ -118,7 +118,7 @@ const TOP1 = 92;
 
 const CALLOUTS: Callout[] = [
   // 上：1 段目
-  // F キーは使わない（2026-11-21。写真は 5、左上の表示は X、視点は V）
+  // F1〜F12 は使わない（2026-11-21。写真は 5、左上の表示は X、視点は V）。文字の F は「その方を向く」（同じ日から）
   { lines: [upTo(key('Esc'), TOP1 + 6)], text: ['メニュー', 'もう一度で戻る'], x: key('Esc').cx + 14, y: TOP1 - 17, anchor: 'start' },
   // 左：1〜6・Q・W・A・Shift・Ctrl
   {
@@ -145,9 +145,16 @@ const CALLOUTS: Callout[] = [
     anchor: 'start',
   },
   { lines: [toRight(key('E'), gapAbove(2), 200)], text: ['右に傾く'], x: RX, y: 204, anchor: 'start' },
-  { lines: [toRight(key('D'), gapAbove(3), 236)], text: ['右へ'], x: RX, y: 240, anchor: 'start' },
-  { lines: [[[key('Enter').right, key('Enter').cy], [RX - 6, 272]]], text: ['チャット（T でも）', '写真の構えではシャッター'], x: RX, y: 276, anchor: 'start' },
-  { lines: [toRight(key('S'), gapBelow(3), 308)], text: ['後ろへ'], x: RX, y: 312, anchor: 'start' },
+  // F は D の上と S の下を線にふさがれているので、D の線につなげて、1 つの説明にまとめる（2026-11-21）
+  {
+    lines: [toRight(key('D'), gapAbove(3), 236), [[key('F').cx, key('F').top], [key('F').cx, gapAbove(3)]]],
+    text: ['D：右へ', 'F：その方を向く', 'もう一度で、選ぶのをやめる'],
+    x: RX,
+    y: 240,
+    anchor: 'start',
+  },
+  { lines: [[[key('Enter').right, key('Enter').cy], [RX - 6, 296]]], text: ['チャット（T でも）', '写真の構えではシャッター'], x: RX, y: 300, anchor: 'start' },
+  { lines: [toRight(key('S'), gapBelow(3), 336)], text: ['後ろへ'], x: RX, y: 340, anchor: 'start' },
   // 下：C・Space・M・Alt。R（レーダー）は、線を通せるすき間が無い（上は 1〜6 の線、左右は Q・E・D の線）ので、M の説明に並べて書く
   // X・C・V は並んでいるので、1 つの説明にまとめる
   {
@@ -234,7 +241,7 @@ export function KeyboardGuide() {
       <ul className="kb-touch">
         <li>
           <span className="kb-touch-head">スマホ</span>
-          ドラッグ：向きを変える ／ 下の真ん中のパッド：倒した向きに進む（端まで倒すとダッシュ） ／ 右下のバー：上へスワイプで速く・下へで遅く ／ 左下の＋：アイコンとチャット ／ 左上の STAR VESSEL：メニュー ／ 左上の情報：タップで隠す（＊で出す） ／ タップ：天体を選ぶ ／ レーダーを押す：大きくする
+          ドラッグ：向きを変える ／ 下の真ん中のパッド：倒した向きに進む（端まで倒すとダッシュ） ／ 右下のバー：上へスワイプで速く・下へで遅く ／ 左下の＋：アイコンとチャット ／ 左上の STAR VESSEL：メニュー ／ 左上の情報：タップで隠す（＊で出す） ／ タップ：天体を選ぶ ／ カードの F：その方を向く（もう一度で、選ぶのをやめる） ／ レーダーを押す：大きくする
         </li>
         <li>
           <span className="kb-touch-head">レーダー</span>

@@ -33,7 +33,12 @@ export class TopStage {
   /** 火星の準備を先に済ませるか（サインインしているとき。ユーザー名から火星へ行く） */
   preloadMars = false;
   /** 描画が書く：船を、タイトル画面と同じ見た目で 1 枚の絵にする（ローディング画面で使う。src/render/ufo-look.ts）。描けるまでは null */
-  snapshotUfo: ((hull: import('../world/ship-design').HullType, hue: number) => Promise<string | null>) | null = null;
+  snapshotUfo: ((shape: import('../world/ship-presets').ShipShape) => Promise<string | null>) | null = null;
+  /** 自分で作った船（マイ UFO）の形（customs の番号の順）。変えたら customVersion を 1 増やす（描画が列を入れ替える） */
+  customShapes: import('../world/ship-presets').ShipShape[] = [];
+  customVersion = 0;
+  /** 宇宙船を作る画面を開いているか（開いている間は、後ろの地球を描かない） */
+  building = false;
   /** 描画が書く：行き先への飛行の速さ（0〜1。飛行の真ん中で 1）。星空が、放射状に伸びて流れる（Backdrop） */
   warp = 0;
 

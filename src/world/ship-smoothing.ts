@@ -9,7 +9,7 @@
 import { nlerp, type Quat } from './quat';
 import type { ShipSnapshot } from './ship-schema';
 import { SHIP_SEND_HZ } from './ship-schema';
-import type { ShipDesign } from './ship-design';
+import type { ShipLook } from './ship-design';
 import { predictShip, shipPositionKm } from './ships';
 import { findBody } from './solar-system';
 import { add, length, scale, sub, type Vec3 } from './vec';
@@ -26,7 +26,7 @@ const SNAP_SECONDS = 1;
 export interface SmoothedShip {
   id: string;
   hue: number;
-  design?: ShipDesign;
+  design?: ShipLook;
   /** 太陽中心の位置（km・EQJ） */
   positionKm: Vec3;
   /** 速度（km/s。届いた値のまま。ベイパーの向きと強さに使う） */

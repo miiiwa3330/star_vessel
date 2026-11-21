@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { BackIcon, MapIcon, TelescopeIcon } from './icons';
 import { INFO_KIND_NAMES_JA, type InfoKind } from '../world/info';
 import { countByKind, formatCatalogNo } from '../world/catalog';
 import type { Visit } from '../world/visits';
@@ -285,6 +286,31 @@ function CollectionDetail({
   return (
     <div className="hud-collection-detail">
       <div className="hud-collection-figure">
+        {/* 左上に一覧へ戻る「←」、左下にマップで見る（マップと同じアイコン）と、その方を向く（望遠鏡）。2026-11-21 にオーナーの指示 */}
+        <button type="button" className="hud-button hud-icon-button hud-collection-back" onClick={onBack} aria-label="一覧へ戻る" title="一覧へ戻る（Backspace）">
+          <BackIcon />
+        </button>
+        {!embedded && (
+          <div className="hud-collection-tools">
+            {known && (
+              <button type="button" className="hud-button hud-icon-button" onClick={() => hudActions.openMapAt(entry.key)} aria-label="マップで見る" title="マップで見る">
+                <MapIcon />
+              </button>
+            )}
+            <button
+              type="button"
+              className="hud-button hud-icon-button"
+              onClick={() => {
+                hudActions.faceEntry(entry.key);
+                hudActions.setOverlay(null);
+              }}
+              aria-label="その方を向く"
+              title="その方を向く"
+            >
+              <TelescopeIcon />
+            </button>
+          </div>
+        )}
         <ObjectViewer key={entry.key} ref={figureRef} look={look} size={size} unknown={!known} />
         <p className="hud-collection-drag">{look.type === 'constellation' ? (known && look.art ? '押すと絵が重なります' : '\u00a0') : 'ドラッグで回せます'}</p>
       </div>
@@ -341,28 +367,6 @@ function CollectionDetail({
             </dl>
           </section>
         )}
-        <div className="hud-collection-actions">
-          <button type="button" className="hud-button hud-button-small" onClick={onBack}>
-            一覧へ戻る
-          </button>
-          {known && !embedded && (
-            <button type="button" className="hud-button hud-button-small" onClick={() => hudActions.openMapAt(entry.key)}>
-              マップで見る
-            </button>
-          )}
-          {!embedded && (
-            <button
-              type="button"
-              className="hud-button hud-button-small"
-              onClick={() => {
-                hudActions.faceEntry(entry.key);
-                hudActions.setOverlay(null);
-              }}
-            >
-              その方を向く
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );

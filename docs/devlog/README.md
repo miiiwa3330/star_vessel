@@ -40,3 +40,5 @@ summary: devlog の目次。経緯を残す価値のある作業を1テーマ1�
 | 2026-11-13 | [図鑑の絵を、天体ごとのデータに合わせる](entries/2026-11-13-collection-data-looks.md) |
 | 2026-11-13 | [三人称・ベイパー・写真の構え・星座の絵](entries/2026-11-13-third-person-vapor-photo-constellations.md) |
 | 2026-11-21 | [ローディングの UFO を滑らかに飛ばす](entries/2026-11-21-loading-ufo.md) |
+| 2026-11-21 | [ブロックで作る宇宙船（マイ UFO）と、3 つの UFO のピクセル化](entries/2026-11-21-block-ships.md) |
+| 2026-11-21 | [作る画面の道具（範囲で消す・塗る・ロック）と、マイ UFO の一覧・BREAK](entries/2026-11-21-builder-tools.md) |

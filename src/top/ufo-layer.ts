@@ -2,16 +2,17 @@
  * 宇宙船（UFO）を選ぶ列の 3D の描画（要件 F48）。地球の描画（earth-scene.ts）と同じ画面（同じ GPU の入れ物）に、
  * 地球のあとで重ねて描く。画面の位置は DOM の箱（stage.getRect）に合わせる：1 ワールド単位 = 1 css px になるカメラを置く。
  *
- * 形は世界の画面と同じ（createShipModel）。色はアカウントの色。真ん中の 1 つだけ大きく、左右は小さい（ufo-carousel.ts）。
+ * 形は世界の画面と同じ（createShipModel。ブロックの船）。並びは、最初から選べる 3 つ・自分で作った船（マイ UFO）・
+ * 新しく作る「＋」（点線の箱と「＋」。いつも出す）。真ん中の 1 つだけ大きく、左右は小さい（ufo-carousel.ts）。
  * 出るときは右から光の速さで飛んできて減速して止まり、消えるときは左へ加速して消える。速いあいだは、光の筋を後ろ（右）へ引く。
  */
 import * as THREE from 'three/webgpu';
 import { float, pow, uniform, uv, vec3 } from 'three/tsl';
-import { createShipModel, type ShipModel } from '../render/ship-models';
+import { createShipModel, presetShape, type ShipModel } from '../render/ship-models';
 import { addUfoLights, UFO_TILT, UFO_YAW } from '../render/ufo-look';
-import { HULL_TYPES, HULLS, type HullType } from '../world/ship-design';
+import type { ShipShape } from '../world/ship-presets';
 import type { TopStage } from './top-stage';
-import { flightDuration, slotLook, SPACING_OF_WIDTH, stepSpring, ufoFlight, wrapOffset, type UfoPhase } from './ufo-carousel';
+import { flightDuration, slotLook, slotsFor, SPACING_OF_WIDTH, stepSpring, ufoFlight, wrapOffset, type UfoPhase, type UfoSlot } from './ufo-carousel';
 
 const FOV = 30;
 /** 真ん中の船の直径（箱の高さ・幅に対する割合） */
@@ -25,11 +26,13 @@ const SPRING_OMEGA = 11;
 const STREAK_MAX = 11;
 
 interface Item {
-  hull: HullType;
+  slot: UfoSlot;
   model: ShipModel;
   wrap: THREE.Group;
   pivot: THREE.Group;
   streaks: { mesh: THREE.Mesh; amp: ReturnType<typeof uniform>; lengthScale: number; yOffset: number; thickness: number }[];
+  /** 光の筋の色など、この船だけのもの（列を入れ替えるときに捨てる） */
+  owned: { dispose(): void }[];
   /** 出入りの順（左端が 0）。出入りが始まるときに決める */
   rank: number;
 }
@@ -47,50 +50,74 @@ export class UfoLayer {
   private vel = 0;
   private clockSec = 0;
   private lastRect: { left: number; top: number; width: number; height: number } | null = null;
+  private streakGeometry!: THREE.PlaneGeometry;
 
-  constructor(hue: number) {
+  constructor() {
     addUfoLights(this.scene);
 
     const geometry = new THREE.PlaneGeometry(1, 1);
     geometry.translate(0.5, 0, 0); // 船の位置から右（後ろ）へ伸びる
     this.owned.push(geometry);
 
-    for (const hull of HULL_TYPES) {
-      const model = createShipModel(hull, hue);
-      const wrap = new THREE.Group();
-      const pivot = new THREE.Group();
-      pivot.rotation.y = UFO_YAW;
-      pivot.add(model.group);
-      wrap.add(pivot);
-      wrap.rotation.x = TILT;
-      this.scene.add(wrap);
+    this.streakGeometry = geometry;
+    this.setSlots(slotsFor(0), []);
+  }
 
-      const streaks: Item['streaks'] = [];
-      // 太さと長さの違う筋を 3 本。光の速さで飛んでいるように見せる
-      for (const [yOffset, thickness, lengthScale] of [[0, 0.1, 1], [0.2, 0.035, 0.7], [-0.17, 0.045, 1.25]] as const) {
-        const amp = uniform(0);
-        const u = uv();
-        const along = pow(float(1).sub(u.x), 2.0);
-        const across = pow(float(1).sub(u.y.sub(0.5).abs().mul(2)), 1.5);
-        const intensity = along.mul(across).mul(amp);
-        const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
-        material.colorNode = vec3(0.72, 0.9, 1.0).mul(intensity);
-        // 背景が透明な画面に光を足す：透明度を光の強さに合わせる（earth-scene.ts の大気と同じ）
-        material.opacityNode = intensity;
-        material.blending = THREE.CustomBlending;
-        material.blendEquation = THREE.AddEquation;
-        material.blendSrc = THREE.OneFactor;
-        material.blendDst = THREE.OneFactor;
-        material.blendSrcAlpha = THREE.OneFactor;
-        material.blendDstAlpha = THREE.OneFactor;
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.renderOrder = -1;
-        this.scene.add(mesh);
-        this.owned.push(material);
-        streaks.push({ mesh, amp, lengthScale, yOffset, thickness });
-      }
-      this.items.push({ hull, model, wrap, pivot, streaks, rank: 0 });
+  /**
+   * 列の並びを入れ替える（自分で作った船を足した・消したとき）。shapes は、自分で作った船の形（customs の番号の順）。
+   * 「＋」は、点線の箱と「＋」
+   */
+  setSlots(slots: readonly UfoSlot[], shapes: readonly ShipShape[]): void {
+    for (const it of this.items) this.dropItem(it);
+    this.items.length = 0;
+    for (const slot of slots) {
+      const shape = slot.kind === 'preset' ? presetShape(slot.hull) : slot.kind === 'custom' ? shapes[slot.index] : null;
+      this.items.push(this.makeItem(slot, shape ? createShipModel(shape) : emptyCustom()));
     }
+  }
+
+  private makeItem(slot: UfoSlot, model: ShipModel): Item {
+    const geometry = this.streakGeometry;
+    const owned: { dispose(): void }[] = [];
+    const wrap = new THREE.Group();
+    const pivot = new THREE.Group();
+    pivot.rotation.y = UFO_YAW;
+    pivot.add(model.group);
+    wrap.add(pivot);
+    wrap.rotation.x = TILT;
+    this.scene.add(wrap);
+
+    const streaks: Item['streaks'] = [];
+    // 太さと長さの違う筋を 3 本。光の速さで飛んでいるように見せる
+    for (const [yOffset, thickness, lengthScale] of [[0, 0.1, 1], [0.2, 0.035, 0.7], [-0.17, 0.045, 1.25]] as const) {
+      const amp = uniform(0);
+      const u = uv();
+      const along = pow(float(1).sub(u.x), 2.0);
+      const across = pow(float(1).sub(u.y.sub(0.5).abs().mul(2)), 1.5);
+      const intensity = along.mul(across).mul(amp);
+      const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
+      material.colorNode = vec3(0.72, 0.9, 1.0).mul(intensity);
+      // 背景が透明な画面に光を足す：透明度を光の強さに合わせる（earth-scene.ts の大気と同じ）
+      material.opacityNode = intensity;
+      material.blending = THREE.CustomBlending;
+      material.blendEquation = THREE.AddEquation;
+      material.blendSrc = THREE.OneFactor;
+      material.blendDst = THREE.OneFactor;
+      material.blendSrcAlpha = THREE.OneFactor;
+      material.blendDstAlpha = THREE.OneFactor;
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.renderOrder = -1;
+      this.scene.add(mesh);
+      this.owned.push(material);
+      streaks.push({ mesh, amp, lengthScale, yOffset, thickness });
+    }
+    return { slot, model, wrap, pivot, streaks, owned, rank: 0 };
+  }
+
+  private dropItem(it: Item): void {
+    this.scene.remove(it.wrap, ...it.streaks.map((x) => x.mesh));
+    it.model.dispose();
+    it.owned.forEach((o) => o.dispose());
   }
 
   /** 描く画面の大きさ（css px）。1 ワールド単位 = 1 css px になるよう、カメラを引く */
@@ -103,10 +130,6 @@ export class UfoLayer {
     this.camera.far = z * 3;
     this.camera.position.set(0, 0, z);
     this.camera.updateProjectionMatrix();
-  }
-
-  setHue(hue: number): void {
-    for (const it of this.items) it.model.setHue(hue);
   }
 
   /** 初めて描く前に、シェーダーのコンパイルを済ませる（済ませないと、飛んでくる最初の動きが引っかかる） */
@@ -147,8 +170,8 @@ export class UfoLayer {
     if (want && (this.phase === 'hidden' || this.phase === 'out')) this.begin('in', nowMs);
     else if (!want && (this.phase === 'in' || this.phase === 'idle')) this.begin('out', nowMs);
     const since = nowMs - this.phaseStartMs;
-    if (this.phase === 'in' && since >= flightDuration('in')) this.phase = 'idle';
-    else if (this.phase === 'out' && since >= flightDuration('out')) this.phase = 'hidden';
+    if (this.phase === 'in' && since >= flightDuration('in', this.items.length)) this.phase = 'idle';
+    else if (this.phase === 'out' && since >= flightDuration('out', this.items.length)) this.phase = 'hidden';
 
     stage.ufoBusy = this.phase === 'in' || this.phase === 'out';
     if (this.phase === 'hidden' || !rect) {
@@ -187,7 +210,7 @@ export class UfoLayer {
 
     for (let i = 0; i < this.items.length; i++) {
       const it = this.items[i];
-      const slot = wrapOffset(i - this.pos);
+      const slot = wrapOffset(i - this.pos, this.items.length);
       const look = slotLook(slot);
       const flight = ufoFlight(this.phase, it.rank, since);
       const visible = flight.visible && look.scale > 0.01;
@@ -197,7 +220,7 @@ export class UfoLayer {
       const x = flight.offset >= 0 ? baseX + flight.offset * (farRight - baseX) : baseX - flight.offset * (farLeft - baseX);
       const bob = motion ? Math.sin(this.clockSec * 1.4 + i * 2.1) * 0.03 * size : 0;
       it.wrap.position.set(x, cy + bob, 0);
-      it.wrap.scale.setScalar(size / HULLS[it.hull].lengthKm);
+      it.wrap.scale.setScalar(size / it.model.lengthKm);
       // 動く向きに傾く（滑っているとき・飛んでいるとき）
       const bank = Math.max(-0.35, Math.min(0.35, this.vel * 0.1)) + flight.speed * 0.3;
       it.wrap.rotation.z = motion ? bank : 0;
@@ -220,13 +243,42 @@ export class UfoLayer {
     this.phase = phase;
     this.phaseStartMs = nowMs;
     const order = this.items
-      .map((_, i) => ({ i, slot: wrapOffset(i - this.pos) }))
+      .map((_, i) => ({ i, slot: wrapOffset(i - this.pos, this.items.length) }))
       .sort((a, b) => a.slot - b.slot);
     order.forEach((o, rank) => (this.items[o.i].rank = rank));
   }
 
   dispose(): void {
-    for (const it of this.items) it.model.dispose();
+    for (const it of this.items) this.dropItem(it);
     this.owned.forEach((o) => o.dispose());
   }
+}
+
+/** まだ自分の船を作っていないときの、マイ UFO の場所の印：点線の箱と、真ん中の「＋」（大きさは 24 m の船くらい） */
+function emptyCustom(): ShipModel {
+  const group = new THREE.Group();
+  const size = 0.02;
+  const box = new THREE.EdgesGeometry(new THREE.BoxGeometry(size, size * 0.5, size));
+  const lineMat = new THREE.LineDashedNodeMaterial({ color: 0xe8ecf4, transparent: true, opacity: 0.55, dashSize: size * 0.06, gapSize: size * 0.05 });
+  const lines = new THREE.LineSegments(box, lineMat);
+  lines.computeLineDistances();
+  group.add(lines);
+  const plusMat = new THREE.MeshBasicNodeMaterial({ color: new THREE.Color(1.3, 1.3, 1.3) });
+  const bar = new THREE.BoxGeometry(size * 0.42, size * 0.1, size * 0.1);
+  const a = new THREE.Mesh(bar, plusMat);
+  const b = new THREE.Mesh(bar, plusMat);
+  b.rotation.y = Math.PI / 2;
+  const c = new THREE.Mesh(bar, plusMat);
+  c.rotation.z = Math.PI / 2;
+  group.add(a, b, c);
+  return {
+    group,
+    lengthKm: size * 1.25,
+    dispose() {
+      box.dispose();
+      lineMat.dispose();
+      bar.dispose();
+      plusMat.dispose();
+    },
+  };
 }

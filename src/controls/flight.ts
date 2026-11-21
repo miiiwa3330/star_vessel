@@ -61,6 +61,8 @@ export class FlightControls {
   onOpenChat: () => void = () => {};
   /** レーダーを大きくする・戻す（R キー。2026-11-12 に M から変えた。M は 3D のマップ） */
   onToggleRadar: () => void = () => {};
+  /** F：選んでいるものの方を向く・もう向いていれば選ぶのをやめる（2026-11-21） */
+  onToggleFocus: () => void = () => {};
   /** 3D のマップを開く・閉じる（M キー） */
   onToggleMap: () => void = () => {};
   /** 下のボタン（ホットバー）を押す（1〜6 キー。マインクラフトと同じく数字で選ぶ） */
@@ -329,7 +331,8 @@ export class FlightControls {
   private onKeyDown = (e: KeyboardEvent) => {
     // 文字を入れている間（チャットの入力欄）は、キーを操縦に使わない
     if (isTyping(e.target)) return;
-    // F キー（F1〜F12）は、2026-11-21 から何にも使わない（オーナーの指示。写真は 5、左上の表示は X、視点は V）。ブラウザのふつうの働きのまま
+    // F キー（F1〜F12）は、2026-11-21 から何にも使わない（オーナーの指示。写真は 5、左上の表示は X、視点は V）。ブラウザのふつうの働きのまま。
+    // 文字の F（KeyF）は、同じ日から「その方を向く・選ぶのをやめる」（オーナーの指示）
     // 操縦中の Esc はブラウザがカーソルを戻すのに使う（ページには届かないことがある）。カーソルが出ているときの Esc だけ使う
     if (e.code === 'Escape') {
       if (!this.locked && performance.now() - this.unlockedAt > 300) {
@@ -346,6 +349,11 @@ export class FlightControls {
     }
     if (e.code === 'KeyR' && plain) {
       this.onToggleRadar();
+      return;
+    }
+    // F：その方を向く・選ぶのをやめる。レーダーを開いている間（ワープホールのカード）も使う
+    if (e.code === 'KeyF' && plain) {
+      this.onToggleFocus();
       return;
     }
     // X：左上の表示を出す・隠す（2026-11-21。それまでは F3）

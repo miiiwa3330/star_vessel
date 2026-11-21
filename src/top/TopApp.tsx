@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { beginLoading, hideLoading, rememberUfoLook } from '../loading-screen';
 import { currentAccount, ensureSession } from '../net/auth';
-import { shipApi } from '../net/ship-repository';
-import { defaultDesignFor, HULL_TYPES, SHIP_DESIGN_VERSION, type HullType } from '../world/ship-design';
+import { rememberCustomBlocks, shipApi, type SavedShip } from '../net/ship-repository';
+import { customKey, presetShape } from '../world/ship-presets';
+import { decodeBlocks, encodeBlocks, type Block } from '../world/ship-blocks';
+import { defaultHullFor, HULL_TYPES, isHullType, MAX_CUSTOM_SHIPS, SHIP_DESIGN_VERSION, type ShipChoice } from '../world/ship-design';
 import { hueFromId } from '../world/ship-schema';
 import type { AccountMode } from './AccountPanel';
 import type { AuthMode } from './AuthLinks';
@@ -12,7 +14,8 @@ import { playUrl } from './routes';
 import { attachSectionWheel } from './section-scroll';
 import { TitleScreen, type TitlePhase } from './TitleScreen';
 import { TopStage } from './top-stage';
-import { hullOfTarget, targetForIndex } from './ufo-carousel';
+import { ShipBuilder } from './ShipBuilder';
+import { indexOfTarget, slotsFor, targetForIndex, type UfoSlot } from './ufo-carousel';
 import { UfoPicker } from './UfoPicker';
 
 /**
@@ -21,8 +24,27 @@ import { UfoPicker } from './UfoPicker';
  *   select：「-START-」のあと。宇宙船を選ぶ（スクロールできない）
  *   auth：SIGN IN・SIGN UP のあとは月へ、ユーザー名のあとは火星へ、カメラが飛ぶ。着いたらアカウントの箱が開く
  *   return：箱を閉じたあと。カメラが地球へ戻る。着いたら title
+ *   build：船を選ぶ段階の「BUILD」のあと。宇宙船を作る画面（ShipBuilder）が画面いっぱいに開く。閉じると select
  */
-type Stage = 'title' | 'select' | 'auth' | 'return';
+type Stage = 'title' | 'select' | 'auth' | 'return' | 'build';
+
+/** 「BREAK」をもう一度押すのを待つ長さ（ms） */
+const BREAK_CONFIRM_MS = 3000;
+
+/** 列の中の、自分で作った船の番号 i の場所（最初から選べる船の後ろ） */
+const customSlotIndex = (i: number): number => HULL_TYPES.length + i;
+/** 列の中の、使う船の場所 */
+const slotIndexOf = (choice: ShipChoice): number => (isHullType(choice) ? HULL_TYPES.indexOf(choice) : customSlotIndex(choice));
+
+/** 形の名前（同じブロックの文字列は、いつも同じ名前。FNV-1a） */
+function textKey(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return `local:${(h >>> 0).toString(16)}:${text.length}`;
+}
 
 /** サーバーにつながらないときの、船の色（見た目のための仮の値） */
 const FALLBACK_HUE = 200;
@@ -63,7 +85,18 @@ export function TopApp() {
   const [error, setError] = useState<string | null>(null);
   /** 自分で船を選んだか（選んだあとに、保存してある船が読めても、選んだ船を上書きしないため） */
   const picked = useRef(false);
-  const savedHull = useRef<HullType | null>(null);
+  /** サーバーに保存してある船（読めるまでは null） */
+  const saved = useRef<SavedShip | null>(null);
+  /** 作る画面を開いたときの、作り直す船の番号（新しく作るときは null）と、その形 */
+  const [buildFrom, setBuildFrom] = useState<{ index: number | null; initial: readonly Block[] | null } | null>(null);
+  /** 自分で作った船（ブロックの文字列。customs の順） */
+  const [customs, setCustoms] = useState<string[]>([]);
+  const customsRef = useRef<string[]>([]);
+  const items = slotsFor(customs.length);
+  const itemsRef = useRef<UfoSlot[]>(items);
+  itemsRef.current = items;
+  /** 「BREAK」を 1 回押して、もう一度押すのを待っているか */
+  const [breakArmed, setBreakArmed] = useState(false);
   const offline = useRef(false);
   const loading = useRef<Promise<void> | null>(null);
 
@@ -72,6 +105,26 @@ export function TopApp() {
       picked.current = true;
       shared.target = next;
       setTargetState(next);
+      setBreakArmed(false);
+    },
+    [shared],
+  );
+
+  /** 自分で作った船の一覧を入れ替える（列の 3D も作り直す） */
+  const applyCustoms = useCallback(
+    (next: string[], ref: string | null, used: number | null) => {
+      customsRef.current = next;
+      setCustoms(next);
+      shared.customShapes = next.map((text, i) => {
+        const blocks = decodeBlocks(text) ?? [];
+        // 使っている船は、サーバーの印を名前にして覚えておく（世界の画面で、他の人と同じ形の名前になる）
+        if (i === used && ref) {
+          rememberCustomBlocks(ref, blocks);
+          return { key: customKey(ref), blocks };
+        }
+        return { key: textKey(text), blocks };
+      });
+      shared.customVersion++;
     },
     [shared],
   );
@@ -82,13 +135,17 @@ export function TopApp() {
       try {
         await ensureSession();
         const acc = await currentAccount();
-        const saved = await shipApi.get();
-        savedHull.current = saved?.hull ?? null;
+        const ship = await shipApi.get();
+        saved.current = ship;
         shared.hue = acc.kind === 'none' ? FALLBACK_HUE : hueFromId(acc.userId);
+        // 自分で作った船を、列のマイ UFO に入れる
+        const next = ship.design?.customs ?? [];
+        const use = ship.design?.use;
+        applyCustoms(next, ship.ref, typeof use === 'number' ? use : null);
         // 保存してある船があれば、それを選ぶ。なければ、アカウントから決まる船（世界の画面の最初の選択と同じ）
         if (!picked.current) {
-          const hull = saved?.hull ?? (acc.kind === 'none' ? HULL_TYPES[0] : defaultDesignFor(acc.userId).hull);
-          const next = targetForIndex(HULL_TYPES.indexOf(hull), shared.target);
+          const choice = use ?? (acc.kind === 'none' ? 'saucer' : defaultHullFor(acc.userId));
+          const next = targetForIndex(slotIndexOf(choice), shared.target, slotsFor(customsRef.current.length).length);
           shared.target = next;
           setTargetState(next);
         }
@@ -100,7 +157,15 @@ export function TopApp() {
     })();
     loading.current = work;
     return work;
-  }, [shared]);
+  }, [shared, applyCustoms]);
+
+  /** 作る画面を閉じたあと（戻るボタン・CANCEL・SAVE） */
+  const leaveBuild = useCallback(() => {
+    if (stageRef.current !== 'build') return;
+    shared.building = false;
+    setBuildFrom(null);
+    setStage('select');
+  }, [shared, setStage]);
 
   // ---- 段階の移り変わり ----
   const start = useCallback(() => {
@@ -132,10 +197,12 @@ export function TopApp() {
       } else if (!inSelect && stageRef.current === 'select') {
         setStage('title');
       }
+      // 作る画面で「戻る」：作る画面を閉じて、船を選ぶ段階へ
+      if (stageRef.current === 'build' && (history.state as { stage?: string } | null)?.stage !== 'build') leaveBuild();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [loadShip, setStage]);
+  }, [loadShip, setStage, leaveBuild]);
 
   // 船を選ぶ段階の間だけ、UFO を出す。それ以外（タイトルへ戻る・月へ飛ぶ）では、左へ消える
   useEffect(() => {
@@ -215,26 +282,113 @@ export function TopApp() {
     return { progress: Math.min(1, root.scrollTop / heroHeight), pastPx: Math.max(0, root.scrollTop - heroHeight) };
   }, []);
 
+  // ---- 宇宙船を作る画面 ----
+  /** 作る画面を開く。index：作り直す自分の船の番号（null なら新しく作る） */
+  const openBuilder = useCallback(
+    (index: number | null) => {
+    if (stageRef.current !== 'select' || goingRef.current) return;
+    if (index === null && customsRef.current.length >= MAX_CUSTOM_SHIPS) {
+      setError(`マイ UFO は ${MAX_CUSTOM_SHIPS} つまでです。BREAK で消してから作れます`);
+      return;
+    }
+    setBuildFrom({ index, initial: index === null ? null : (shared.customShapes[index]?.blocks ?? null) });
+    setError(null);
+    setStage('build');
+    shared.building = true;
+    history.pushState({ stage: 'build' }, '');
+    },
+    [shared, setStage],
+  );
+
+  const closeBuilder = useCallback(() => {
+    if ((history.state as { stage?: string } | null)?.stage === 'build') history.back();
+    else leaveBuild();
+  }, [leaveBuild]);
+
+  /** 作った船を保存して、その船を選んだ状態で閉じる（新しく作った船は、一覧の後ろに足す）。失敗したら例外（作る画面が理由を出す） */
+  const saveBuild = useCallback(
+    async (blocks: readonly Block[]) => {
+      await loading.current;
+      if (offline.current) throw new Error('サーバーにつながらない');
+      const next = [...customsRef.current];
+      const i = buildFrom?.index ?? next.length;
+      next[i] = encodeBlocks(blocks);
+      const ship = await shipApi.save({ v: SHIP_DESIGN_VERSION, use: i, customs: next });
+      saved.current = ship;
+      applyCustoms(ship.design?.customs ?? next, ship.ref, i);
+      chooseTarget(targetForIndex(customSlotIndex(i), shared.target, slotsFor(next.length).length));
+      closeBuilder();
+    },
+    [shared, buildFrom, applyCustoms, chooseTarget, closeBuilder],
+  );
+
+  /** 真ん中の自分の船を消す（最初から選べる船は消せない）。1 回目は確かめ、3 秒以内にもう一度押すと消す */
+  const breakSelected = useCallback(async () => {
+    if (stageRef.current !== 'select' || goingRef.current || shared.ufoBusy) return;
+    const slot = itemsRef.current[indexOfTarget(shared.target, itemsRef.current.length)];
+    if (slot?.kind !== 'custom') return;
+    if (!breakArmed) {
+      setBreakArmed(true);
+      return;
+    }
+    setBreakArmed(false);
+    try {
+      await loading.current;
+      if (offline.current) throw new Error('サーバーにつながらない');
+      const i = slot.index;
+      const next = customsRef.current.filter((_, k) => k !== i);
+      // 使っている船を消したらソーサーに、後ろの船を使っていたら番号を 1 つ詰める
+      const use = saved.current?.design?.use ?? 'saucer';
+      const nextUse: ShipChoice = typeof use === 'number' ? (use === i ? 'saucer' : use > i ? use - 1 : use) : use;
+      const ship = await shipApi.save({ v: SHIP_DESIGN_VERSION, use: nextUse, ...(next.length > 0 ? { customs: next } : {}) });
+      saved.current = ship;
+      applyCustoms(next, ship.ref, typeof nextUse === 'number' ? nextUse : null);
+      // 消した船の 1 つ前（1 つ目なら、最初から選べる船の最後）を選ぶ
+      const count = slotsFor(next.length).length;
+      const prev = customSlotIndex(i) - 1;
+      const t = targetForIndex(prev, shared.target, count);
+      shared.dragPos = null;
+      chooseTarget(t);
+      setError(null);
+    } catch (e) {
+      console.error(e);
+      setError('マイ UFO を消せませんでした。もう一度お試しください');
+    }
+  }, [shared, breakArmed, applyCustoms, chooseTarget]);
+
+  useEffect(() => {
+    if (!breakArmed) return;
+    const id = window.setTimeout(() => setBreakArmed(false), BREAK_CONFIRM_MS);
+    return () => clearTimeout(id);
+  }, [breakArmed]);
+
   // ---- 出発 ----
   const depart = useCallback(async () => {
     if (goingRef.current || stageRef.current !== 'select') return;
+    const slot = itemsRef.current[indexOfTarget(shared.target, itemsRef.current.length)];
+    // 「＋」で出発しようとしたら、新しく作る画面を開く
+    if (!slot || slot.kind === 'new') return openBuilder(null);
+    const choice: ShipChoice = slot.kind === 'preset' ? slot.hull : slot.index;
     goingRef.current = true;
     setGoing(true);
     setError(null);
     // ローディング画面を飛ぶ UFO は、選んだ船そのもの：いまの見た目で絵にして覚えておく（長くても 0.3 秒だけ待つ）
-    const pickedHull = hullOfTarget(shared.target);
+    const shape = slot.kind === 'custom' ? shared.customShapes[slot.index] : presetShape(slot.hull);
     const url = shared.snapshotUfo
-      ? await Promise.race([shared.snapshotUfo(pickedHull, shared.hue), new Promise<null>((r) => setTimeout(() => r(null), 300))])
+      ? await Promise.race([shared.snapshotUfo(shape), new Promise<null>((r) => setTimeout(() => r(null), 300))])
       : null;
-    if (url) rememberUfoLook(pickedHull, shared.hue, url);
+    if (url) rememberUfoLook(shape.key, shared.hue, url);
     // ローディング画面（ページが /play に変わっても、UFO は続きから。世界が動き出して、UFO が右の外へ消えたら切り替わる）
     beginLoading();
     try {
       await loading.current;
-      const hull = hullOfTarget(shared.target);
-      // 選んだ船が保存してあるものと違うときだけ保存する（選び直さなければ、世界の画面の最初の選択も出ない）。
+      // 選んだ船が保存してあるものと違うときだけ保存する（作った船のブロックは、ほかの船を選んでも残す）。
       // サーバーにつながらないときは保存せず、そのまま出発できる（世界の画面も、つながらないままで動く）
-      if (!offline.current && hull !== savedHull.current) await shipApi.save({ v: SHIP_DESIGN_VERSION, hull });
+      const current = saved.current?.design ?? null;
+      if (!offline.current && choice !== current?.use) {
+        const list = customsRef.current;
+        await shipApi.save({ v: SHIP_DESIGN_VERSION, use: choice, ...(list.length > 0 ? { customs: list } : {}) });
+      }
       location.assign(playUrl(location.search));
     } catch (e) {
       console.error(e);
@@ -243,7 +397,7 @@ export function TopApp() {
       goingRef.current = false;
       setGoing(false);
     }
-  }, [shared]);
+  }, [shared, openBuilder]);
 
   const step = useCallback(
     (delta: number) => {
@@ -253,7 +407,42 @@ export function TopApp() {
     [shared, chooseTarget],
   );
 
+  /** 船を押した：「＋」なら新しく作る、真ん中のマイ UFO なら作り直す、ほかは隣へ送る */
+  const activate = useCallback(
+    (offset: -1 | 0 | 1) => {
+      const list = itemsRef.current;
+      const slot = list[indexOfTarget(shared.target + offset, list.length)];
+      if (slot?.kind === 'new') return openBuilder(null);
+      if (offset === 0) {
+        if (slot?.kind === 'custom') openBuilder(slot.index);
+        return;
+      }
+      step(offset);
+    },
+    [shared, openBuilder, step],
+  );
+
   const phase: TitlePhase = stage === 'title' ? 'title' : stage === 'select' ? 'select' : 'away';
+  const centered = items[indexOfTarget(target, items.length)];
+  const canBreak = stage === 'select' && !going && centered?.kind === 'custom';
+  const picker = (
+    <>
+      <UfoPicker stage={shared} active={stage === 'select'} target={target} items={items} onTarget={chooseTarget} onActivate={activate} showNames={earth3d === 'none'} />
+      <div className={`top-build${stage === 'select' ? ' is-open' : ''}`}>
+        <button
+          type="button"
+          className={`top-button top-button-small top-break-button${breakArmed ? ' is-armed' : ''}`}
+          onClick={() => void breakSelected()}
+          disabled={!canBreak}
+          tabIndex={stage === 'select' ? 0 : -1}
+          title={centered?.kind === 'custom' ? 'このマイ UFO を消す' : '最初からある UFO は消せません'}
+        >
+          {breakArmed ? 'BREAK?' : 'BREAK'}
+        </button>
+        {breakArmed && <p className="top-break-hint">もう一度押すと、このマイ UFO を消します</p>}
+      </div>
+    </>
+  );
   return (
     <div ref={rootRef} tabIndex={-1} className={`top${stage === 'title' ? ' is-title' : ' is-locked'}`}>
       <Backdrop getScroll={getScroll} stage={shared} onEarth3d={setEarth3d} />
@@ -270,8 +459,9 @@ export function TopApp() {
         onSignedIn={(signedIn) => {
           shared.preloadMars = signedIn;
         }}
-        picker={<UfoPicker stage={shared} active={stage === 'select'} target={target} onTarget={chooseTarget} showNames={earth3d === 'none'} />}
+        picker={picker}
       />
+      {stage === 'build' && buildFrom && <ShipBuilder initial={buildFrom.initial} onSave={saveBuild} onCancel={closeBuilder} />}
       {(stage === 'auth' || stage === 'return') && <AuthBox open={boxOpen} initialMode={authMode} onDone={closeAuth} onClose={closeAuth} />}
     </div>
   );

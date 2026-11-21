@@ -6,7 +6,7 @@ import { linkStatements } from './account-link';
 /** 手元の D1 と同じ SQLite に、本物のテーブル（migrations/）を作って確かめる */
 function db(): DatabaseSync {
   const d = new DatabaseSync(':memory:');
-  for (const f of ['0002_warps.sql', '0003_ship_designs.sql', '0004_visits.sql']) d.exec(readFileSync(new URL(`../../migrations/${f}`, import.meta.url), 'utf8'));
+  for (const f of ['0002_warps.sql', '0003_ship_designs.sql', '0004_visits.sql', '0009_ship_blocks.sql']) d.exec(readFileSync(new URL(`../../migrations/${f}`, import.meta.url), 'utf8'));
   return d;
 }
 
@@ -31,7 +31,7 @@ describe('匿名のときの記録を、登録したアカウントへ移す', (
 
   it('宇宙船の設計は、登録した側がすでに決めていればそちらを残す', () => {
     const d = db();
-    const put = (u: string, hull: string) => d.prepare(`INSERT INTO ship_designs VALUES (?, ?, '2026-11-05')`).run(u, JSON.stringify({ v: 1, hull }));
+    const put = (u: string, hull: string) => d.prepare(`INSERT INTO ship_designs (user_id, design, updated_at) VALUES (?, ?, '2026-11-05')`).run(u, JSON.stringify({ v: 1, hull }));
     put('anon', 'bell');
     put('new', 'ring');
     link(d, 'anon', 'new');
@@ -43,7 +43,7 @@ describe('匿名のときの記録を、登録したアカウントへ移す', (
 
   it('宇宙船の設計は、登録した側が決めていなければ匿名のものを移す', () => {
     const d = db();
-    d.prepare(`INSERT INTO ship_designs VALUES ('anon', '{"v":1,"hull":"bell"}', '2026-11-05')`).run();
+    d.prepare(`INSERT INTO ship_designs (user_id, design, updated_at) VALUES ('anon', '{"v":1,"hull":"bell"}', '2026-11-05')`).run();
     link(d, 'anon', 'new');
     const rows = d.prepare('SELECT user_id FROM ship_designs').all() as { user_id: string }[];
     expect(rows).toEqual([{ user_id: 'new' }]);

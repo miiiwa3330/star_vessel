@@ -19,8 +19,8 @@ export function linkStatements(anonymousId: string, userId: string): SqlStatemen
   return [
     { sql: 'UPDATE warps SET owner_id = ? WHERE owner_id = ?', params: [userId, anonymousId] },
     {
-      sql: `INSERT INTO ship_designs (user_id, design, updated_at)
-            SELECT ?, design, updated_at FROM ship_designs WHERE user_id = ?
+      sql: `INSERT INTO ship_designs (user_id, design, blocks_ref, updated_at)
+            SELECT ?, design, blocks_ref, updated_at FROM ship_designs WHERE user_id = ?
             ON CONFLICT (user_id) DO NOTHING`,
       params: [userId, anonymousId],
     },
