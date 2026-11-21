@@ -4,10 +4,20 @@
  */
 import { reportServerTime } from '../world/clock';
 import type { ChatMessage, ServerMessage, ShipSnapshot, ShipState, StateMessage } from '../world/ship-schema';
-import { cleanChatText } from '../world/chat';
+import { cleanChatText, isStampText } from '../world/chat';
 import type { ShipLook } from '../world/ship-design';
 
 const MAX_RETRY_MS = 10_000;
+
+export interface ReceivedChat {
+  from: string;
+  hue: number;
+  name: string | null;
+  text: string;
+  to?: string;
+  toHue?: number;
+  toName?: string | null;
+}
 
 export class SpaceLink {
   /** 近くの船（最後に受け取ったもの） */
@@ -17,7 +27,7 @@ export class SpaceLink {
   /** 自分の船の短い ID（サーバーが決める。届いたチャットが自分のものか見分ける） */
   selfId: string | null = null;
   /** チャットが届いたとき（要件 F6）。main.ts が入れる */
-  onChat: (c: { from: string; hue: number; name: string | null; text: string }) => void = () => {};
+  onChat: (c: ReceivedChat) => void = () => {};
   private ws: WebSocket | null = null;
   private room: string | null = null;
   private retryMs = 1_000;
@@ -44,11 +54,12 @@ export class SpaceLink {
     this.ws?.send(JSON.stringify(msg));
   }
 
-  /** チャットを送る。届いたかどうかは、自分にも返ってくる chat で分かる。送れる形でなければ false */
-  sendChat(raw: string): boolean {
+  /** チャットを送る（to があるときは相手 UFO 宛てのスタンプ）。送れる形でなければ false */
+  sendChat(raw: string, to?: string): boolean {
     const text = cleanChatText(raw);
     if (!this.connected || text === null) return false;
-    const msg: ChatMessage = { t: 'chat', text };
+    if (to !== undefined && !isStampText(text)) return false;
+    const msg: ChatMessage = to ? { t: 'chat', text, to } : { t: 'chat', text };
     this.ws?.send(JSON.stringify(msg));
     return true;
   }
@@ -76,7 +87,14 @@ export class SpaceLink {
       } else if (m.t === 'chat') {
         const text = cleanChatText(m.text);
         if (text !== null && typeof m.from === 'string' && typeof m.hue === 'number') {
-          this.onChat({ from: m.from, hue: m.hue, name: typeof m.name === 'string' ? m.name : null, text });
+          const directed = typeof m.to === 'string' && typeof m.toHue === 'number';
+          this.onChat({
+            from: m.from,
+            hue: m.hue,
+            name: typeof m.name === 'string' ? m.name : null,
+            text,
+            ...(directed ? { to: m.to, toHue: m.toHue, toName: typeof m.toName === 'string' ? m.toName : null } : {}),
+          });
         }
       }
     };

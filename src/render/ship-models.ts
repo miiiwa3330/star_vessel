@@ -99,3 +99,5 @@ export function createShipModel(shape: ShipShape, selfLight = 0): ShipModel {
 
 /** 船の大きさ（km）。三人称のカメラの距離などに使う */
 export const shapeLengthKm = (shape: ShipShape): number => shipMeshFor(shape.key, shape.blocks).lengthM * M;
+/** 船の前後方向の大きさ（km。Z 軸の幅）。一人称カメラを UFO の前に置くのに使う */
+export const shapeDepthKm = (shape: ShipShape): number => shipMeshFor(shape.key, shape.blocks).sizeM.z * M;

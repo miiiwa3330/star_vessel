@@ -31,10 +31,11 @@ export interface ShipState {
   orientation: Quat;
 }
 
-/** ブラウザ → サーバー：チャットを送る（要件 F6）。text は cleanChatText で確かめる */
+/** ブラウザ → サーバー：チャットを送る（要件 F6）。text は cleanChatText で確かめる。to があれば相手 UFO 宛てのスタンプ */
 export interface ChatMessage {
   t: 'chat';
   text: string;
+  to?: string;
 }
 
 /**
@@ -52,6 +53,8 @@ export interface ShipSnapshot {
   id: string;
   /** 船の色（色相 0〜359）。アカウントごとに決まる */
   hue: number;
+  /** 宇宙船名（サインアップしていない人や、タイトル画面の背景の API では付けない） */
+  n?: string;
   s: ShipState;
   /** 船の見た目の印（送ってこない人は無し。受け取った側が決まった船で描く） */
   d?: ShipLook;
@@ -65,9 +68,10 @@ export type ServerMessage =
   | { t: 'ships'; now: number; ships: ShipSnapshot[] }
   /**
    * 近くの船（または自分）が送ったチャット。from は船の短い ID、hue は送った人の色、
-   * name は宇宙船名（サインアップしていない人は null）
+   * name は宇宙船名（サインアップしていない人は null）。
+   * to があるときは相手 UFO 宛てのスタンプ（toHue・toName は宛先の情報）
    */
-  | { t: 'chat'; now: number; from: string; hue: number; name: string | null; text: string };
+  | { t: 'chat'; now: number; from: string; hue: number; name: string | null; to?: string; toHue?: number; toName?: string | null; text: string };
 
 const finite = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
 const isVec = (v: unknown): v is Vec3 => {

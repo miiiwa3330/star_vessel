@@ -26,6 +26,8 @@ const SNAP_SECONDS = 1;
 export interface SmoothedShip {
   id: string;
   hue: number;
+  /** 宇宙船名（サインアップしていない人は null） */
+  name: string | null;
   design?: ShipLook;
   /** 太陽中心の位置（km・EQJ） */
   positionKm: Vec3;
@@ -83,6 +85,7 @@ export class ShipSmoother {
       out.push({
         id: snap.id,
         hue: snap.hue,
+        name: snap.n ?? null,
         design: snap.d,
         positionKm: add(positionAt(snap, date), t.errorKm),
         velocityKmS: snap.s.velocityKmS,

@@ -10,12 +10,13 @@ import { SpaceLink } from './net/space-link';
 import { createStarfield } from './render/starfield';
 import { SolarSystemView } from './render/solar-system-view';
 import { ChaseCamera } from './controls/chase-camera';
-import { customKey, presetShape, shapeLengthKm, type ShipShape } from './render/ship-models';
+import { customKey, presetShape, shapeDepthKm, shapeLengthKm, type ShipShape } from './render/ship-models';
 import { customBlocks, rememberCustomBlocks, shipApi } from './net/ship-repository';
 import { decodeBlocks } from './world/ship-blocks';
 import { lookOf, usedCustom, type ShipLook } from './world/ship-design';
 import { ChatBubbles } from './ui/chat-bubbles';
-import { CHAT_LOG_SIZE, CHAT_MIN_INTERVAL_MS } from './world/chat';
+import { ShipStampRing, type ShipScreenTarget } from './ui/ship-stamp-ring';
+import { CHAT_LOG_SIZE, CHAT_MIN_INTERVAL_MS, shouldLeaveChatFocus } from './world/chat';
 import { AsteroidField, type AsteroidFile } from './render/asteroid-field';
 import { REQUIRED_TEXTURES, TEXTURE_FILES } from './render/body-looks';
 import { WarpView } from './render/warp-view';
@@ -32,7 +33,7 @@ import { keepOutsideBodies } from './world/collision';
 import { absolutePositionKm, moveBy, reanchor, startObserver } from './world/observer';
 import { radarLayerOfBody, radarBlips, radarRange, type RadarTarget } from './world/radar';
 import { SHIP_SEND_HZ } from './world/ship-schema';
-import { ShipSmoother } from './world/ship-smoothing';
+import { ShipSmoother, type SmoothedShip } from './world/ship-smoothing';
 import { allBodies, bodyFixedToEqj, bodyInfo, findBody, majorGmKm3s2, registerBodies, unregisterBodies, type BodyInfo, heliocentricPositionKm, setBodyResolver } from './world/solar-system';
 import { decodeExoplanets } from './world/exoplanet-data';
 import { largeAsteroidBodies, moonBodies, smallAsteroidBody, type LargeAsteroid, type MoonRecord } from './world/small-bodies';
@@ -311,23 +312,47 @@ async function main() {
   const link = new SpaceLink();
   const shipSmoother = new ShipSmoother();
 
-  // チャット（要件 F6）。届いたら、送った人の船の上に吹き出しを出し、画面の左下の履歴にも残す
+  // チャット（要件 F6）。届いたら、送った人の船の上に吹き出し・スタンプを出し、画面の左下の履歴にも残す
   const bubbles = new ChatBubbles(document.getElementById('ui')!);
+  const stampRing = new ShipStampRing(document.getElementById('ui')!);
   let chatKey = 0;
-  link.onChat = ({ from, hue, name, text }) => {
+  link.onChat = ({ from, hue, name, text, to, toHue, toName }) => {
     const mine = from === link.selfId;
+    const focus = hudStore.get().chatFocus;
+    if (to) {
+      bubbles.showGift(to === link.selfId ? SELF_BUBBLE : to, text, performance.now());
+      if (!mine && to !== link.selfId) return;
+      if (focus) {
+        if (focus.id === from && name && !focus.name) hudStore.set({ chatFocus: { ...focus, name } });
+        else if (focus.id === to && toName && !focus.name) hudStore.set({ chatFocus: { ...focus, name: toName } });
+      }
+      const entry = {
+        key: ++chatKey,
+        from,
+        to,
+        prefix: mine ? ('To' as const) : ('From' as const),
+        hue: mine ? (toHue ?? hue) : hue,
+        name: mine ? (toName ?? null) : name,
+        text,
+        mine,
+        at: Date.now(),
+      };
+      hudStore.set({ chatLog: [entry, ...hudStore.get().chatLog].slice(0, CHAT_LOG_SIZE) });
+      return;
+    }
     bubbles.show(mine ? SELF_BUBBLE : from, text, hue, performance.now());
-    const log = [{ key: ++chatKey, hue, name, text, mine, at: Date.now() }, ...hudStore.get().chatLog].slice(0, CHAT_LOG_SIZE);
+    if (focus && focus.id === from && name && !focus.name) hudStore.set({ chatFocus: { ...focus, name } });
+    const log = [{ key: ++chatKey, from, hue, name, text, mine, at: Date.now() }, ...hudStore.get().chatLog].slice(0, CHAT_LOG_SIZE);
     hudStore.set({ chatLog: log });
   };
   let chatSentAt = -Infinity;
-  hudActions.sendChat = (text) => {
+  hudActions.sendChat = (text, to) => {
     // サーバーは間隔の短いものを黙って捨てるので、先にここで知らせる（スタンプを続けて押したときなど）
     if (performance.now() - chatSentAt < CHAT_MIN_INTERVAL_MS) {
       showNotice('少し待ってから送ってください');
       return false;
     }
-    if (link.sendChat(text)) {
+    if (link.sendChat(text, to)) {
       chatSentAt = performance.now();
       return true;
     }
@@ -388,12 +413,62 @@ async function main() {
     face: (rel) => controls.lookAt(rel, controls.up()),
     starName: (system) => starNameJa(starInfo.get(system)),
   });
-  // クリック・タップ：天体があればそれを選ぶ。無ければ、線を出しているときは、その先の星座を選ぶ（絵を重ねて、コレクションに入れる。2026-11-13）
+  // クリック・タップ：他の船があればその相手との会話だけに絞る。無ければ天体、さらに無ければ星座を選ぶ
   let lastObserverPc = { x: 0, y: 0, z: 0 };
+  let lastOthers: SmoothedShip[] = [];
+  let lastAbsKm: Vec3 = { x: 0, y: 0, z: 0 };
   const tapDirection = new THREE.Vector3();
+  const camLocal = new THREE.Vector3();
+  const invCamQ = new THREE.Quaternion();
+  const pickOtherShip = (x: number, y: number, w: number, h: number): SmoothedShip | null => {
+    if (lastOthers.length === 0) return null;
+    camera.updateMatrixWorld();
+    invCamQ.copy(camera.quaternion).invert();
+    const pxPerRad = h / 2 / Math.tan((FOV * Math.PI) / 360);
+    let best: SmoothedShip | null = null;
+    let bestD = Infinity;
+    for (const o of lastOthers) {
+      const rel = sub(o.positionKm, lastAbsKm);
+      const camRel = sub(rel, camera.position);
+      camLocal.set(camRel.x, camRel.y, camRel.z).applyQuaternion(invCamQ);
+      if (camLocal.z >= 0) continue;
+      projected.set(rel.x, rel.y, rel.z).project(camera);
+      const sx = ((projected.x + 1) / 2) * w;
+      const sy = ((1 - projected.y) / 2) * h;
+      const shipRadiusKm = (shipView.lengthKmOf(o.id) ?? shapeLengthKm(shipView.shapeOf(o.design, o.id))) / 2;
+      const radiusPx = (shipRadiusKm / Math.max(length(camRel), 1e-9)) * pxPerRad;
+      const d = Math.hypot(sx - x, sy - y) - radiusPx;
+      if (d < Math.max(36 - radiusPx, 0) + 1e-9 && d < bestD) {
+        bestD = d;
+        best = o;
+      }
+    }
+    return best;
+  };
   controls.onTap = (x, y) => {
+    const hit = stampRing.pick(x, y);
+    if (hit) {
+      if (hudActions.sendChat(hit.stamp, hit.shipId)) stampRing.pulse(hit.index);
+      return;
+    }
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const picked = pickOtherShip(x, y, w, h);
+    if (picked) {
+      const cur = hudStore.get().chatFocus;
+      if (cur?.id === picked.id) {
+        hudStore.set({ chatFocus: null });
+        showNotice('全員の会話に戻しました');
+      } else {
+        const name = picked.name ?? hudStore.get().chatLog.find((l) => l.from === picked.id && l.name)?.name ?? null;
+        const clickedDistanceKm = length(sub(picked.positionKm, lastAbsKm));
+        hudStore.set({
+          chatFocus: { id: picked.id, hue: picked.hue, name, since: Date.now(), clickedDistanceKm },
+        });
+        showNotice(`${name ?? 'ゲスト'} の会話だけを表示します`);
+      }
+      return;
+    }
     if (info.tap(x, y, w, h)) return;
     tapDirection.set((x / w) * 2 - 1, 1 - (y / h) * 2, 0.5).unproject(camera).sub(camera.position).normalize();
     const c = constellationView.pick(lastObserverPc, { x: tapDirection.x, y: tapDirection.y, z: tapDirection.z });
@@ -792,7 +867,7 @@ async function main() {
   if (import.meta.env.DEV) {
     const devTools = {
       /** 動きの滑らかさを測るための入口（描いている物を直接読む） */
-      debug: { shipView, cometField, satelliteField, solar, asteroids, starScene, chase, controls },
+      debug: { shipView, cometField, satelliteField, solar, asteroids, starScene, chase, controls, camera, stampRing },
       /** 太陽中心の EQJ（pc）の場所へ行き、lookAtPc の方を向く */
       teleportPc(p: { x: number; y: number; z: number }, lookAtPc = { x: 0, y: 0, z: 0 }) {
         observer = reanchor({ anchor: 'Sun', offsetKm: { x: p.x * KM_PER_PC, y: p.y * KM_PER_PC, z: p.z * KM_PER_PC } }, worldNow());
@@ -924,23 +999,63 @@ async function main() {
       }
     }
     const others = shipSmoother.update(link.ships, date, dt);
+    lastOthers = others;
+    lastAbsKm = abs;
+    {
+      const focus = hudStore.get().chatFocus;
+      if (focus) {
+        const target = others.find((o) => o.id === focus.id);
+        const distKm = target ? length(sub(target.positionKm, abs)) : null;
+        if (shouldLeaveChatFocus(distKm, focus.clickedDistanceKm)) {
+          hudStore.set({ chatFocus: null });
+          showNotice(`${focus.name ?? 'ゲスト'} から離れたため、全員の会話に戻しました`);
+        } else if (target?.name && !focus.name) {
+          hudStore.set({ chatFocus: { ...focus, name: target.name } });
+        }
+      }
+    }
     shipView.update(others, abs, dt);
 
     const ownLengthKm = shapeLengthKm(myShape);
-    chase.pose(controls.orientation, ownLengthKm, camera.position, camera.quaternion);
+    const ownDepthKm = shapeDepthKm(myShape);
+    chase.pose(controls.orientation, ownLengthKm, camera.position, camera.quaternion, ownDepthKm);
     const q = controls.orientation;
     shipView.setOwn(chase.mode !== 'first', myShape, { x: q.x, y: q.y, z: q.z, w: q.w }, velocityKmS, controls.speedKmS, dt);
     starCamera.quaternion.copy(camera.quaternion);
 
-    // チャットの吹き出しを、船の少し上に置く。自分の船は、一人称のときは画面の下の方に出す
+    // 相手の UFO に照準を合わせたときのスタンプリングと、吹き出し・スタンプの配置（一人称では自分のものを隠す）
     camera.updateMatrixWorld();
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const pxPerRad = h / 2 / Math.tan((FOV * Math.PI) / 360);
+    invCamQ.copy(camera.quaternion).invert();
+    const screenShips: ShipScreenTarget[] = [];
+    const screenById = new Map<string, ShipScreenTarget>();
+    for (const o of others) {
+      const rel = sub(o.positionKm, abs);
+      const camRel = sub(rel, camera.position);
+      camLocal.set(camRel.x, camRel.y, camRel.z).applyQuaternion(invCamQ);
+      if (camLocal.z >= 0) continue;
+      projected.set(rel.x, rel.y, rel.z).project(camera);
+      if (projected.z > 1 || Math.abs(projected.x) > 1.2 || Math.abs(projected.y) > 1.2) continue;
+      const sx = ((projected.x + 1) / 2) * w;
+      const sy = ((1 - projected.y) / 2) * h;
+      const shipRadiusKm = (shipView.lengthKmOf(o.id) ?? shapeLengthKm(shipView.shapeOf(o.design, o.id))) / 2;
+      const radiusPx = (shipRadiusKm / Math.max(length(camRel), 1e-9)) * pxPerRad;
+      const t = { id: o.id, sx, sy, radiusPx };
+      screenShips.push(t);
+      screenById.set(o.id, t);
+    }
+    const hud = hudStore.get();
+    const ringEnabled = hud.overlay === null && !hud.photoMode && hud.chatReady && (!controls.usesPointerLock || hud.locked);
+    stampRing.update(ringEnabled, w / 2, h / 2, w, h, screenShips);
+
+    const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     bubbles.update(nowMs, (id) => {
       let rel: { x: number; y: number; z: number };
       let size: number;
       if (id === SELF_BUBBLE) {
-        if (chase.mode === 'first') return { x: w / 2, y: h * 0.72 };
+        if (chase.mode === 'first') return null;
         rel = { x: 0, y: 0, z: 0 };
         size = ownLengthKm;
       } else {
@@ -950,9 +1065,23 @@ async function main() {
         size = shipView.lengthKmOf(o.id) ?? shapeLengthKm(shipView.shapeOf(o.design, o.id));
       }
       const up = new THREE.Vector3(0, size * 0.8, 0).applyQuaternion(camera.quaternion);
-      projected.set(rel.x + up.x, rel.y + up.y, rel.z + up.z).project(camera);
+      const wx = rel.x + up.x;
+      const wy = rel.y + up.y;
+      const wz = rel.z + up.z;
+      if ((wx - camera.position.x) * camForward.x + (wy - camera.position.y) * camForward.y + (wz - camera.position.z) * camForward.z <= 0) return null;
+      projected.set(wx, wy, wz).project(camera);
       if (projected.z > 1 || Math.abs(projected.x) > 1.2 || Math.abs(projected.y) > 1.2) return null;
-      return { x: ((projected.x + 1) / 2) * w, y: ((1 - projected.y) / 2) * h };
+      const x = ((projected.x + 1) / 2) * w;
+      const y = ((1 - projected.y) / 2) * h;
+      if (id === SELF_BUBBLE) {
+        projected.set(rel.x, rel.y, rel.z).project(camera);
+        const cx = ((projected.x + 1) / 2) * w;
+        const cy = ((1 - projected.y) / 2) * h;
+        const radiusPx = ((size / 2) / Math.max(camera.position.length(), 1e-9)) * pxPerRad;
+        return { x, y, cx, cy, radiusPx };
+      }
+      const s = screenById.get(id);
+      return s ? { x, y, cx: s.sx, cy: s.sy, radiusPx: s.radiusPx } : { x, y };
     });
     starCamera.position.set(abs.x / KM_PER_PC, abs.y / KM_PER_PC, abs.z / KM_PER_PC);
     galaxy.update({ x: abs.x / KM_PER_PC, y: abs.y / KM_PER_PC, z: abs.z / KM_PER_PC });

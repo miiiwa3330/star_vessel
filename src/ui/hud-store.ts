@@ -56,6 +56,12 @@ export interface Photo {
 /** チャットの履歴の 1 行（要件 F6） */
 export interface ChatLogItem {
   key: number;
+  /** 送った船の短い ID */
+  from: string;
+  /** 宛先の船の短い ID（相手 UFO 宛てのスタンプのとき） */
+  to?: string;
+  /** 表示の前置き（相手宛てのスタンプ：受け取りは From、送信は To） */
+  prefix?: 'From' | 'To';
   hue: number;
   /** 宇宙船名（サインアップしていない人は null） */
   name: string | null;
@@ -63,6 +69,17 @@ export interface ChatLogItem {
   mine: boolean;
   /** 受け取った時刻（Date.now()。ふだんの表示で、しばらくたった行を消すため） */
   at: number;
+}
+
+/** 相手の UFO をクリックしてチャット欄をその相手だけに絞っている状態 */
+export interface ChatFocus {
+  id: string;
+  hue: number;
+  name: string | null;
+  /** クリックして絞り込みを始めた時刻（Date.now()） */
+  since: number;
+  /** クリックしたときの距離（km）。離れたかを測る基準 */
+  clickedDistanceKm: number;
 }
 
 export interface WarpListItem {
@@ -113,6 +130,8 @@ export interface HudState {
   chatReady: boolean;
   /** チャットの履歴（新しい順） */
   chatLog: ChatLogItem[];
+  /** クリックして会話を絞っている相手の UFO（絞っていなければ null） */
+  chatFocus: ChatFocus | null;
   /** いる場所の目印（星団の中なら、その名前。英語） */
   region: string | null;
   /** 中にいる星雲・銀河の名前（英語） */
@@ -179,6 +198,7 @@ let state: HudState = {
   orbitDrag: false,
   chatReady: false,
   chatLog: [],
+  chatFocus: null,
   region: null,
   deepRegion: null,
   fromEarthKm: { x: 0, y: 0, z: 0 },
@@ -281,8 +301,12 @@ export const hudActions = {
   cycleStarLimit: (): void => {},
   /** 星座の線を出す・消す（要件 F40） */
   toggleConstellations: (): void => {},
-  /** チャットを送る（要件 F6）。送れたら true */
-  sendChat: (_text: string): boolean => false,
+  /** チャットを送る（to があるときは相手 UFO 宛てのスタンプ。要件 F6）。送れたら true */
+  sendChat: (_text: string, _to?: string): boolean => false,
+  /** 相手の UFO をクリックして絞ったチャットの表示を解除する */
+  clearChatFocus: (): void => {
+    hudStore.set({ chatFocus: null });
+  },
   /** 天体を選ぶ（null で選ぶのをやめる。要件 F35） */
   selectTarget: (_key: string | null): void => {},
   /** 選んだ天体の方を向く */

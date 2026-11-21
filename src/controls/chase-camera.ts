@@ -1,7 +1,7 @@
 /**
  * 一人称と三人称の視点（要件 F28。2026-11-10 に、マインクラフトの F5 と同じ 3 つにした。要件 F60）。
  *
- * - 一人称（first）：カメラは船の位置・向きそのもの
+ * - 一人称（first。2026-11-22）：カメラは UFO の前端の少し前（−Z）に置き、船と同じ向きを見る
  * - 後ろから（third。最初の視点。2026-11-13）：カメラは船の後ろの上から、**船と同じ向き**を見る。
  *   船は画面の真ん中より下に映り、照準（画面の真ん中）は船の上あたりに来る（FPS の三人称と同じ）。
  *   照準の向きは船の前と同じなので、照準の先へまっすぐ進む。回り込み（船のまわりを回る角度）と距離を変えられる
@@ -20,6 +20,8 @@ const ORDER: readonly ViewMode[] = ['first', 'third', 'front'];
  * （縦の視野 60 度なら、真ん中と下の端のあいだの半分より少し下）。見た目のための値
  */
 export const HEIGHT_RATIO = 0.26;
+/** 一人称のカメラを UFO の前端からどれだけ前に置くか（km。2 m。near クリップ面 1 m より前） */
+export const FIRST_PERSON_MARGIN_KM = 0.002;
 /** 船の長さの何倍だけ後ろへ下がるか（初め・最小・最大）。2026-11-13 に、初めを 3 から 4.5 にした（もう少し遠目から） */
 const DISTANCE = { initial: 4.5, min: 1.5, max: 40 };
 const ORBIT_RAD_PER_PX = 0.006;
@@ -60,12 +62,12 @@ export class ChaseCamera {
   }
 
   /**
-   * カメラの位置（船からの相対・km）と向き。ship は船の向き、shipLengthKm は船の長さ
+   * カメラの位置（船からの相対・km）と向き。ship は船の向き、shipLengthKm は船の長さ、shipDepthKm は前後の大きさ
    */
-  pose(ship: Quaternion, shipLengthKm: number, outPosition: Vector3, outQuaternion: Quaternion): void {
+  pose(ship: Quaternion, shipLengthKm: number, outPosition: Vector3, outQuaternion: Quaternion, shipDepthKm = shipLengthKm): void {
     if (this.mode === 'first') {
-      outPosition.set(0, 0, 0);
       outQuaternion.copy(ship);
+      outPosition.set(0, 0, -(shipDepthKm / 2 + FIRST_PERSON_MARGIN_KM)).applyQuaternion(ship);
       return;
     }
     const d = shipLengthKm * this.distanceFactor;

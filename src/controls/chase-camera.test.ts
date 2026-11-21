@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Quaternion, Vector3 } from 'three/webgpu';
-import { ChaseCamera, HEIGHT_RATIO } from './chase-camera';
+import { ChaseCamera, FIRST_PERSON_MARGIN_KM, HEIGHT_RATIO } from './chase-camera';
 
 describe('三人称のカメラ', () => {
   const ship = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2); // 船の前（−Z）が −X を向く
@@ -11,12 +11,18 @@ describe('三人称のカメラ', () => {
     expect(new ChaseCamera().mode).toBe('third');
   });
 
-  it('一人称ではカメラは船そのもの', () => {
+  it('一人称ではカメラは UFO の前端の前にいて、船と同じ向きを見る', () => {
     const c = new ChaseCamera();
     c.mode = 'first';
+    const front = new Vector3(0, 0, -1).applyQuaternion(ship);
     c.pose(ship, 0.04, pos, q);
-    expect(pos.length()).toBe(0);
+    expect(pos.dot(front)).toBeCloseTo(0.04 / 2 + FIRST_PERSON_MARGIN_KM, 9);
+    expect(pos.length()).toBeCloseTo(0.04 / 2 + FIRST_PERSON_MARGIN_KM, 9);
     expect(q.angleTo(ship)).toBeCloseTo(0, 9);
+
+    c.pose(ship, 0.04, pos, q, 0.02);
+    expect(pos.dot(front)).toBeCloseTo(0.02 / 2 + FIRST_PERSON_MARGIN_KM, 9);
+    expect(pos.length()).toBeCloseTo(0.02 / 2 + FIRST_PERSON_MARGIN_KM, 9);
   });
 
   it('三人称では船の後ろの上にいて、船と同じ向きを見る（照準は船の上あたり）', () => {

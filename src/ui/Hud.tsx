@@ -10,6 +10,7 @@ import { Radar } from './Radar';
 import { RadarPanel } from './RadarPanel';
 import { PhotoView } from './PhotoView';
 import { MAX_WARPS_PER_PLAYER } from '../world/warp-schema';
+import { filterChatLog } from '../world/chat';
 import { ChatBox } from './ChatBox';
 import { InfoCard, WarpCard } from './InfoCard';
 import { CollectionPanel } from './CollectionPanel';
@@ -29,6 +30,7 @@ export function Hud() {
   const wide = o === 'map' || o === 'collection';
   const myWarps = s.warps.filter((w) => w.mine).length;
   const selectedWarp = o === 'radar' && s.selectedWarp ? (s.warps.find((w) => w.id === s.selectedWarp) ?? null) : null;
+  const visibleChatLog = filterChatLog(s.chatLog, s.chatFocus);
   // 写真の構え（5・F2）：画面の表示をすべて消して、シャッターの線だけを出す（2026-11-13）
   if (s.photoMode) {
     return (
@@ -95,7 +97,7 @@ export function Hud() {
         </div>
       )}
       {o === 'radar' && <RadarPanel blips={s.radar} rangeKm={s.radarRangeKm} layers={s.radarLayers} selectedKey={s.selectedKey} selectedWarp={s.selectedWarp} withCard={selectedWarp !== null || s.infoCard !== null} />}
-      <ChatBox ready={s.chatReady} log={s.chatLog} open={o === 'chat'} underPanel={o === 'radar' || o === 'photo' || wide} collapsed={!s.chatOpen} />
+      <ChatBox ready={s.chatReady} log={s.chatLog} focus={s.chatFocus} open={o === 'chat'} underPanel={o === 'radar' || o === 'photo' || wide} collapsed={!s.chatOpen} />
       {o === 'map' && <StarMap points={s.mapPoints} selfKm={s.mapSelfKm} focusKey={s.mapFocus} />}
       {o === 'collection' && <CollectionPanel visits={s.visits} />}
       {o === 'photo' && s.photo && <PhotoView photo={s.photo} />}
@@ -212,9 +214,9 @@ export function Hud() {
           <MapIcon />
         </button>
         {/* スマホ：チャットは開閉式。このボタンで開く・閉じる（PC はいつも左下に出している） */}
-        <ChatToggle open={s.chatOpen} log={s.chatLog} />
+        <ChatToggle open={s.chatOpen} log={visibleChatLog} />
         {/* スマホ：アイコンは「＋」にまとめる。いちばん下の「＋」で開き、「−」で閉じる（2026-11-21） */}
-        <ItemsToggle open={s.itemsOpen} chatOpen={s.chatOpen} log={s.chatLog} />
+        <ItemsToggle open={s.itemsOpen} chatOpen={s.chatOpen} log={visibleChatLog} />
       </div>
 
       {/* スマホの操縦：下の真ん中のバーチャルパッドと、右の速さのバー。画面を開いている間は隠す */}
