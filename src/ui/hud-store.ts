@@ -174,8 +174,8 @@ let state: HudState = {
   overlay: null,
   pointerLock: false,
   locked: false,
-  // スマホは、左上の情報を最初は隠して「＊」だけにする（2026-11-21。オーナーの指示）。PC は出しておく（F3 で切り替え）
-  statusVisible: !(typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px), (pointer: coarse)').matches),
+  // 左上の情報は、最初は隠して「＊」だけにする（2026-11-21。オーナーの指示。PC・スマホとも）。X キー・「＊」・情報を押すと切り替え
+  statusVisible: false,
   orbitDrag: false,
   chatReady: false,
   chatLog: [],
@@ -263,9 +263,10 @@ export const hudActions = {
   toggleView: (): void => {},
   /**
    * 画面を開く・閉じる（null で閉じて操縦に戻る）。PC では、開くとカーソルを出し、閉じるとカーソルを消す
-   * （カーソルを消すのは、押したときの処理の中でしかできないので、クリック・キーの処理の中で呼ぶ）。main.ts が中身を入れる
+   * （カーソルを消すのは、押したときの処理の中でしかできないので、クリック・キーの処理の中で呼ぶ）。main.ts が中身を入れる。
+   * opts.lock が false なら、閉じてもカーソルは消さない（Esc で閉じるとき。ブラウザは Esc では操縦に戻らせてくれないので、クリックを待つ）
    */
-  setOverlay: (overlay: Overlay): void => {
+  setOverlay: (overlay: Overlay, _opts?: { lock?: boolean }): void => {
     hudStore.set({ overlay });
   },
   /** 同じ画面が開いていれば閉じ、そうでなければ開く */
@@ -287,6 +288,10 @@ export const hudActions = {
   /** 選んだ天体の方を向く */
   faceTarget: (): void => {},
   /** 左上の表示（座標など）を出す・消す（F3 キー） */
+  /** ゲームメニューの「タイトルへ」（ローディング画面をはさんで、タイトル画面へ）。main.ts が中身を入れる */
+  goTitle: (): void => {
+    window.location.assign('/');
+  },
   /** スマホの「＋」：アイコンを出す・しまう */
   toggleItems: (): void => {
     hudStore.set({ itemsOpen: !hudStore.get().itemsOpen });

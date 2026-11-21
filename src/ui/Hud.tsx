@@ -50,14 +50,14 @@ export function Hud() {
           </button>
         </header>
         {/* 左上の表示は英語（2026-11-12 にオーナーの指示） */}
-        {/* スマホ：左上の表示はタップで隠し、代わりに「＊」を置く。「＊」をタップすると、また出す（2026-11-21） */}
+        {/* 左上の表示は、最初は隠して「＊」だけ。「＊」・X キーで出し、表示を押す・X キーで隠す（2026-11-21。PC・スマホとも） */}
         {!s.statusVisible && !wide && (
-          <button type="button" className="hud-status-toggle hud-touch-only" aria-label="左上の情報を出す" onClick={() => hudActions.toggleStatus()}>
+          <button type="button" className="hud-status-toggle" aria-label="左上の情報を出す（X）" title="左上の情報を出す（X）" onClick={() => hudActions.toggleStatus()}>
             ＊
           </button>
         )}
         {s.statusVisible && !wide && (
-          <div className="hud-status" lang="en" onClick={() => touchOnly && hudActions.toggleStatus()}>
+          <div className="hud-status" lang="en" title="押すと隠す（X）" onClick={() => hudActions.toggleStatus()}>
             <div>UTC {utc}</div>
             <div>
               {formatDistanceEn(s.altitudeKm)} above {s.anchorName}
@@ -228,9 +228,6 @@ export function Hud() {
     </>
   );
 }
-
-/** 指で操作する端末か（スマホ。左上の表示をタップで隠すのは、スマホだけ） */
-const touchOnly = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
 /** 閉じている間に、新しい発言が届いたか（チャットのボタンと「＋」の点に使う） */
 function useUnread(open: boolean, log: readonly { key: number }[]): boolean {

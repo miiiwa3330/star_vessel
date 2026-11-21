@@ -9,7 +9,7 @@
  *     W の 2 回押しか Ctrl でダッシュ、Q/E で傾き、ホイールか +/− で速さ（Ctrl か Shift を押しながら +/− で 10 倍ずつ・
  *     Ctrl＋ホイールで 10 倍ずつ）、クリックで照準の先の天体を選ぶ
  * スマホ：1 本指のドラッグで向きを変える。左下の十字のボタンで前後左右、右下のボタンで上昇・下降（前のボタンの 2 回押しでダッシュ）
- * 視点（src/controls/chase-camera.ts）：F5 か V キーで、一人称 → 後ろから → 前から と切り替える。三人称では、右ボタンを押しながら
+ * 視点（src/controls/chase-camera.ts）：V キーで、後ろから → 前から → 一人称 と切り替える（F5 は 2026-11-21 から使わない）。三人称では、右ボタンを押しながら
  *     マウスを動かすと船のまわりを回り、Alt＋ホイールで距離を変える。スマホは画面のボタンで切り替え、「カメラを回す」のときは
  *     1 本指のドラッグで回る
  */
@@ -52,10 +52,10 @@ export class FlightControls {
   onOrbit: (dxPx: number, dyPx: number) => boolean = () => false;
   /** カメラの距離を変える（Alt＋ホイール） */
   onZoom: (steps: number) => void = () => {};
-  /** 視点を切り替える（F5・V キー） */
+  /** 視点を切り替える（V キー） */
   onToggleView: () => void = () => {};
   onToggleConstellations: () => void = () => {};
-  /** 左上の表示（座標など）を出す・消す（F3 キー） */
+  /** 左上の表示（座標など）を出す・消す（X キー） */
   onToggleStatus: () => void = () => {};
   /** チャットの入力欄を開く（Enter・T キー） */
   onOpenChat: () => void = () => {};
@@ -65,7 +65,7 @@ export class FlightControls {
   onToggleMap: () => void = () => {};
   /** 下のボタン（ホットバー）を押す（1〜6 キー。マインクラフトと同じく数字で選ぶ） */
   onHotbar: (n: number) => void = () => {};
-  /** F2：写真を撮る構えに入る・やめる（マインクラフトと同じキー） */
+  /** 写真を撮る構えに入る・やめる（2026-11-21 まで F2。いまは使っていない。5 キーは onHotbar） */
   onPhoto: () => void = () => {};
   /** Enter を、チャットより先に受け取る（写真の構えの間のシャッター）。受け取ったら true。main.ts が入れる */
   onEnter: () => boolean = () => false;
@@ -329,16 +329,7 @@ export class FlightControls {
   private onKeyDown = (e: KeyboardEvent) => {
     // 文字を入れている間（チャットの入力欄）は、キーを操縦に使わない
     if (isTyping(e.target)) return;
-    if (e.code === 'F2') {
-      e.preventDefault();
-      if (!e.repeat) this.onPhoto();
-      return;
-    }
-    if (e.code === 'F3') {
-      e.preventDefault(); // ブラウザの検索を出さない
-      if (!e.repeat) this.onToggleStatus();
-      return;
-    }
+    // F キー（F1〜F12）は、2026-11-21 から何にも使わない（オーナーの指示。写真は 5、左上の表示は X、視点は V）。ブラウザのふつうの働きのまま
     // 操縦中の Esc はブラウザがカーソルを戻すのに使う（ページには届かないことがある）。カーソルが出ているときの Esc だけ使う
     if (e.code === 'Escape') {
       if (!this.locked && performance.now() - this.unlockedAt > 300) {
@@ -355,6 +346,11 @@ export class FlightControls {
     }
     if (e.code === 'KeyR' && plain) {
       this.onToggleRadar();
+      return;
+    }
+    // X：左上の表示を出す・隠す（2026-11-21。それまでは F3）
+    if (e.code === 'KeyX' && plain) {
+      this.onToggleStatus();
       return;
     }
     const digit = /^(?:Digit|Numpad)([1-6])$/.exec(e.code);
@@ -383,11 +379,8 @@ export class FlightControls {
       e.preventDefault(); // Space でページが動かないように
     }
     // 操縦中は、Ctrl＋キー（ブックマーク・保存など）をブラウザに渡さない（Ctrl＋W などブラウザが譲らないものは、閉じる前に確かめる）
-    if (this.locked && (e.ctrlKey || e.code === 'F5')) e.preventDefault();
-    if (e.code === 'F5') {
-      e.preventDefault(); // 読み込み直さない
-      if (!e.repeat) this.onToggleView();
-    } else if (SPEED_UP_CODES.has(e.code)) this.changeSpeed(1, e.ctrlKey);
+    if (this.locked && e.ctrlKey) e.preventDefault();
+    if (SPEED_UP_CODES.has(e.code)) this.changeSpeed(1, e.ctrlKey);
     else if (SPEED_DOWN_CODES.has(e.code)) this.changeSpeed(-1, e.ctrlKey);
     else if (e.code === 'KeyV' && !e.repeat) this.onToggleView();
     else if (e.code === 'KeyC' && !e.repeat && !e.ctrlKey) this.onToggleConstellations();

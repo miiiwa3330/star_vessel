@@ -898,6 +898,29 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
   .hud-collection-lead { font-size: 13px; }
 }
 
+/* 左上の情報：押すと隠す。隠している間は「＊」を置き、押すとまた出す（X キーでも。2026-11-21。PC・スマホとも） */
+.hud-left .hud-status { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hud-status-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px 0 0 -8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #5eff72;
+  font-family: 'DotGothic16', ui-monospace, monospace;
+  font-size: 24px;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 0 6px rgba(2, 4, 10, 0.9);
+}
+
+
 /* スマホだけの部品（.hud-icon-button の inline-flex が .hud-touch-only より強いので、ここで PC では消す） */
 .hud-chat-toggle, .hud-items-toggle { display: none; }
 /* 左上のタイトル：押すとゲームメニュー（2026-11-21）。見た目は前のまま */
@@ -911,28 +934,6 @@ body.is-photo-mode .chat-bubbles, body.is-photo-mode .target-ring, body.is-photo
  * チャットは開閉式。写真の構えは、シャッターが下の真ん中、やめる × が右下のかぎの内側。上の方の規則を、ここで上書きする
  */
 @media (max-width: 720px), (pointer: coarse) {
-  /* 左上の情報：タップで隠す。隠している間は「＊」を置き、タップでまた出す */
-  .hud-left .hud-status { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .hud-status-toggle.hud-touch-only {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    margin: -6px 0 0 -8px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: #5eff72;
-    font-family: 'DotGothic16', ui-monospace, monospace;
-    font-size: 24px;
-    line-height: 1;
-    pointer-events: auto;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    text-shadow: 0 0 6px rgba(2, 4, 10, 0.9);
-  }
-
   /* 左の列：1〜6 とチャット。下から縦に並べる */
   .hud-hotbar {
     left: calc(12px + env(safe-area-inset-left));
